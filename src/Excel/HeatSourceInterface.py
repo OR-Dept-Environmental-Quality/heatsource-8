@@ -4,6 +4,7 @@ from Utils.Time import TimeUtil
 from StreamNode import StreamNode
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
+from Utils.IniParams import IniParams
 from numpy import arange
 import math
 
@@ -14,20 +15,25 @@ class HeatSourceInterface(DataSheet):
             raise Warning("Need a model filename!")
         DataSheet.__init__(self, filename)
         self.StreamNodeList = ()
+        self.IniParams = IP = IniParams.getInstance()
+
+        # Grab the initialization parameters from the Excel file.
+        # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
+        self.SetSheet("TTools Data")
+        IP.Name = self.GetValue("I2")
+        IP.Date = self.GetValue("I3")
+        IP.DT = self.GetValue("I4")
+        IP.Dx = self.GetValue("I5")
+        IP.Length = self.GetValue("I6")
+        IP.LongSample = self.GetValue("I7")
+        IP.TransSample = self.GetValue("I8")
+        IP.InflowSites = self.GetValue("I9")
+        IP.ContSites = self.GetValue("I10")
+        IP.FlushDays = self.GetValue("I11")
+        IP.TimeZone = self.GetValue("I12")
+        IP.SimPeriod = self.GetValue("I13")
 
         self.Time = TimeUtil()
-        self.info = {"Name": "I2",
-                     "Date": "I3",
-                     "dT": "I4",
-                     "dx": "I5",
-                     "Length": "I6",
-                     "LongRate": "I7",
-                     "TransRate": "I8",
-                     "InflowSites": "I9",
-                     "ContinuousSites": "I10",
-                     "Flush": "I11",
-                     "TimeZone": "I12",
-                     "Period": "I13"}
         self.pages = ("TTools Data", "Land Cover Codes", "Morphology Data", "Flow Data",
                       "Continuous Data", "Chart-Diel Temp","Validation Data", "Chart-TIR",
                       "Chart-Shade","Output - Hydraulics","Chart-Heat Flux","Chart-Long Temp",
@@ -36,8 +42,6 @@ class HeatSourceInterface(DataSheet):
                       "Output - Evaporation","Output - Convection","Output - Conduction",
                       "Output - Total Heat","Output - Evaporation Rate", "Output - Daily Heat Flux")
 
-    def GetFromMenu(self,value):
-        return self.GetValue(self.info[value])
     def BasicInputs(self,Flag_HS=0):
         if len(self.StreamNodeList) = 0:
             raise Exception("StreamNodes must be built before this method is functional")
@@ -49,12 +53,12 @@ class HeatSourceInterface(DataSheet):
         Flag_EvapLoss = self.GetValue("IV1","Land Cover Codes")
         Flag_Muskingum = self.GetValue("IS1","Land Cover Codes")
         Flag_Emergent = self.GetValue("IV5","Land Cover Codes")
-        dt = self.GetFromMenu("dT") * 60 #Time Step (sec)
-        dx = self.GetFromMenu("dx") #Distance step (meters)
+        dt = self.IniParams.DT * 60 #Time step to seconds
+        dx = self.IniParams.Dx
         #TODO: Need to deal with these flags
-        if Flag_HS == 1 or Flag_HS == 2: Dx_lc = self.GetFromMenu("TransRate")  #LC distance sampling
-        LongSampleRate = self.GetFromMenu("LongRate")  #Distance step (meters)
-        if Flag_HS != 2: Days = self.GetValue("I13")
+        if Flag_HS == 1 or Flag_HS == 2: Dx_lc = self.IniParams.TranSample
+        LongSampleRate = self.IniParams.LongSample
+        if Flag_HS != 2: Days = self.IniParams.SimPeriod
         else: Days = 1
         Hours = int(Days * 24) #Sim Period (Hours)
         self.Q_BC = []
@@ -73,7 +77,7 @@ class HeatSourceInterface(DataSheet):
                 self.T_BC.append(t_val)
                 self.Cloudiness.append(self.GetValue((17 + I, 10),"Continuous Data"))
         #I = 0 # TODO: necessary?
-        StreamLength = self.GetFromMenu("Length") #Model distance
+        StreamLength = self.IniParams.Length
         self.Nodes = round(1 + (StreamLength / (dx / 1000)))  #Model distance nodes
         #=======================================================
         #Get Inflow and continuous data inputs
@@ -142,18 +146,20 @@ class HeatSourceInterface(DataSheet):
                         val == "" or \
                         self.Num_Q_Var <= 0:
                         raise Exception("Invalid data: row %i, cell %s: '%s' ... Flow router terminated" %(theRow, self.excelize(theCol),val))
+
     def BuildStreamNodes(self):
         """Create list of StreamNodes from the spreadsheet"""
         # This function is copied from the VB code, but it is somewhat pointless if the
         # program is built in a proper OOP framework, because most of these variables would
         # in objects
         # TODO: Building a stream node might need to be cleaned up a bit.
-        for i in range(4): # self.Num_Q_Var):
+        for i in range(self.Num_Q_Var):
             node = StreamNode()
             self.sheet = 'Morphology Data'
             node.RiverKM = self[i + 17, 4]
             node.Slope = self[i + 17, 6]
             node.N = self[i + 17, 7]
+            node.WD = self[i + 17, 9]
             node.Width_BF = self[i + 17, 10]
             node.Width_B = self[i + 17, 11]
             node.Depth_BF = self[i + 17, 12]
@@ -183,6 +189,18 @@ class HeatSourceInterface(DataSheet):
             node.VHeight = self[i + 17, 159]
             node.VDensity = self[i + 17, 160]
             node.Elevation = self[i + 17, 7]
+
+            #The original VB code has this method BFMorph, which calculates some things and
+            # spits them back to the spreadsheet. We want to keep everything in the node, but
+            # we'll spit these four things back to the spreadsheet for now, until we understand
+            # better what the purpose was
+            self.sheet = "Morphology Data"
+            node.BFMorph()
+            self.SetValue((i + 17, 11),node.BottomWidth)
+            self.SetValue((i + 17, 12),node.MaxDepth)
+            self.SetValue((i + 17, 13),node.AveDepth)
+            self.SetValue((i + 17, 14),node.BFXArea)
+            ##############################################################
 
             dir = [] # List to save the seven directions
             for Direction in xrange(1,8):
@@ -451,55 +469,35 @@ class HeatSourceInterface(DataSheet):
             node.theVelocity[0] = 0
             node.Q[0] = 0
             node.Celerity = 0
-    def SetupSheets2(self,Node, Count_Q_Var):
-        #TODO: Implement this ("Isn't there a better way?" He asked God.)
-#        '======================================================
-#        'Record Values
-#        Sheet15.Cells(Node + 17, 2).Value = Sheet1.Cells(Count_Q_Var + 17, 2).Value  'Location Info.
-#        Sheet15.Cells(Node + 17, 3).Value = Sheet1.Cells(Count_Q_Var + 17, 3).Value  'HS Node
-#        Sheet15.Cells(Node + 17, 4).Value = Sheet1.Cells(Count_Q_Var + 17, 4).Value  'Long Distance
-#        Sheet15.Cells(Node + 17, 5).Value = Round(theDistance, 3)             'Stream KM
-#        Sheet20.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet20.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet20.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet20.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet21.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet21.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet21.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet21.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet22.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet22.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet22.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet22.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet23.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet23.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet23.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet23.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet24.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet24.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet24.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet24.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet25.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet25.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet25.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet25.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet26.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet26.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet26.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet26.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet27.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet27.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet27.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet27.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet28.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet28.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet28.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet28.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet18.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet18.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet18.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet18.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
-#        Sheet19.Cells(Node + 17, 2).Value = Sheet15.Cells(Node + 17, 2).Value
-#        Sheet19.Cells(Node + 17, 3).Value = Sheet15.Cells(Node + 17, 3).Value
-#        Sheet19.Cells(Node + 17, 4).Value = Sheet15.Cells(Node + 17, 4).Value
-#        Sheet19.Cells(Node + 17, 5).Value = Sheet15.Cells(Node + 17, 5).Value
+
+    def SetupSheets1(self):
+        for page in ("Solar Potential","Solar Surface","Solar Received","Longwave",\
+              "Evaporation","Convection","Total Heat","Conduction","Evaporation Rate",\
+              "Temperature","Hydraulics","Daily Heat Flux"):
+            name = "Output - %s" % page
+            self.Clear("F16:IV16",name)
+            self.Clear("17:50000",name)
+        self.Clear("A13:D10000", "Chart-TIR")
+        self.Clear("A13:c10000", "Chart-Shade")
+        self.Clear("17:50000", "Chart-Diel Temp")
+        self.Clear("13:50000", "Chart-Heat Flux")
+        self.Clear("13:50000","Chart-Shade")
+        self.Clear("13:50000", "Chart-Solar Flux")
+
+    def SetupSheets2(self,Node, Count_Q_Var, theDistance):
+        """Set the values for a particular node and distance.
+
+        "There must be a better way... right?" He asked God."""
+        self.SetSheet("Morphology Data")
+        val = {}
+        val[2] = self[Count_Q_Var + 17, 2] # Location Info
+        val[3] = self[Count_Q_Var + 17, 3] # HS Node
+        val[4] = self[Count_Q_Var + 17, 4] # Long Distance
+        val[5] = round(theDistance, 3)     # Stream km
+
+        for page in ("Solar Potential","Solar Surface","Solar Received","Longwave",\
+              "Evaporation","Convection","Total Heat","Conduction","Evaporation Rate",\
+              "Temperature","Daily Heat Flux", "Hydraulics"):
+            name = "Output - %s" % page
+            for i in val.keys():
+                self.SetValue((Node+17,i),val[i],sheet=name)

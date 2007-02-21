@@ -1,12 +1,16 @@
 from __future__ import division
+from Utils.IniParams import IniParams
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
     def __init__(self, **kwargs):
+        self.IniParams = IniParams.getInstance()
 
-        #Set up some variables that define the stream node. Technically, these needn't be defined
-        # here beacuse we can assign attributes on the fly, but we place them here to document them
-        #TODO: Re-evaluate the OOP-ness of this class.
+        # In the original VB code, there were all these attributes (e.g. Slope) with averages
+        # calculated and called 'the' something (e.g. theSlope). We retain that system here
+        # initially. We have attributes in the list below, then build more attributes with
+        # a 'the' prefix. The main difference is that we have our Zonator class instance
+        # in self.Zone and self.theZone. The averages are in theZone.
 
         # These are variables that have some sort of average calculated in the original
         # VB code subroutine called SubLoadModelVariables
@@ -15,39 +19,40 @@ class StreamNode(object):
                  'Topo_S','Topo_E','Latitude','Longitude','FLIR_Temp','FLIR_Time',
                  'Q_Out','Q_Control','D_Control','T_Control','VHeight','VDensity',
                  'Q_Accretion','T_Accretion','Elevation']
+
         # These are attributes not used in the averages calculations
         # TODO: Variables that come from the menu (i.e. same for all nodes) should be in a singleton class.
-        other_attrs = ['BFWidth','WD','dx','Dx_lc',] #TODO: Get the transfer sample rate input here from the menu
+        other_attrs = ['BFWidth','WD'] #TODO: Get the transfer sample rate input here from the menu
+
         l = map(the_attrs,lambda x: 'the'+x) # return theATTR for all ATTR in the_attrs
+
         attrs = the_attrs + other_attrs + l # All attributes
 
-        for attr in attrs: # Set all the attributes to zero, or set from the constructor
+        # Set all the attributes to zero, or set from the constructor
+        for attr in attrs:
             x = kwargs[attr] if attr in kwargs.keys() else 0
             setattr(self,attr,x)
 
-        # Zone get's set differently
         self.Zone = None # This gets built elsewhere
+
         # theZone should be set to zeroed values
         dir = [] # List to save the seven directions
         for Direction in xrange(1,8):
             z = () #Tuple to store the zones 0-4
             for Zone in xrange(0,5):
-                if Zone == 0:
-                    #TODO: See what this storage of elevation is used for, because it is also used above.
-                    z += VegZone(), #Overhang and Elevation
-                    continue #No need to do any more for 0th zone
                 z += VegZone(),
             dir.append(z) # append to the proper direction
         self.theZone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
 
-        if self.dx and self.WD: self.CheckDx()
-
+        self.dx = self.IniParams.Dx
+        if self.dx and self.WD: self.checkDx()
 
     def __repr__(self):
         if self.RiverKM:
             return '%s @ %.3f km' % (self.__class__.__name__, self.RiverKM)
         else: return self.__class__.__name__
-    def CheckDx(self):
+
+    def checkDx(self):
         # bottom depth cannot be zero, which will happen if the equation:
         # BFWidth - (2 * dx * depth) <= 0
         # Substituting BFWidth/WD for depth and solving for dx or depth tells us that
@@ -61,15 +66,36 @@ class StreamNode(object):
         """Calculate cross-sectional channel morphology
 
         Assumes a trapazoidal channel and calculates the average depth, cross-sectional area
-        and bottom width"""
+        and bottom width. The original VB code contained a couple of questionable loops
+        These loops basically recalculated until the calculated cross-sectional area
+        equalled the bankfull cross-sectional area. The outcome of this was that the area
+        of the trapazoidal stream cross-section was calculated as a rectangle where the
+        long edge was the bankfull width and the short edge was the average depth. This is
+        larger than the true trapazoidinal shape. It didn't seem that this new, too large,
+        cross-sectional area was actually used in the program, but it was spit out to the
+        spreadsheet, so it's calculated here.
+        """
         # Estimate depth of the trapazoid from the width/depth ratio
         self.AveDepth = self.BFWidth/self.WD
         # Calculated the bottom of the channel by subtracting the differences between
         # Top and bottom of the trapazoid
         self.BottomWidth = self.BFWidth - (2 * self.AveDepth * self.dx)
         # Calculate the area of this newly estimated trapazoid
-        # TODO: implement if needed:
-        #self.BFXArea = (self.BottomWidth + (self.dx * self.AveDepth)) * self.AveDepth
+        self.BFXArea = (self.BottomWidth + (self.dx * self.AveDepth)) * self.AveDepth
+        # NOTE: What follows is a strange calculation of the max depth, that was taken from
+        # the original VB code. It basically increases depth until the area equals the
+        # area of the bankfull rectangle (see the note in the docstring). This is not
+        # an accurate representation of the maximum bankfull depth, but is included for
+        # legacy reasons.
+        BW = self.BottomWidth
+        D_Est = self.AveDepth
+        XArea = BW / self.WD
+        # Here, we add to depth until the area equals the bankfull area.
+        while True:
+            Delta = (XArea - (BW + self.Z * D_Est) * D_Est)
+            if Delta < 0.0001: break
+            D_Est += 0.01
+        self.MaxDepth = D_Est
 
     def ViewtoSky(self, Flag_HS):
         if Flag_HS == 1 or Flag_HS == 2:
