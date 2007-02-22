@@ -30,7 +30,7 @@ class TestExcelDocument(TestCase):
         self.doc.SetValue("a1:z100",rng)
         self.assertEqual(self.doc.GetValue("c3",'Sheet1'),2.0)
         self.assertEqual(self.doc.GetValue((4,3),'Sheet1'),3.0)
-        l = [[0.0, 1.0, 2.0, 3.0, 4.0], [0.0, 1.0, 2.0, 3.0, 4.0], [0.0, 1.0, 2.0, 3.0, 4.0]]
+        l = ((0.0, 1.0, 2.0, 3.0, 4.0), (0.0, 1.0, 2.0, 3.0, 4.0), (0.0, 1.0, 2.0, 3.0, 4.0))
         self.assertEqual(self.doc.GetValue("A2:e4",'Sheet1'), l)
         # In the infinite Micro$oft wisdom, Excel uses column first
         # when accessing as 'A1' but it uses row first when accessing as

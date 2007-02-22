@@ -20,60 +20,84 @@ class DataSheet(ExcelDocument):
     def __makeSlice(self, arg):
         if isinstance(arg,int): return slice(None,arg,None)
         elif isinstance(arg, slice): return arg
-        elif isinstance(arg, list) or isinistance(arg,tuple):
+        elif isinstance(arg, list) or isinstance(arg,tuple):
             start = arg[0]
             stop = arg[1]
             step = arg[2] if len(arg) > 2 else None
             return slice(start,stop,step)
     def __getitem__(self,arg):
         col = slice(None,None,None)
-        temp_sheet = None
+        sheet = self.sheet
         try:
             if len(arg) > 1: # We have a tuple or list
                 row = self.__makeSlice(arg[0])
                 col = self.__makeSlice(arg[1])
                 if len(arg) >2: # we have a temporary sheet
-                    temp_sheet = self.sheet
-                    self.SetSheet(arg) # Error catching in the method
+                    sheet = arg[2]
             else:
                 row = self.__makeSlice(arg) # the slice can only be a row if there's only one element.
-        except TypeError: # The slice() object has no __len__ attribute, so the if len(arg) will fail if it's a slice
+        except TypeError: # The slice() object has no __len__ attribute, so the 'if len(arg)' will fail if it's a slice
             if isinstance(arg,slice):
                 row = self.__makeSlice(arg)
             else: raise
 
-        range1 = range2 = None
-        # A few cases. We need to clean this syntax up.
-        # First case, we have a rectangular range
-        if row.start and col.start: range1 = self.excelize(col.start) + `row.start`
-        if row.stop and col.stop: range2 = self.excelize(col.stop) + `row.stop`
-        value = None
-        if range1 and range2:
-            try:
-                value = self.GetValue("%s:%s"%(range1,range2))
-            except: raise
-        # Second case, we have a single number
-        elif range2:
-            try:
-                value = self.GetValue(range2)
-            except: raise
-        # We don't have ranges, so we were only given a row to return.
-        else:
-            value = [] # make a list of rows
-            cstart = self.excelize(0)
-            cstop = self.excelize(255)
-            for i in xrange(row.start, row.stop+1):
-                # So we get the entire row and filter it removing blanks and putting them in a list
-                # Appending that list to value. So value here is a list of lists.
-                # Get the entire row- 256 columns is Excel's max, so we get it all, just in case.
-                r = [i for i in self.GetValue("%s%i:%s%i" % (cstart, i, cstop, i))]
-                r.reverse() # Reverse so we can remove all the Null items
-                r = [i for i in dropwhile(lambda x: x==None, r)] # Remove all the empty (None) items
-                r.reverse() # Reverse back to original
-                value.append(tuple(r)) # Append this list
-            value = value[0] if len(value) == 1 else value
-        if temp_sheet: self.SetSheet(temp_sheet) #Clear the sheet value
-        return value
+        blank = slice(None,None,None)
+        cstart, cstop = 0,255 # Default Excel column bounds
+        rstart, rstop = 1,65536 # Default row bounds
+
+        if (row and row != blank) and (col and col != blank): # we have values for both rows and columns
+            # They should both have stop values, but we test anyway to make sure there's no funkiness
+            if not row.stop: raise Exception("Row needs a stopping point")
+            if not col.stop: raise Exception("Column needs a stopping point")
+            #Then we make sure that both row and column have a starting point, which can be None coming in.
+            # Here, we set it to the stopping point if it's None.
+            rstart = row.start if row.start else row.stop
+            rstop = row.stop
+            cstart = col.start if col.start else col.stop
+            cstop = col.stop
+        elif not col or col == blank: # We want a full row or rows
+            if not row or row == blank: raise Exception("Must choose row(s) and/or column(s) to get data")
+            rstart = row.start if row.start else row.stop
+            rstop = row.stop
+        elif not row or row == blank: # We want a full column or columns,
+            if not col or col == blank: raise Exception("Must choose row(s) and/or column(s) to get data")
+            cstart = col.start if col.start else col.stop
+            cstop = col.stop
+        else: raise Exception("Logical error in %s" % self.__class__.__name__)
+
+        # Now we have start and stop points for both rows and columns, so we just get the range
+        range1 = self.excelize(cstart) + `rstart`
+        range2 = self.excelize(cstop) + `rstop`
+        value = self.GetValue("%s:%s"%(range1,range2),sheet=sheet)
+
+        # If we are not a tuple of data from a range
+        if not isinstance(value,tuple):
+            return value
+        # Otherwise, build a list for processing
+        else: value = [i for i in value]
+
+        # Having gotten the range, we may have overshot our available data. For instance, we may have
+        # Chosen rows 1-5 when only 1-3 have data, or similar with columns. The resulting forms are:
+        # For rows:
+        # ( (0, 0, 0, None, None), (0, 0, 0, None, None), (0, 0, 0, None, None), ... )
+
+        # For columns:
+        # ( (0, 0), (0, 0), (0, 0), (None, None), (None, None), (None, None), ... )
+
+        # What we want to do is cycle through the value matrix and remove all None values that are
+        # at the END of a row or column (None values in the middle are important to keep)
+
+        for i in xrange(len(value)):
+            row = [j for j in value[i]]
+            row.reverse()
+            row = [k for k in dropwhile(lambda x:x==None, row)] # Drop all the null values at the end.
+            row.reverse()
+            value[i] = row
+        value.reverse()
+        value = [tuple(i) for i in dropwhile(lambda x: len(x) == 0, value)] # Drop the empty lists
+        value.reverse()
+
+        return tuple(value) # Keep everything as a tuple of tuples, as GetValue returns.
 
     def ClearCalcData(self):
         if len(self.calcDataRange) == 0: return

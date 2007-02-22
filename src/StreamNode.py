@@ -1,5 +1,7 @@
 from __future__ import division
 from Utils.IniParams import IniParams
+from Utils.VegZone import VegZone
+from Utils.Zonator import Zonator
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
@@ -21,10 +23,9 @@ class StreamNode(object):
                  'Q_Accretion','T_Accretion','Elevation']
 
         # These are attributes not used in the averages calculations
-        # TODO: Variables that come from the menu (i.e. same for all nodes) should be in a singleton class.
-        other_attrs = ['BFWidth','WD'] #TODO: Get the transfer sample rate input here from the menu
+        other_attrs = ['BFWidth','WD']
 
-        l = map(the_attrs,lambda x: 'the'+x) # return theATTR for all ATTR in the_attrs
+        l = map(lambda x: 'the'+x,the_attrs) # return theATTR for all ATTR in the_attrs
 
         attrs = the_attrs + other_attrs + l # All attributes
 
@@ -62,7 +63,7 @@ class StreamNode(object):
             raise Warning("Reach has no bottom width! Recalculating Channel angle.")
             self.dx = 0.99 * (self.WD/2)
 
-    def BFMorph():
+    def BFMorph(self):
         """Calculate cross-sectional channel morphology
 
         Assumes a trapazoidal channel and calculates the average depth, cross-sectional area

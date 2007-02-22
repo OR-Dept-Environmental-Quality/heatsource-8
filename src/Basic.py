@@ -1,5 +1,85 @@
+from __future__ import division
+from Excel.HeatSourceInterface import HeatSourceInterface
 """Junker test class to make sure things are running and test out options"""
 
 # This is a transliterated version of the subroutine called theModel in the
 # original VB code
 
+# For now, we work directly from the HeatSourceInterface class.
+HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
+# TODO: Implement cross-platform path capabilities
+
+# The original code calls a subroutine called BFMorph which calculates the
+# Bottomwidth, max depth, etc. We no longer do that separately but calculate
+# it when the StreamNode is built because it is StreamNode specific. It is
+# Now calculated in HeatSourceInterface.BuildStreamNodes()
+
+# The original version clears a bunch of data in different ways. With a live
+# link between internal data and interface, this would be unnecessary...
+# Way to go, Micro$oft.
+# TODO: Perhaps we should query the user here to see if they want to clear
+# all of the data.
+HS.SetupSheets1()
+
+# The next sub basically counts the number of streamnodes. This is a pretty
+# meaningless function, because with the StreamNode class, we build a list
+# of them in the HeatSourceInterface, so we should be able to work around this
+# and then just call len(HS.StreamNodeList) on the rare occasions when it is
+# actually necessary. However, since much of the later un-reworked code needs
+# it still, we will do it for now. This comes before BasicInputs here because
+# we want to build the StreamNodes before the BasicInputs subroutine
+HS.UpdateQVarCounter()
+
+# This routine checks for the validity of input. This is a fairly stupid way
+# to do this, rather than creating input validators for the spreadsheet itself.
+# We should consider just making it impossible to enter a string into a numeric
+# cell, rather than allowing it and then checking every single cell to make sure
+# that it didn't happen
+HS.CheckMorphologySheet()
+
+# This was called something like RedimVariables1 in the original code. The
+# purpose was to set all the variables to zero and then fill the various arrays
+# with data from the spreadsheet. Rather, here we decide to just use the
+# spreadsheet to generate StreamNode instances and add them to the main container.
+HS.BuildStreamNodes()
+
+# The next sub originally set the meridian and the timezone based on what the user
+# inputs. Rather than set the timezone as a separate variable, we are using
+# a Datetime class for time, which has timezone builtin. I have not yet
+# found where meridian is used, when I do, I will implement it if it's needed.
+
+# This subroutine does some more setting up, much of which should just be done
+# in the constructor of the HS instance, or within the StreamNode, or in a much
+# more elegant place than here. It's kept here for now to reduce uncertainty
+# between this and the VB code's differences.
+HS.BasicInputs()
+
+# the next routine was RedimVariables number 2, and is completely pointless in
+# Python, since we have dynamically sized containers and the StreamNode class.
+
+# Next, a bunch of global variables were set. These globals are really bad form
+# and should be removed since they are not really 'global' in the python sense
+# anyway.
+theDistance = HS.IniParams.Length # Bad form, IniParams should be local, but it's temporary
+Node = 0
+Count_Q_Var = 0
+Count_Q_In = 0
+Flag_DryChannel = 0
+Flag_ChannelWidth = 0
+Flag_BC = 1
+Flag_StoptheModel = 0
+Counter_Atmospheric_Data = 1
+
+# If the needles in your eyes weren't enough, now things REALLY start getting painful!
+# This loop cycles over the model distance timesteps and calls the two functions
+# for each model timestep.
+# We have GOT to find a better way to accomplish this
+while theDistance >= 0:
+    HS.LoadModelVariables()
+    Call SubViewtoSky(Flag_HS)
+    If Flag_HS <> 2 Then Call SubInitialConditions(Flag_HS)
+    Call SetupSheets2
+    theDistance = theDistance - (dx / 1000)
+    Node = Node + 1
+    Flag_BC = 0
+Loop

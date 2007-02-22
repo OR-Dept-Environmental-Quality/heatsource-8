@@ -43,11 +43,11 @@ class HeatSourceInterface(DataSheet):
                       "Output - Total Heat","Output - Evaporation Rate", "Output - Daily Heat Flux")
 
     def BasicInputs(self,Flag_HS=0):
-        if len(self.StreamNodeList) = 0:
+        if len(self.StreamNodeList) == 0:
             raise Exception("StreamNodes must be built before this method is functional")
         # TODO: This is the original subroutine to get the input data. We should make it OOP!
         #=======================================================
-        StartDate = self.Time.MakeDatetime(self.GetFromMenu("Date"))
+        StartDate = self.IniParams.Date
         # I don't understand where these values are stored, so I've left it exactly as
         # it was in the original VB code.
         Flag_EvapLoss = self.GetValue("IV1","Land Cover Codes")
@@ -76,8 +76,6 @@ class HeatSourceInterface(DataSheet):
                 if t_val == 0: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
                 self.T_BC.append(t_val)
                 self.Cloudiness.append(self.GetValue((17 + I, 10),"Continuous Data"))
-        #I = 0 # TODO: necessary?
-        StreamLength = self.IniParams.Length
         self.Nodes = round(1 + (StreamLength / (dx / 1000)))  #Model distance nodes
         #=======================================================
         #Get Inflow and continuous data inputs
@@ -117,19 +115,13 @@ class HeatSourceInterface(DataSheet):
         else: raise Exception("Stupid Flag_HS is broken")
 
     def UpdateQVarCounter(self):
-        ## This is kind of a stupid method. We should know from somewhere else how
-        # many datapoints there are.
-        #TODO: Fix this
-        #=======================================================
-        #Calc Number of Flow, Morphology and Land Cover Inputs
-        Num_Q_Var = -1
-        self.SetSheet("TTools Data")
-        val = self[Num_Q_Var + 18,5]
-        while val:
-            Num_Q_Var += 1 # Iterate
-            val = self[Num_Q_Var + 18,5]
-            if val == "": val = None
-        self.Num_Q_Var = Num_Q_Var
+        """Calculate the number of stream node inputs"""
+        # The former subroutine in VB did this by getting each row's value
+        # and incrementing a counter if the value was not blank. With the
+        # new DataSheet's __getitem__ functionality, we can merely access
+        # the sheet once, and return the length of that tuple
+        row = self[:,5]
+        self.Num_Q_Var = len(row[16:])
 
     def CheckMorphologySheet(self):
         #=======================================================
@@ -153,6 +145,7 @@ class HeatSourceInterface(DataSheet):
         # program is built in a proper OOP framework, because most of these variables would
         # in objects
         # TODO: Building a stream node might need to be cleaned up a bit.
+        self.StreamNodeList = ()
         for i in range(self.Num_Q_Var):
             node = StreamNode()
             self.sheet = 'Morphology Data'
@@ -190,18 +183,6 @@ class HeatSourceInterface(DataSheet):
             node.VDensity = self[i + 17, 160]
             node.Elevation = self[i + 17, 7]
 
-            #The original VB code has this method BFMorph, which calculates some things and
-            # spits them back to the spreadsheet. We want to keep everything in the node, but
-            # we'll spit these four things back to the spreadsheet for now, until we understand
-            # better what the purpose was
-            self.sheet = "Morphology Data"
-            node.BFMorph()
-            self.SetValue((i + 17, 11),node.BottomWidth)
-            self.SetValue((i + 17, 12),node.MaxDepth)
-            self.SetValue((i + 17, 13),node.AveDepth)
-            self.SetValue((i + 17, 14),node.BFXArea)
-            ##############################################################
-
             dir = [] # List to save the seven directions
             for Direction in xrange(1,8):
                 z = () #Tuple to store the zones 0-4
@@ -218,7 +199,20 @@ class HeatSourceInterface(DataSheet):
                 dir.append(z) # append to the proper direction
             node.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
 
-        self.StreamNodeList += node, # Now add this node to the stream node list
+            #############################################################
+            #The original VB code has this method BFMorph, which calculates some things and
+            # spits them back to the spreadsheet. We want to keep everything in the node, but
+            # we'll spit these four things back to the spreadsheet for now, until we understand
+            # better what the purpose was
+            node.BFMorph()
+            self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
+            self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
+            self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
+            self.SetValue((i + 17, 14),node.BFXArea, sheet="Morphology Data")
+            ##############################################################
+
+            self.StreamNodeList += node, # Now add this node to the stream node list
+
 
     def LoadModelVariables(self,Node,theDistance,Count_Q_Var,Flag_HS):
         """Load model variables (see notes)"""
@@ -359,7 +353,7 @@ class HeatSourceInterface(DataSheet):
         node = self.StreamNodeList[Node]
         if Flag_BC: # TODO: What the hell is Flag_BC?
             node.Q[0] = self.Q_BC[0]
-        else
+        else:
             if node.theQ_Control(Node) != 0:
                 node.Q[0] = node.theQ_Control
             else:
@@ -374,7 +368,7 @@ class HeatSourceInterface(DataSheet):
         #Set Atmospheric Counter
         #TODO: To StreamNode??
         if Flag_HS == 1:
-            while Cont_Distance[Counter_Atmospheric_Data] >= (theDistance + dx / 1000)
+            while Cont_Distance[Counter_Atmospheric_Data] >= (theDistance + dx / 1000):
                 Counter_Atmospheric_Data = Counter_Atmospheric_Data + 1
             node.Atmospheric_Data = Counter_Atmospheric_Data
         #======================================================
@@ -390,7 +384,7 @@ class HeatSourceInterface(DataSheet):
             node.Rh = node.AreaX[0] / node.Pw
         #======================================================
         #No Control Depth
-        else
+        else:
             if node.theSlope <= 0:
                 raise Exception("Slope cannot be less than or equal to zero unless you enter a control depth.")
             if Flag_BC == 1:
@@ -398,10 +392,10 @@ class HeatSourceInterface(DataSheet):
             else:
                 node.theDepth[0] = self.StreamNodeList[Node-1].theDepth[0]
             Q_Est = node.Q[0]
-            if Q_Est < 0.0071: 'Channel is going dry
+            if Q_Est < 0.0071: #Channel is going dry
                 Flag_SkipNode[Node] = True
                 if Flag_HS == 1: T_Last = node.T[0]
-                if Flag_DryChannel == 0:
+                if Flag_DryChannel == 0: pass
                     # TODO: Implement dry channel controls
 #                    If Sheet2.Range("IV22").Value = 1 Then
 #                        Style = vbYesNo + vbCritical                   ' Define buttons.
@@ -416,7 +410,7 @@ class HeatSourceInterface(DataSheet):
 #                    Else
 #                        Flag_DryChannel = 1
 #                    End If
-            else    'Channel has sufficient flow
+            else:    #Channel has sufficient flow
                 Flag_SkipNode[Node] = False
 
         if not Flag_SkipNode[Node]:
@@ -443,8 +437,8 @@ class HeatSourceInterface(DataSheet):
                 thed = D_Est - Fy / dFy
                 D_Est = thed
                 if D_Est < 0 or D_Est > 1000000000000 or Count_Iterations > 1000:
-                    D_Est = 10 * Rnd 'Randomly reseed initial value and step
-    '                dy = 1 / ((200 - 100 + 1) * Rnd + 100)
+                    D_Est = 10 * Rnd #Randomly reseed initial value and step
+                    #dy = 1 / ((200 - 100 + 1) * Rnd + 100) # Leftover comment from original code
                     Converge = 10
                     Count_Iterations = 0
                 dy = 0.01
