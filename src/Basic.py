@@ -1,5 +1,11 @@
 from __future__ import division
+from Utils.ProgressBar import ProgressBar
+import wx
 from Excel.HeatSourceInterface import HeatSourceInterface
+
+app = wx.App()
+app.MainLoop()
+
 """Junker test class to make sure things are running and test out options"""
 
 # This is a transliterated version of the subroutine called theModel in the
@@ -19,7 +25,7 @@ HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
 # Way to go, Micro$oft.
 # TODO: Perhaps we should query the user here to see if they want to clear
 # all of the data.
-HS.SetupSheets1()
+# HS.SetupSheets1() # moved to HS's constructor
 
 # The next sub basically counts the number of streamnodes. This is a pretty
 # meaningless function, because with the StreamNode class, we build a list
@@ -28,20 +34,20 @@ HS.SetupSheets1()
 # actually necessary. However, since much of the later un-reworked code needs
 # it still, we will do it for now. This comes before BasicInputs here because
 # we want to build the StreamNodes before the BasicInputs subroutine
-HS.UpdateQVarCounter()
+# HS.UpdateQVarCounter() # moved to HS's constructor
 
 # This routine checks for the validity of input. This is a fairly stupid way
 # to do this, rather than creating input validators for the spreadsheet itself.
 # We should consider just making it impossible to enter a string into a numeric
 # cell, rather than allowing it and then checking every single cell to make sure
 # that it didn't happen
-HS.CheckMorphologySheet()
+# HS.CheckMorphologySheet() # moved to HS's constructor
 
 # This was called something like RedimVariables1 in the original code. The
 # purpose was to set all the variables to zero and then fill the various arrays
 # with data from the spreadsheet. Rather, here we decide to just use the
 # spreadsheet to generate StreamNode instances and add them to the main container.
-HS.BuildStreamNodes()
+# HS.BuildStreamNodes() # moved to HS's constructor
 
 # The next sub originally set the meridian and the timezone based on what the user
 # inputs. Rather than set the timezone as a separate variable, we are using
@@ -52,7 +58,7 @@ HS.BuildStreamNodes()
 # in the constructor of the HS instance, or within the StreamNode, or in a much
 # more elegant place than here. It's kept here for now to reduce uncertainty
 # between this and the VB code's differences.
-HS.BasicInputs()
+# HS.BasicInputs() # moved to HS's constructor
 
 # the next routine was RedimVariables number 2, and is completely pointless in
 # Python, since we have dynamically sized containers and the StreamNode class.
@@ -61,6 +67,7 @@ HS.BasicInputs()
 # and should be removed since they are not really 'global' in the python sense
 # anyway.
 theDistance = HS.IniParams.Length # Bad form, IniParams should be local, but it's temporary
+Flag_HS = 0
 Node = 0
 Count_Q_Var = 0
 Count_Q_In = 0
@@ -74,12 +81,16 @@ Counter_Atmospheric_Data = 1
 # This loop cycles over the model distance timesteps and calls the two functions
 # for each model timestep.
 # We have GOT to find a better way to accomplish this
+PB = ProgressBar(len(HS.StreamNodeList))
 while theDistance >= 0:
-    HS.LoadModelVariables()
-    Call SubViewtoSky(Flag_HS)
-    If Flag_HS <> 2 Then Call SubInitialConditions(Flag_HS)
-    Call SetupSheets2
-    theDistance = theDistance - (dx / 1000)
+    HS.LoadModelVariables(Node, theDistance, Count_Q_Var, Flag_HS)
+    if Flag_HS != 2: HS.CalculateInitialConditions(Node, theDistance,Flag_BC, Flag_HS)
+    HS.SetupSheets2(Node, Count_Q_Var, theDistance)
+    theDistance = theDistance - (HS.IniParams.Dx / 1000)
     Node = Node + 1
-    Flag_BC = 0
-Loop
+    PB("Loading model variables")
+
+# This next method has been moved to the StreamNode, and it is not necessary to
+# have it in the above loop, especially since you can map a function to the StreamNodeList
+
+HS.Map(lambda x: x.ViewToSky())

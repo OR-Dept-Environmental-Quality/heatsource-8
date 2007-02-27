@@ -12,7 +12,7 @@ class TestDataSheet(TestCase):
     def test_UpdateQVarCounter(self):
         """Test ability to count variables"""
         self.doc.UpdateQVarCounter()
-        self.assertEqual(self.doc.Num_Q_Var,63)
+        self.assertEqual(self.doc.Num_Q_Var,64)
 
     def test_CheckMorphology(self):
         """Test ability to check morphology"""
@@ -25,7 +25,10 @@ class TestDataSheet(TestCase):
         self.doc.UpdateQVarCounter()
         self.doc.BuildStreamNodes()
         self.doc.BasicInputs()
-        node = self.doc.StreamNodeList[0]
+        # Accessing this way tests the __getitem__ method
+        nodelist = self.doc.GetNode(slice(0,3))
+        self.assertEqual(len(nodelist),3)
+        node = nodelist[0]
         l = (('RiverKM', 3.15),
              ('Slope', 0.0012),
              ('N', 0.25),

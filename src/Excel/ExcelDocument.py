@@ -26,7 +26,7 @@ class ExcelDocument(object):
         self.sheet = 1
 
     def __del__(self):
-        self.app.Quit()
+        if self.app: self.app.Quit()
 
     def New(self, filename=None):
         """

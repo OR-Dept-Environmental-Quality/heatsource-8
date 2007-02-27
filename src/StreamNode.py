@@ -8,42 +8,28 @@ class StreamNode(object):
     def __init__(self, **kwargs):
         self.IniParams = IniParams.getInstance()
 
-        # In the original VB code, there were all these attributes (e.g. Slope) with averages
-        # calculated and called 'the' something (e.g. theSlope). We retain that system here
-        # initially. We have attributes in the list below, then build more attributes with
-        # a 'the' prefix. The main difference is that we have our Zonator class instance
-        # in self.Zone and self.theZone. The averages are in theZone.
-
-        # These are variables that have some sort of average calculated in the original
-        # VB code subroutine called SubLoadModelVariables
-        the_attrs = ['RiverKM', 'Slope','N','Width_BF','Width_B','Width_BF','Z','X_Weight',
+        # Attributes, which are either values from the spreadsheet if distance step
+        # equals the longitudinal sample rate, or averages if the distance step is 
+        # a multiple of the sample rate.
+        attrs = ['RiverKM', 'Slope','N','Width_BF','Width_B','Depth_BF','Z','X_Weight',
                  'Embeddedness','Conductivity','ParticleSize','Aspect','Topo_W',
                  'Topo_S','Topo_E','Latitude','Longitude','FLIR_Temp','FLIR_Time',
                  'Q_Out','Q_Control','D_Control','T_Control','VHeight','VDensity',
-                 'Q_Accretion','T_Accretion','Elevation']
-
-        # These are attributes not used in the averages calculations
-        other_attrs = ['BFWidth','WD']
-
-        l = map(lambda x: 'the'+x,the_attrs) # return theATTR for all ATTR in the_attrs
-
-        attrs = the_attrs + other_attrs + l # All attributes
-
+                 'Q_Accretion','T_Accretion','Elevation','BFWidth','WD','Temp_Sed']
         # Set all the attributes to zero, or set from the constructor
         for attr in attrs:
             x = kwargs[attr] if attr in kwargs.keys() else 0
             setattr(self,attr,x)
 
-        self.Zone = None # This gets built elsewhere
+        # Some variables that had two values
+        lsts = ['AreaX','Depth','Q','T','Velocity']
+        for attr in lsts:
+            x = xwargs[attr] if attr in kwargs.keys() else [0,0]
+            setattr(self, attr, x)
 
-        # theZone should be set to zeroed values
-        dir = [] # List to save the seven directions
-        for Direction in xrange(1,8):
-            z = () #Tuple to store the zones 0-4
-            for Zone in xrange(0,5):
-                z += VegZone(),
-            dir.append(z) # append to the proper direction
-        self.theZone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
+        # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
+        # with values for the sampled zones in each directions
+        self.Zone = None
 
         self.dx = self.IniParams.Dx
         if self.dx and self.WD: self.checkDx()

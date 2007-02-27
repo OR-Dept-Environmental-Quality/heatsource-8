@@ -1,6 +1,7 @@
 from __future__ import division
 from DataSheet import DataSheet
 from Utils.Time import TimeUtil
+from Utils.ProgressBar import ProgressBar
 from StreamNode import StreamNode
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
@@ -8,15 +9,21 @@ from Utils.IniParams import IniParams
 from numpy import arange
 import math
 
+#Flag_HS values:
+#    0: Flow Router
+#    1: Heat Source
+#    2: Shadelator
+
 class HeatSourceInterface(DataSheet):
     """Defines a datasheet specific to the Current (version 7, 2006) HeatSource Excel interface"""
-    def __init__(self, filename=None, show=None):
+    def __init__(self, filename=None, show=None, Flag_HS=1):
         if not filename:
             raise Warning("Need a model filename!")
         DataSheet.__init__(self, filename)
         self.StreamNodeList = ()
         self.IniParams = IP = IniParams.getInstance()
 
+        #######################################################
         # Grab the initialization parameters from the Excel file.
         # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
         self.SetSheet("TTools Data")
@@ -32,8 +39,15 @@ class HeatSourceInterface(DataSheet):
         IP.FlushDays = self.GetValue("I11")
         IP.TimeZone = self.GetValue("I12")
         IP.SimPeriod = self.GetValue("I13")
-
+        # I don't understand where these values are stored, so I've left it exactly as
+        # it was in the original VB code, except that I place the values in the IniParams class
+        IP.Flag_EvapLoss = self.GetValue("IV1","Land Cover Codes")
+        IP.Flag_Muskingum = self.GetValue("IS1","Land Cover Codes")
+        IP.Flag_Emergent = self.GetValue("IV5","Land Cover Codes")
+        ######################################################
+        # Create a time manipulator
         self.Time = TimeUtil()
+        # Page names- maybe a useless tuple, we'll see
         self.pages = ("TTools Data", "Land Cover Codes", "Morphology Data", "Flow Data",
                       "Continuous Data", "Chart-Diel Temp","Validation Data", "Chart-TIR",
                       "Chart-Shade","Output - Hydraulics","Chart-Heat Flux","Chart-Long Temp",
@@ -42,177 +56,247 @@ class HeatSourceInterface(DataSheet):
                       "Output - Evaporation","Output - Convection","Output - Conduction",
                       "Output - Total Heat","Output - Evaporation Rate", "Output - Daily Heat Flux")
 
-    def BasicInputs(self,Flag_HS=0):
-        if len(self.StreamNodeList) == 0:
-            raise Exception("StreamNodes must be built before this method is functional")
-        # TODO: This is the original subroutine to get the input data. We should make it OOP!
-        #=======================================================
-        StartDate = self.IniParams.Date
-        # I don't understand where these values are stored, so I've left it exactly as
-        # it was in the original VB code.
-        Flag_EvapLoss = self.GetValue("IV1","Land Cover Codes")
-        Flag_Muskingum = self.GetValue("IS1","Land Cover Codes")
-        Flag_Emergent = self.GetValue("IV5","Land Cover Codes")
         dt = self.IniParams.DT * 60 #Time step to seconds
-        dx = self.IniParams.Dx
-        #TODO: Need to deal with these flags
-        if Flag_HS == 1 or Flag_HS == 2: Dx_lc = self.IniParams.TranSample
-        LongSampleRate = self.IniParams.LongSample
+
+        self.SetupSheets1()
+
+        # TODO: These are only used in the VB routine SubEvaporativeFlux, so they should be moved there
+        # What the hell are they, anyway?
+        self.IniParams.the_a = self.GetValue("IV3","Land Cover Codes")
+        self.IniParams.the_b = self.GetValue("IV4","Land Cover Codes")
+
+        self.Nodes = round(1 + (self.IniParams.Length / (self.IniParams.Dx / 1000)))  #Model distance nodes
+
+        # from VB: Apparently, only one day is simulated for the shadelator
         if Flag_HS != 2: Days = self.IniParams.SimPeriod
         else: Days = 1
-        Hours = int(Days * 24) #Sim Period (Hours)
-        self.Q_BC = []
-        self.T_BC = []
-        self.Cloudiness = []
-        for I in range(Hours - 1):
-            if Flag_HS != 2:
-                val = self.GetValue((17 + I, 8),"Continuous Data")
-                if val == 0: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
-                self.Q_BC.append(val)
-                the_a = self.GetValue("IV3","Land Cover Codes")
-                the_b = self.GetValue("IV4","Land Cover Codes")
-            if Flag_HS == 1:
-                t_val = self.GetValue((17 + I,9),"Continuous Data")
-                if t_val == 0: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
-                self.T_BC.append(t_val)
-                self.Cloudiness.append(self.GetValue((17 + I, 10),"Continuous Data"))
-        self.Nodes = round(1 + (StreamLength / (dx / 1000)))  #Model distance nodes
-        #=======================================================
-        #Get Inflow and continuous data inputs
-        if Flag_HS == 0:
-            #TODO: Why do we grab values from different sheets if they are all available from the menu or some main sheet?
-            Inflow_DistNodes = int(self.GetValue("I9","Output - Hydraulics"))
-            # TODO: Some of this should likely be moved to the StreamNode class
-            Inflow_Distance = []
-            Inflow_Rate = [[] for i in xrange(Inflow_DistNodes)]
-            for I in xrange(Inflow_DistNodes):
-                Inflow_Distance.append(self.GetValue((I + 17, 12),"Flow Data"))
-                for II in xrange(len(Hours)):
-                    Inflow_Rate[I].append(self.GetValue((II + 17, 15 + I * 2),"Flow Data"))
-        elif Flag_HS == 1: #Heat Source
-            Cont_DistNodes = self.GetValue("I10","TTools Data")
-            Cont_Humidity = [[] for i in Cont_DistNodes]
-            Cont_Wind = [[] for i in Cont_DistNodes]
-            Cont_Air_Temp = [[] for i in Cont_DistNodes]
-            Cont_Distance = []
-            for I in xrange(len(Cont_DistNodes)):
-                Cont_Distance.append(self.GetValue((I + 17, 5),"Continuous Data"))
-                for II in xrange(len(Hours)):
-                    Cont_Wind[I].append(self.GetValue((17 + II, 8 + (I * 4)),"Continuous Data"))
-                    Cont_Humidity[I].append(self.GetValue((17 + II, 9 + (I * 4)),"Continuous Data"))
-                    Cont_Air_Temp[I].append(self.GetValue((17 + II, 10 + (I * 4)),"Continuous Data"))
-            Inflow_DistNodes = self.GetValue("I9","TTools Data")
-            Inflow_Distance = []
-            Inflow_Rate = [[] for i in Inflow_DistNodes]
-            Inflow_Temp = [[] for i in Inflow_DistNodes]
-            for I in xrange(len(Inflow_DistNodes)):
-                Inflow_Distance.append(self.GetValue((I + 17, 12),"Flow Data"))
-                for II in xrange(len(Hours)):
-                    Inflow_Rate[I].append(self.GetValue((II + 17, 15 + I * 2),"Flow Data"))
-                    Inflow_Temp[I].append(self.GetValue((17 + II, 16 + I * 2),"Flow Data"))
-        elif Flag_HS == 2: #Shadealator
-            pass
-        else: raise Exception("Stupid Flag_HS is broken")
+        Hours = int(self.IniParams.SimPeriod * 24) if Flag_HS != 2 else 24
 
-    def UpdateQVarCounter(self):
-        """Calculate the number of stream node inputs"""
+        #Figure out the length of the data and store it (This could be changed)
+        self.UpdateQVarCount()
+
+        # Build a quick progress bar
+        self.PB = ProgressBar(self.IniParams.InflowSites + self.IniParams.ContSites + Hours + self.Num_Q_Var)
+
+        # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
+        #TODO: We need to clean up this syntax and logical progression
+        self.GetBoundaryConditions(Hours)
+        if Flag_HS != 2:
+            self.GetInflowData()
+            if Flag_HS == 1: self.GetContinuousData(Hours)
+        self.ScanMorphology()
+        self.BuildStreamNodes()
+
+        self.PB.Hide() #Hide the progressbar, but keep it live
+
+
+    def GetNode(self, index):
+        if isinstance(index,slice):
+            return self.StreamNodeList[index.start:index.stop:index.step]
+        else: return self.StreamNodeList[index]
+    def Map(self, func):
+        """Map a lambda function to the list of streamnodes, returning nothing"""
+        # this uses list comprehension instead of map() because of the Psyco modules problems with it.
+        [func(i) for i in self.StreamNodeList]
+
+    def UpdateQVarCount(self):
+        # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
         # and incrementing a counter if the value was not blank. With the
         # new DataSheet's __getitem__ functionality, we can merely access
         # the sheet once, and return the length of that tuple
-        row = self[:,5]
-        self.Num_Q_Var = len(row[16:])
+        row = self[:,5][16:] # no row definition, 5th column- strip off the first 16 lines
+        self.Num_Q_Var = len(row)
 
-    def CheckMorphologySheet(self):
-        #=======================================================
-        #Scan morphology variables for null of nonnumeric values
+    def GetBoundaryConditions(self, Hours):
+        """Get the boundary conditions from the "Continuous Data" page"""
+        # Boundary conditions
+        self.Q_BC = []
+        self.T_BC = []
+        self.Cloudiness = []
+
+        # These are storage of inflow and continuous data information
+        self.IniParams.InflowSites = int(self.IniParams.InflowSites)
+        self.Inflow_Rate = [[] for i in xrange(self.IniParams.InflowSites)]
+        self.Inflow_Temp = [[] for i in xrange(self.IniParams.InflowSites)]
+        self.Inflow_Distance = []
+
+        self.IniParams.ContSites = int(self.IniParams.ContSites)
+        self.Cont_Humidity = [[] for i in xrange(self.IniParams.ContSites)]
+        self.Cont_Wind = [[] for i in xrange(self.IniParams.ContSites)]
+        self.Cont_Air_Temp = [[] for i in xrange(self.IniParams.ContSites)]
+        self.Cont_Distance = []
+
+        col = 7
+        for I in xrange(Hours):
+            # Get the flow boundary condition
+            val = self.GetValue((17 + I, col),"Continuous Data")
+            if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
+            self.Q_BC.append(val)
+            # Temperature boundary condition
+            t_val = self.GetValue((17 + I,col+1),"Continuous Data")
+            if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
+            self.T_BC.append(t_val)
+            # Cloudiness boundary condition
+            self.Cloudiness.append(self.GetValue((17 + I, col+2),"Continuous Data"))
+            self.PB("Reading boundary conditions",I,Hours)
+
+    def GetInflowData(self):
+        """Get accumulation data from the "Flow Data" page"""
+        for I in xrange(self.IniParams.InflowSites):
+            self.Inflow_Distance.append(self.GetValue((I + 17, 11),"Flow Data"))
+            for II in xrange(len(Hours)):
+                self.Inflow_Rate[I].append(self.GetValue((II + 17, 14 + I * 2),"Flow Data"))
+                self.Inflow_Temp[I].append(self.GetValue((17 + II, 15 + I * 2),"Flow Data"))
+                self.PB("Reading inflow data", I, self.IniParams.InflowSites)
+    def GetContinuousData(self, Hours):
+        """Get data from the "Continuous Data" page"""
+        for I in xrange(self.IniParams.ContSites):
+            self.Cont_Distance.append(self.GetValue((I + 17, 4),"Continuous Data"))
+            for II in xrange(Hours):
+                self.Cont_Wind[I].append(self.GetValue((17 + II, 7 + (I * 4)),"Continuous Data"))
+                self.Cont_Humidity[I].append(self.GetValue((17 + II, 8 + (I * 4)),"Continuous Data"))
+                self.Cont_Air_Temp[I].append(self.GetValue((17 + II, 9 + (I * 4)),"Continuous Data"))
+            self.PB("Reading continuous data", I, self.IniParams.ContSites)
+
+    def ScanMorphology(self):
+        """Scan morphology variables for null of nonnumeric values"""
         # Start scanning at the 17th row of the spreadsheet
-        #TODO: The visual basic code for this routine makes absolutely no sense!
+        #TODO: The visual basic code for this routine makes absolutely no sense
         # Included is a transcription of the original, which I've tried to interpret
         self.SetSheet('TTools Data')
         for theRow in xrange(17,self.Num_Q_Var + 16):
-                for theCol in xrange(7,22):
-                    if theCol == 9: continue
-                    val = self[theRow,theCol]
-                    if not (isinstance(val,float) or isinstance(val,int)) or \
-                        val == "" or \
-                        self.Num_Q_Var <= 0:
-                        raise Exception("Invalid data: row %i, cell %s: '%s' ... Flow router terminated" %(theRow, self.excelize(theCol),val))
+            for theCol in xrange(7,22):
+                if theCol == 9: continue
+                val = self[theRow,theCol]
+                if not (isinstance(val,float) or isinstance(val,int)) or \
+                    val == "" or \
+                    self.Num_Q_Var <= 0:
+                    raise Exception("Invalid data: row %i, cell %s: '%s' ... Flow router terminated" %(theRow, self.excelize(theCol),val))
+            self.PB("Scanning morphology data", theRow, self.Num_Q_Var+16)
 
     def BuildStreamNodes(self):
-        """Create list of StreamNodes from the spreadsheet"""
-        # This function is copied from the VB code, but it is somewhat pointless if the
-        # program is built in a proper OOP framework, because most of these variables would
-        # in objects
-        # TODO: Building a stream node might need to be cleaned up a bit.
-        self.StreamNodeList = ()
-        for i in range(self.Num_Q_Var):
+        """Create list of StreamNodes from the spreadsheet
+
+        In the original VB code, this was quite different. I will not explain what that
+        code does, but will rather explain the motivation behind this version. We have two
+        controlling variables: longitudinal sample rate and the distance step (dx). The
+        dx is always a multiple of the longitudinal sample rate. The values within the
+        node are the average values of the longitudinal samples that fall within that dx.
+        For instance, if longrate=50 and dx=200, then the Slope for the node will be
+        the average of 4 longitudinal slopes."""
+        self.StreamNodeList = () # Make sure we empty any current list
+
+        long = self.IniParams.LongSample
+        dx = self.IniParams.Dx
+        length = self.IniParams.Length
+
+        # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
+        if (dx%long or dx<long): raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
+
+        multiple = dx/long #We have this many samples per distance step
+
+        # Dictionary of sheet names, StreamNode attributes and corresponding columns within the sheet.
+        # This is used in the later loop to fill the stream node with averaged data.
+        sheets = {'Morphology Data': {'RiverKM': 4,
+                                      'Slope': 6,
+                                      'N': 7,
+                                      'WD': 9,
+                                      'Width_BF': 10,
+                                      'Width_B': 11,
+                                      'Depth_BF': 12,
+                                      'Z': 15,
+                                      'X_Weight': 16,
+                                      'Conductivity': 17, # This value needs to be divided by 1000
+                                      'ParticleSize': 18,
+                                      'Embeddedness': 19,
+                                      'FLIR_Time': 20,
+                                      'FLIR_Temp': 21,
+                                      'Q_Control': 22,
+                                      'D_Control': 23,
+                                      'T_Control': 24},
+                  'Flow Data': {'Q_Accretion': 4,
+                                'T_Accretion': 5,
+                                'Q_Out': 6,},
+                  'TTools Data': {'Longitude': 5,
+                                  'Latitude': 6,
+                                  'Elevation': 7,
+                                  'Aspect': 9,
+                                  'Topo_W': 10,
+                                  'Topo_S': 11,
+                                  'Topo_E': 12,
+                                  'VHeight': 159,
+                                  'VDensity': 160}}
+        # Get the total number of attributes we are cycling over here
+        num_attrs = 0
+        for d in sheets.values(): num_attrs += len(d)
+
+        row_km = 0 #Current sampled kilometer
+        row = 0 # Current row
+        while row_km >= 0: # Until we get to the end of the data
             node = StreamNode()
-            self.sheet = 'Morphology Data'
-            node.RiverKM = self[i + 17, 4]
-            node.Slope = self[i + 17, 6]
-            node.N = self[i + 17, 7]
-            node.WD = self[i + 17, 9]
-            node.Width_BF = self[i + 17, 10]
-            node.Width_B = self[i + 17, 11]
-            node.Depth_BF = self[i + 17, 12]
-            node.Z = self[i + 17, 15]
-            node.X_Weight = self[i + 17, 16]
-            node.Conductivity = self[i + 17, 17] / 1000
-            node.Particle_Size = self[i + 17, 18]
-            node.Embeddedness = self[i + 17, 19]
-            node.Q_Control = self[i + 17, 22]
-            node.D_Control = self[i + 17, 23]
-            node.FLIR_Time = self[i + 17, 20]
-            node.FLIR_Temp = self[i + 17, 21]
-            node.T_Control = self[i + 17, 24]
+            for i in xrange(multiple): # How many samples per node?
+                test = i == multiple-1 #Are we in the last pass?
+                thisrow = row + i
+                for sheetname in sheets.keys():
+                    for attr,col in sheets[sheetname].items():
+                        val = self[thisrow+17, col]
+                        total = getattr(node,attr)
+                        try:
+                            setattr(node,attr,total+val)
+                        except TypeError:
+                             # we have a null value, which means we may be at the end of our data.
+                             # e.g. if we have 3.15 km of stream with samples every 50 meters and
+                             # a dx of 100 meters, we'll have an extra segment of 50 meters, so
+                             # trying to grab the second part of that segment will be null.
+                             # In that case, we average immediately and scram
+                             setattr(node,attr,total/i+1) # divide by total passes, which should be 1 or greater
+                             continue # then scram
+                        if test: # We are the final row, so average
+                            total = getattr(node,attr) # Get the new total
+                            setattr(node,attr,total/multiple) # divide by the multiple
+                row += 1
+            print node.RiverKM
+            self.StreamNodeList += node,
+        print len(self.StreamNodeList)
+        print self.StreamNodeList[0]
 
-            self.sheet = 'Flow Data'
-            node.Q_Out = self[i + 17, 6]
-            node.Q_Accretion = self[i + 17, 4]
-            node.T_Accretion = self[i + 17, 5]
-
-            self.sheet = 'TTools Data'
-            node.Longitude = self[i + 17, 5]
-            node.Latitude = self[i + 17, 6]
-            node.Aspect = self[i + 17, 9]
-            node.Topo_W = self[i + 17, 10]
-            node.Topo_S = self[i + 17, 11]
-            node.Topo_E = self[i + 17, 12]
-            node.VHeight = self[i + 17, 159]
-            node.VDensity = self[i + 17, 160]
-            node.Elevation = self[i + 17, 7]
-
-            dir = [] # List to save the seven directions
-            for Direction in xrange(1,8):
-                z = () #Tuple to store the zones 0-4
-                for Zone in xrange(5):
-                    if Zone == 0:
-                        #TODO: See what this storage of elevation is used for, because it is also used above.
-                        z += VegZone(self[i + 17, 7], Overhang=self[i + 17, Direction + 150]), #Overhang and Elevation
-                        continue #No need to do any more for 0th zone
-                    Elevation = self[i + 17, Direction * 4 + 37 + Zone]
-                    VHeight = self[i + 17, Direction * 8 + 61 + Zone * 2]
-                    VDensity = self[i + 17, Direction * 8 + 60 + Zone * 2]
-                    # append to the ith zone
-                    z += VegZone(Elevation,VHeight,VDensity),
-                dir.append(z) # append to the proper direction
-            node.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
-
-            #############################################################
-            #The original VB code has this method BFMorph, which calculates some things and
-            # spits them back to the spreadsheet. We want to keep everything in the node, but
-            # we'll spit these four things back to the spreadsheet for now, until we understand
-            # better what the purpose was
-            node.BFMorph()
-            self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
-            self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
-            self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
-            self.SetValue((i + 17, 14),node.BFXArea, sheet="Morphology Data")
-            ##############################################################
-
-            self.StreamNodeList += node, # Now add this node to the stream node list
-
+#        for i in range(count):
+#
+#            dir = [] # List to save the seven directions
+#            for Direction in xrange(7):
+#                z = () #Tuple to store the zones 0-4
+#                for Zone in xrange(5):
+#                    if Zone == 0:
+#                        #TODO: See what this storage of elevation is used for, because it is also used above.
+#                        elev = self[i + 17, 7]
+#                        over = self[i + 17, Direction + 150]
+#                        elev = elev if elev else 0 # In case the values are None
+#                        over = over if over else 0
+#                        z += VegZone(elev, Overhang=over), #Overhang and Elevation
+#                        continue #No need to do any more for 0th zone
+#                    Elevation = self[i + 17, Direction * 4 + 37 + Zone]
+#                    VHeight = self[i + 17, Direction * 8 + 61 + Zone * 2]
+#                    VDensity = self[i + 17, Direction * 8 + 60 + Zone * 2]
+#                    # append to the ith zone
+#                    z += VegZone(Elevation,VHeight,VDensity),
+#                dir.append(z) # append to the proper direction
+#            node.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
+#
+#            #############################################################
+#            #The original VB code has this method BFMorph, which calculates some things and
+#            # spits them back to the spreadsheet. We want to keep everything in the node, but
+#            # we'll spit these four things back to the spreadsheet for now, until we understand
+#            # better what the purpose was
+#            node.BFMorph()
+#            self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
+#            self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
+#            self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
+#            self.SetValue((i + 17, 14),node.BFXArea, sheet="Morphology Data")
+#            ##############################################################
+#
+#            self.StreamNodeList += node, # Now add this node to the stream node list
+#            if not self.PB("Building Stream Nodes", i, count)[0]: raise Exception("Building streamnodes cancelled, model stopped")
 
     def LoadModelVariables(self,Node,theDistance,Count_Q_Var,Flag_HS):
         """Load model variables (see notes)"""
@@ -222,7 +306,9 @@ class HeatSourceInterface(DataSheet):
         #TODO: Figure out a better way to define these averages, perhaps in BuildStreamNodes.
         self.SetSheet('Morphology Data')
         node = self.StreamNodeList[Node]
-        while Node > 0 and Round(theDistance, 2) < round(self[Count_Q_Var + 17, 5], 2):
+
+        Flag_First = 1
+        while Node > 0 and round(theDistance, 2) < round(self[Count_Q_Var + 17, 4], 2):
             Count_Q_Var = Count_Q_Var + 1
         #======================================================
         #Average Parameters Over Modeled Segments
@@ -235,67 +321,73 @@ class HeatSourceInterface(DataSheet):
         # Here's a list of attributes that we are calculating in the original
         # VB code. This allows us to just loop over them, instead of individually
         # calculating each one.
-        the_attrs = ['RiverKM', 'Slope','N','Width_BF','Width_B','Width_BF','Z','X_Weight',
+        the_attrs = ['RiverKM', 'Slope','N','Width_BF','Width_B','Depth_BF','Z','X_Weight',
                  'Embeddedness','Conductivity','ParticleSize','Aspect','Topo_W',
                  'Topo_S','Topo_E','Latitude','Longitude','FLIR_Temp','FLIR_Time',
                  'Q_Out','Q_Control','D_Control','T_Control','VHeight','VDensity',
                  'Q_Accretion','Elevation']
 
-        thisNode = self.StreamNodeList[Count_Q_Var - I]
         calc = True
         while calc:
             """So, there's a weird loop in this subroutine (VB code) that I'm
             simulating with a nested while statement"""
+            prevNode = self.StreamNodeList[Node - I]
             for attr in the_attrs:
                 name = "the" + attr # Original code has 'the' in front of attribute names (i.e. theSlope for average of Slope)
                 x = getattr(node,name) # get the average value (or zero if it's not yet calculated)
-                y = x + thisNode.Slope # Add the current value
+                y = x + prevNode.Slope # Add the current value
                 setattr(node, name, y)
                 if attr in control_num.keys(): control_num[attr] += 1
             # NOTE: The VB code had certain totals (e.g. T_Control_Total) which have been renamed to 'the' (e.g. theT_Control)
             # Temperature accretion is treated somewhat differently, and it should be calculated after
             # Flow accretion, so we do it outside that loop
-            node.theT_Accretion = (node.theT_Accretion + thisNode.T_Accretion * thisNode.Q_Accretion)
+            print prevNode
+            node.theT_Accretion += prevNode.T_Accretion * prevNode.Q_Accretion
 
-            for Direction in xrange(1,8):
+
+            for Direction in xrange(7):
                 for Zone in xrange(5):
                     if Zone == 0:
-                        node.theZone[Direction][Zone].Elevation += thisNode.Zone[Direction][Zone].Elevation
-                        node.theZone[Direction][Zone].Overhang += thisNode.Zone[Direction][Zone].Overhang
+                        node.theZone[Direction][Zone].Elevation += prevNode.Zone[Direction][Zone].Elevation
+                        node.theZone[Direction][Zone].Overhang += prevNode.Zone[Direction][Zone].Overhang
                         continue # Nothing else in the 0th zone
-                    node.theZone[Direction][Zone].Elevation = node.Zone[Direction][Zone].theElevation + thisNode.Zone[Direction][Zone].Elevation
-                    node.theZone[Direction][Zone].VHeight +=  node.Zone[Direction][Zone].VHeight
-                    node.theZone[Direction][Zone].VDensity += node.Zone[Direction][Zone].VDensity
+                    node.theZone[Direction][Zone].Elevation += prevNode.Zone[Direction][Zone].Elevation
+                    node.theZone[Direction][Zone].VHeight +=  prevNode.Zone[Direction][Zone].VHeight
+                    node.theZone[Direction][Zone].VDensity += prevNode.Zone[Direction][Zone].VDensity
             I = I + 1
-            if ((Count_Q_Var - I) < 0) or (thisNode.theRiverKM >= round((theDistance + dx / 1000), 3)): break
+            if ((Count_Q_Var - I) < 0) or (prevNode.theRiverKM >= round((theDistance + dx / 1000), 3)): break
         #======================================================
         #Account for Inflow Volumes
+        Count_Q_In = 0 #This was a global variable in the original code
         Flag_Inflow = 0
         I8 = Count_Q_In
         I7 = Count_Q_In
         if Flag_First == 1:
             Dummy = Count_Q_In
-        if Count_Q_In < Inflow_DistNodes:
-            while (theDistance <= Inflow_Distance(Count_Q_In)) and ((theDistance + dx / 1000) > Inflow_Distance(Count_Q_In)):
+
+        if Count_Q_In < self.IniParams.InflowSites:
+            while (theDistance <= self.Inflow_Distance[Count_Q_In]) and ((theDistance + dx / 1000) > Inflow_Distance[Count_Q_In]):
                 for II in xrange(Hours):
                     # TODO: Move much of this to the StreamNode class
-                    Q_In[II] += Inflow_Rate[Count_Q_In][II]
+                    self.Q_In[II] += self.Inflow_Rate[Count_Q_In][II]
                     if Flag_HS == 1:
-                        T_In[Node][II] = T_In[Node][II] + Inflow_Temp[Count_Q_In][II] * Inflow_Rate[Count_Q_In][II]
-                Count_Q_In = Count_Q_In + 1
+                        node.T_In[II] = node.T_In[II] + self.Inflow_Temp[Count_Q_In][II] * self.Inflow_Rate[Count_Q_In][II]
+                Count_Q_In += 1
                 Flag_Inflow = 1
                 if Count_Q_In > Inflow_DistNodes: break
         #======================================================
         #Account for Inflow Temps
         if Flag_Inflow == 1 and Flag_HS == 1:
             for II in xrange(Hours):
-                T_In[Node][II] = T_In[Node][II] / Q_In[Node][II]
+                node.T_In[II] = node.T_In[II] / node.Q_In[II]
         Flag_Inflow = 0
 
         node.theSlope /= I
         node.theN /= I
         node.theWidth_BF /= I
-        node.theArea_Wetland = theArea_Wetland + node.theWidth_BF * dx
+        wet_area = node.theWidth_BF * self.IniParams.Dx
+        try: node.theArea_Wetland += area
+        except AttributeError: node.theArea_Wetland = wet_area
         node.theWidth_B /= I
         node.theDepth_BF /= I
         node.theZ /= I
@@ -334,7 +426,7 @@ class HeatSourceInterface(DataSheet):
         node.theFLIR_Temp /= I
         node.theVHeight /= I
         node.theVDensity /= I
-        for Direction in xrange(1,8):
+        for Direction in xrange(7):
             for Zone in xrange(5):
                 if Zone == 0:
                     node.theZone[Direction][Zone].Elevation /= I
@@ -345,7 +437,7 @@ class HeatSourceInterface(DataSheet):
                 node.theZone[Direction][Zone].VDensity /= I
                 node.theZone[Direction][Zone].SlopeHeight = node.theZone[Direction][Zone].Elevation - node.theZone[Direction][0].Elevation
 
-    def CalculateInitialConditions(self,Node, theDistance, Flag_BC):
+    def CalculateInitialConditions(self,Node, theDistance, Flag_BC, Flag_HS):
         """Initial conditions"""
         #==================================================
         # Initial conditions for flow
@@ -354,7 +446,7 @@ class HeatSourceInterface(DataSheet):
         if Flag_BC: # TODO: What the hell is Flag_BC?
             node.Q[0] = self.Q_BC[0]
         else:
-            if node.theQ_Control(Node) != 0:
+            if node.theQ_Control != 0:
                 node.Q[0] = node.theQ_Control
             else:
                 node.Q[0] = self.StreamNodeList[Node-1].Q[0] + node.Q_In[theHour] - node.theQ_Out + node.theQ_Accretion
@@ -377,11 +469,18 @@ class HeatSourceInterface(DataSheet):
         if node.theD_Control: node.theDepth[0] = node.theD_Control
         #======================================================
         #Control Depth
+
         if node.theD_Control:
             node.AreaX[0] = node.theDepth[0] * (node.theWidth_B + node.theZ * node.theDepth[0])
             node.Pw = node.theWidth_B + 2 * node.theDepth[0] * math.sqrt(1 + node.theZ ** 2)
             if node.Pw <= 0: node.Pw = 0.00001
             node.Rh = node.AreaX[0] / node.Pw
+            Flag_SkipNode = False
+            # Not sure if this should go here. The problem is it is undefined before this if/else
+            # statement, and is not otherwise defined in the if portion, but it is needed AFTER
+            # this statement, so if we hit this if portion, we have an undefined variable below.
+            # TODO: Figure out what we are really trying to do here.
+            Q_Est = node.Q[0]
         #======================================================
         #No Control Depth
         else:
@@ -393,7 +492,7 @@ class HeatSourceInterface(DataSheet):
                 node.theDepth[0] = self.StreamNodeList[Node-1].theDepth[0]
             Q_Est = node.Q[0]
             if Q_Est < 0.0071: #Channel is going dry
-                Flag_SkipNode[Node] = True
+                Flag_SkipNode = True
                 if Flag_HS == 1: T_Last = node.T[0]
                 if Flag_DryChannel == 0: pass
                     # TODO: Implement dry channel controls
@@ -411,9 +510,9 @@ class HeatSourceInterface(DataSheet):
 #                        Flag_DryChannel = 1
 #                    End If
             else:    #Channel has sufficient flow
-                Flag_SkipNode[Node] = False
+                Flag_SkipNode = False
 
-        if not Flag_SkipNode[Node]:
+        if not Flag_SkipNode:
             Converge = 100000
             dy = 0.01
             D_Est = node.theDepth[0]
@@ -428,7 +527,7 @@ class HeatSourceInterface(DataSheet):
                 Fy = A_Est * (node.Rh ** (2 / 3)) - (node.theN) * Q_Est / math.sqrt(node.theSlope)
                 thed = D_Est + dy
                 A_Est = thed * (node.theWidth_B + node.theZ * thed)
-                node.Pw = node.theWidth_B + 2 * thed * node.sqrt(1 + node.theZ ** 2)
+                node.Pw = node.theWidth_B + 2 * thed * math.sqrt(1 + node.theZ ** 2)
                 if node.Pw <= 0: node.Pw = 0.00001
                 node.Rh = A_Est / node.Pw
                 Fyy = A_Est * (node.Rh ** (2 / 3)) - (node.theN) * Q_Est / math.sqrt(node.theSlope)
@@ -450,7 +549,7 @@ class HeatSourceInterface(DataSheet):
             node.theVelocity[0] = node.Q[0] / node.AreaX[0]
             node.theWidth = node.theWidth_B + 2 * node.theZ * node.theDepth[0]
             node.Celerity = node.theVelocity[0] + math.sqrt(9.8 * node.theDepth[0]) #TODO: Check this with respect to gravity rounding error
-            if Flag_Muskingum == 0 and Flag_HS < 2 and Flag_SkipNode[Node] == 0:
+            if self.IniParams.Flag_Muskingum == 0 and Flag_HS < 2 and Flag_SkipNode == 0:
                 if dt > dx / node.Celerity: dt = dx / node.Celerity
         else:
             Q_Est = 0
