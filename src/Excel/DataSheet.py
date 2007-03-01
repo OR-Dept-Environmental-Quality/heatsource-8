@@ -19,6 +19,7 @@ class DataSheet(ExcelDocument):
 
     def __makeSlice(self, arg):
         if isinstance(arg,int): return slice(None,arg,None)
+        elif isinstance(arg, float): return slice(None,int(arg),None)
         elif isinstance(arg, slice): return arg
         elif isinstance(arg, list) or isinstance(arg,tuple):
             start = arg[0]
@@ -98,6 +99,8 @@ class DataSheet(ExcelDocument):
         value.reverse()
 
         return tuple(value) # Keep everything as a tuple of tuples, as GetValue returns.
+    def __del__(self):
+        pass
 
     def ClearCalcData(self):
         if len(self.calcDataRange) == 0: return

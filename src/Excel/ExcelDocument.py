@@ -22,7 +22,9 @@ class ExcelDocument(object):
     """
     def __init__(self, visible=False):
         self.app = Dispatch("Excel.Application")
-        self.app.Visible = visible
+        try:
+            self.app.Visible = visible
+        except: pass
         self.sheet = 1
 
     def __del__(self):

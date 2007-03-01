@@ -73,21 +73,21 @@ class HeatSourceInterface(DataSheet):
         Hours = int(self.IniParams.SimPeriod * 24) if Flag_HS != 2 else 24
 
         #Figure out the length of the data and store it (This could be changed)
-        self.UpdateQVarCount()
+#        self.UpdateQVarCount()
 
         # Build a quick progress bar
-        self.PB = ProgressBar(self.IniParams.InflowSites + self.IniParams.ContSites + Hours + self.Num_Q_Var)
+#        self.PB = ProgressBar(self.IniParams.InflowSites + self.IniParams.ContSites + Hours + self.Num_Q_Var)
 
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
         #TODO: We need to clean up this syntax and logical progression
-        self.GetBoundaryConditions(Hours)
-        if Flag_HS != 2:
-            self.GetInflowData()
-            if Flag_HS == 1: self.GetContinuousData(Hours)
-        self.ScanMorphology()
+#        self.GetBoundaryConditions(Hours)
+#        if Flag_HS != 2:
+#           self.GetInflowData()
+#           if Flag_HS == 1: self.GetContinuousData(Hours)
+#        self.ScanMorphology()
         self.BuildStreamNodes()
 
-        self.PB.Hide() #Hide the progressbar, but keep it live
+#        self.PB.Hide() #Hide the progressbar, but keep it live
 
 
     def GetNode(self, index):
@@ -198,68 +198,81 @@ class HeatSourceInterface(DataSheet):
 
         # Dictionary of sheet names, StreamNode attributes and corresponding columns within the sheet.
         # This is used in the later loop to fill the stream node with averaged data.
-        sheets = {'Morphology Data': {'RiverKM': 4,
-                                      'Slope': 6,
-                                      'N': 7,
-                                      'WD': 9,
-                                      'Width_BF': 10,
-                                      'Width_B': 11,
-                                      'Depth_BF': 12,
-                                      'Z': 15,
-                                      'X_Weight': 16,
-                                      'Conductivity': 17, # This value needs to be divided by 1000
-                                      'ParticleSize': 18,
-                                      'Embeddedness': 19,
-                                      'FLIR_Time': 20,
-                                      'FLIR_Temp': 21,
-                                      'Q_Control': 22,
-                                      'D_Control': 23,
-                                      'T_Control': 24},
-                  'Flow Data': {'Q_Accretion': 4,
-                                'T_Accretion': 5,
-                                'Q_Out': 6,},
-                  'TTools Data': {'Longitude': 5,
-                                  'Latitude': 6,
-                                  'Elevation': 7,
-                                  'Aspect': 9,
-                                  'Topo_W': 10,
-                                  'Topo_S': 11,
-                                  'Topo_E': 12,
-                                  'VHeight': 159,
-                                  'VDensity': 160}}
-        # Get the total number of attributes we are cycling over here
-        num_attrs = 0
-        for d in sheets.values(): num_attrs += len(d)
+        morph = {'Slope': 6,
+                'N': 7,
+                'WD': 9,
+                'Width_BF': 10,
+                'Width_B': 11,
+                'Depth_BF': 12,
+                'Z': 15,
+                'X_Weight': 16,
+                'Conductivity': 17, # This value needs to be divided by 1000
+                'ParticleSize': 18,
+                'Embeddedness': 19,
+#                'FLIR_Time': 20,
+                'FLIR_Temp': 21}
+#                'Q_Control': 22,
+#                'D_Control': 23,
+#                'T_Control': 24}
+        flow = {'Q_Accretion': 4,
+                'T_Accretion': 5,
+                'Q_Out': 6,}
+        ttools = {'Longitude': 5,
+                  'Latitude': 6,
+                  'Elevation': 7,
+                  'Aspect': 9,
+                  'Topo_W': 10,
+                  'Topo_S': 11,
+                  'Topo_E': 12,
+                  'VHeight': 159,
+                  'VDensity': 160}
+        pages = {'Morphology Data': morph}#, 'Flow Data': flow, 'TTools Data': ttools}
 
-        row_km = 0 #Current sampled kilometer
-        row = 0 # Current row
-        while row_km >= 0: # Until we get to the end of the data
+        # This process is quite gruelling. I think that this can probably be cleaned up by
+        # getting the entire data matrix in a single call, averaging every X group of values
+        # in every column, and dumping that data into the StreamNode. This would be significantly
+        # easier than this method. However, since UsedRange does not seem to work, we have to find
+        # a way of getting all of the data from a sheet in a non-stupid fashion. Until we do that,
+        # this method will suffice.
+
+        row = 17 # Current row
+        GotNodes = False
+        while not GotNodes: # Until we get to the end of the data
             node = StreamNode()
-            for i in xrange(multiple): # How many samples per node?
+            for i in xrange(int(multiple)): # How many samples per node?
+                if GotNodes: break # If we set GotNodes to true in an inner loop, we don't necessarily break out of this one.
                 test = i == multiple-1 #Are we in the last pass?
-                thisrow = row + i
-                for sheetname in sheets.keys():
-                    for attr,col in sheets[sheetname].items():
-                        val = self[thisrow+17, col]
-                        total = getattr(node,attr)
-                        try:
-                            setattr(node,attr,total+val)
-                        except TypeError:
-                             # we have a null value, which means we may be at the end of our data.
-                             # e.g. if we have 3.15 km of stream with samples every 50 meters and
-                             # a dx of 100 meters, we'll have an extra segment of 50 meters, so
-                             # trying to grab the second part of that segment will be null.
-                             # In that case, we average immediately and scram
-                             setattr(node,attr,total/i+1) # divide by total passes, which should be 1 or greater
-                             continue # then scram
-                        if test: # We are the final row, so average
-                            total = getattr(node,attr) # Get the new total
-                            setattr(node,attr,total/multiple) # divide by the multiple
-                row += 1
-            print node.RiverKM
+                # We have to get the rivermile, but if it's blank, and since we are assuming that
+                # we checked all the morphology data for blank values, then we will assume that,
+                # if this is None, we hit a blank row
+                val = self[row+i,4,'Morphology Data']
+                node.RiverKM = val if val else node.RiverKM # Set the river mile
+                row_km = node.RiverKM
+                for page in pages:
+                    # Row of all available data grabbed in a single 'get' call
+                    # We get the 0th item because what's returned is actually a row of rows, but with only one.
+                    try:
+                        data = self[row+i,:,page][0]
+                    except IndexError:
+                         # we have a null value, which means we may be at the end of our data.
+                         # e.g. if we have 3.15 km of stream with samples every 50 meters and
+                         # a dx of 100 meters, we'll have an extra segment of 50 meters, so
+                         # trying to grab the second part of that segment will be null.
+                         # In that case, we average immediately and scram
+                        val = getattr(node,attr) / (i+1)
+                        setattr(node,attr,val)
+                        GotNodes = True # Assume we're at the end of the data, and break completely
+                        break
+                    for attr, col in pages[page].items():
+                        val = getattr(node,attr) + data[col] # Get current value using the attribute's name string
+                        setattr(node,attr,val) # set the new value
+                        if not test and attr=="Slope": crap = val
+                        if test and page == 'Morphology Data': # we are in the last run, or have a null value, so we average
+                            val = getattr(node,attr) / multiple
+                            setattr(node,attr,val)
+            row += multiple
             self.StreamNodeList += node,
-        print len(self.StreamNodeList)
-        print self.StreamNodeList[0]
+            raise Exception("Not yet, we still have to finish what's commented below")
 
 #        for i in range(count):
 #

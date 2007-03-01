@@ -46,6 +46,13 @@ class TestDataSheet(TestCase):
         rng = self.doc[:,c1:c2]
 
         self.doc.Close()
+
+    def testFullRange(self):
+        # test ability to get the used range in a worksheet
+        print ""
+        t = self.doc.GetFullRange()
+        print len(t), t
+
     def testOpening(self):
         """Test ability to open a file and read from it"""
         self.doc.Close()

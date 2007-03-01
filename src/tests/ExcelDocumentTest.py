@@ -38,7 +38,6 @@ class TestExcelDocument(TestCase):
         self.assertEqual(self.doc.GetValue((1,0,3,4),'Sheet1'),l)
         self.assertEqual(self.doc.GetValue(((1,0),(3,4)),'Sheet1'),l)
 
-
     def test_excelize(self):
         self.assertEqual(self.doc.excelize(0),"A")
         self.assertEqual(self.doc.excelize(18),"S")

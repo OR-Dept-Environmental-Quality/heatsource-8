@@ -9,7 +9,7 @@ class StreamNode(object):
         self.IniParams = IniParams.getInstance()
 
         # Attributes, which are either values from the spreadsheet if distance step
-        # equals the longitudinal sample rate, or averages if the distance step is 
+        # equals the longitudinal sample rate, or averages if the distance step is
         # a multiple of the sample rate.
         attrs = ['RiverKM', 'Slope','N','Width_BF','Width_B','Depth_BF','Z','X_Weight',
                  'Embeddedness','Conductivity','ParticleSize','Aspect','Topo_W',
@@ -35,9 +35,7 @@ class StreamNode(object):
         if self.dx and self.WD: self.checkDx()
 
     def __repr__(self):
-        if self.RiverKM:
-            return '%s @ %.3f km' % (self.__class__.__name__, self.RiverKM)
-        else: return self.__class__.__name__
+        return '%s @ %.3f km' % (self.__class__.__name__, self.RiverKM)
 
     def checkDx(self):
         # bottom depth cannot be zero, which will happen if the equation:
