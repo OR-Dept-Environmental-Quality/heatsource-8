@@ -15,7 +15,8 @@ class StreamNode(object):
                  'Embeddedness','Conductivity','ParticleSize','Aspect','Topo_W',
                  'Topo_S','Topo_E','Latitude','Longitude','FLIR_Temp','FLIR_Time',
                  'Q_Out','Q_Control','D_Control','T_Control','VHeight','VDensity',
-                 'Q_Accretion','T_Accretion','Elevation','BFWidth','WD','Temp_Sed']
+                 'Q_Accretion','T_Accretion','Elevation','BFWidth','WD','Temp_Sed',
+                 'Area_Wetland']
         # Set all the attributes to zero, or set from the constructor
         for attr in attrs:
             x = kwargs[attr] if attr in kwargs.keys() else 0
@@ -28,14 +29,45 @@ class StreamNode(object):
             setattr(self, attr, x)
 
         # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
-        # with values for the sampled zones in each directions
-        self.Zone = None
+        # with values for the sampled zones in each directions. We build a blank Zonator
+        # here so that the HeatSourceInterface.BuildStreamNode() method can add values without
+        # needing to build anything
+        dir = [] # List to save the seven directions
+        for Direction in xrange(7):
+            z = () #Tuple to store the zones 0-4
+            for Zone in xrange(5):
+                z += VegZone(),
+            dir.append(z) # append to the proper direction
+        self.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
+
 
         self.dx = self.IniParams.Dx
         if self.dx and self.WD: self.checkDx()
 
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.RiverKM)
+    def __iter__(self):
+        """Iterator that cycles through the zonator
+
+        This method returns a tuple (i,j,zone) where i is the cardinal direction of the
+        Zonator instance (0-6) and j is the zone number (0-4). zone is the actual zone
+        instance so that the following syntax can be used:
+
+        >>> SN = StreamNode()
+        >>> for i,j,zone in SN:
+        >>>     print i, j, zone
+        0 0 VZ:(0, 0, 0, 0, 0)
+        0 1 VZ:(0, 0, 0, 0, 0)
+        0 2 VZ:(0, 0, 0, 0, 0)
+        0 3 VZ:(0, 0, 0, 0, 0)
+        0 4 VZ:(0, 0, 0, 0, 0)
+        1 0 VZ:(0, 0, 0, 0, 0)
+        1 1 VZ:(0, 0, 0, 0, 0)
+        ...
+        """
+        for i in xrange(7):
+            for j in xrange(5):
+                yield i,j,self.Zone[i][j]
 
     def checkDx(self):
         # bottom depth cannot be zero, which will happen if the equation:

@@ -11,8 +11,6 @@ app.MainLoop()
 # This is a transliterated version of the subroutine called theModel in the
 # original VB code
 
-# For now, we work directly from the HeatSourceInterface class.
-HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
 # TODO: Implement cross-platform path capabilities
 
 # The original code calls a subroutine called BFMorph which calculates the
@@ -66,6 +64,8 @@ HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
 # Next, a bunch of global variables were set. These globals are really bad form
 # and should be removed since they are not really 'global' in the python sense
 # anyway.
+# For now, we work directly from the HeatSourceInterface class.
+HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
 theDistance = HS.IniParams.Length # Bad form, IniParams should be local, but it's temporary
 Flag_HS = 0
 Node = 0
@@ -80,15 +80,18 @@ Counter_Atmospheric_Data = 1
 # If the needles in your eyes weren't enough, now things REALLY start getting painful!
 # This loop cycles over the model distance timesteps and calls the two functions
 # for each model timestep.
-# We have GOT to find a better way to accomplish this
-PB = ProgressBar(len(HS.StreamNodeList))
-while theDistance >= 0:
-    HS.LoadModelVariables(Node, theDistance, Count_Q_Var, Flag_HS)
-    if Flag_HS != 2: HS.CalculateInitialConditions(Node, theDistance,Flag_BC, Flag_HS)
-    HS.SetupSheets2(Node, Count_Q_Var, theDistance)
-    theDistance = theDistance - (HS.IniParams.Dx / 1000)
-    Node = Node + 1
-    PB("Loading model variables")
+# This has now all been moved to the constructor of HS, since it all has to be loaded
+# regardless, there's no reason to keep it global. Now, all of this get's done
+# automagically when we build a HS instance.
+#while theDistance >= 0:
+#    HS.LoadModelVariables(Node, theDistance, Count_Q_Var, Flag_HS)
+#    if Flag_HS != 2: HS.CalculateInitialConditions(Node, theDistance,Flag_BC, Flag_HS)
+#    HS.SetupSheets2(Node, Count_Q_Var, theDistance)
+#    theDistance = theDistance - (HS.IniParams.Dx / 1000)
+#    Node = Node + 1
+#    PB("Loading model variables")
+
+
 
 # This next method has been moved to the StreamNode, and it is not necessary to
 # have it in the above loop, especially since you can map a function to the StreamNodeList

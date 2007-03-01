@@ -7,7 +7,7 @@ from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
 from Utils.IniParams import IniParams
 from numpy import arange
-import math
+import math, time, datetime
 
 #Flag_HS values:
 #    0: Flow Router
@@ -73,10 +73,10 @@ class HeatSourceInterface(DataSheet):
         Hours = int(self.IniParams.SimPeriod * 24) if Flag_HS != 2 else 24
 
         #Figure out the length of the data and store it (This could be changed)
-#        self.UpdateQVarCount()
+        self.UpdateQVarCount()
 
         # Build a quick progress bar
-#        self.PB = ProgressBar(self.IniParams.InflowSites + self.IniParams.ContSites + Hours + self.Num_Q_Var)
+        self.PB = ProgressBar(self.IniParams.InflowSites + self.IniParams.ContSites + Hours + self.Num_Q_Var)
 
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
         #TODO: We need to clean up this syntax and logical progression
@@ -209,11 +209,11 @@ class HeatSourceInterface(DataSheet):
                 'Conductivity': 17, # This value needs to be divided by 1000
                 'ParticleSize': 18,
                 'Embeddedness': 19,
-#                'FLIR_Time': 20,
-                'FLIR_Temp': 21}
-#                'Q_Control': 22,
-#                'D_Control': 23,
-#                'T_Control': 24}
+                'FLIR_Time': 20,
+                'FLIR_Temp': 21,
+                'Q_Control': 22,
+                'D_Control': 23,
+                'T_Control': 24}
         flow = {'Q_Accretion': 4,
                 'T_Accretion': 5,
                 'Q_Out': 6,}
@@ -226,28 +226,35 @@ class HeatSourceInterface(DataSheet):
                   'Topo_E': 12,
                   'VHeight': 159,
                   'VDensity': 160}
-        pages = {'Morphology Data': morph}#, 'Flow Data': flow, 'TTools Data': ttools}
+        pages = {'Morphology Data': morph, 'TTools Data': ttools}#, 'Flow Data': flow}
 
         # This process is quite gruelling. I think that this can probably be cleaned up by
         # getting the entire data matrix in a single call, averaging every X group of values
         # in every column, and dumping that data into the StreamNode. This would be significantly
         # easier than this method. However, since UsedRange does not seem to work, we have to find
-        # a way of getting all of the data from a sheet in a non-stupid fashion. Until we do that,
-        # this method will suffice.
+        # a way of getting all of the data from a sheet in a non-stupid fashion. However, significant
+        # time will have to be spent figuring out how to turn the nature of the spreadsheet into
+        # a proper OOP framework.
+        # One idea for this is to subclass sheets from DataSheet and have a MorphologySheet,
+        # a FlowSheet, etc. Then, we could tie the StreamNode class directly to the DataSheet
+        # subclass and have this done internally.
+        # TODO: Optimize, or otherwise try to clean up this syntax.
 
         row = 17 # Current row
+        # this is a boolean that allows us to use the while statement to cycle until we want to fail
         GotNodes = False
         while not GotNodes: # Until we get to the end of the data
             node = StreamNode()
-            for i in xrange(int(multiple)): # How many samples per node?
+            # We want to get the data for a number of datapoints and average them for a node, so
+            # we go through and get the data for each row starting at 'row' and continuing 'multiple'
+            # times, then we divide by 'multiple'
+            for i in xrange(int(multiple)):
                 if GotNodes: break # If we set GotNodes to true in an inner loop, we don't necessarily break out of this one.
                 test = i == multiple-1 #Are we in the last pass?
-                # We have to get the rivermile, but if it's blank, and since we are assuming that
-                # we checked all the morphology data for blank values, then we will assume that,
-                # if this is None, we hit a blank row
+                # Set the river mile, we set this each time because we want the river mile
+                # to equal the last mile for the combined (averaged) data.
                 val = self[row+i,4,'Morphology Data']
-                node.RiverKM = val if val else node.RiverKM # Set the river mile
-                row_km = node.RiverKM
+                node.RiverKM = val if val else node.RiverKM
                 for page in pages:
                     # Row of all available data grabbed in a single 'get' call
                     # We get the 0th item because what's returned is actually a row of rows, but with only one.
@@ -258,125 +265,134 @@ class HeatSourceInterface(DataSheet):
                          # e.g. if we have 3.15 km of stream with samples every 50 meters and
                          # a dx of 100 meters, we'll have an extra segment of 50 meters, so
                          # trying to grab the second part of that segment will be null.
-                         # In that case, we average immediately and scram
+                         # In that case, we average immediately and scram. However, if we are at
+                         # the first pass in 'multiple' then we actually grabbed the last bit of
+                         # data during the last pass, meaning we have just built a node with
+                         # zero kilometers and no internal data. Thus, we have to figure out if
+                         # this is true, and if so, set a condition that allows us to delet the node.
+                        GotNodes = True # We're done, either way
+                        if not i: # we're at the first pass, i==0
+                            del node # Get rid of the node
+                            break # then scram
                         val = getattr(node,attr) / (i+1)
                         setattr(node,attr,val)
-                        GotNodes = True # Assume we're at the end of the data, and break completely
+                        # Make sure we get the vegzones
+                        for j,k,zone in node: # use StreamNode.__iter__(), we can ignore the indexes, we just want the zone.
+                            for attr in ["Elevation","Overhang","VHeight","VDensity"]:
+                                val = getattr(zone,attr) # Get the value
+                                val = val / (i+1) if val else val # Divide if not zero, or keep zero if it is
+                                setattr(zone, attr, val)
                         break
+                    # using [get|set]attr() allows us to do all of this with a single list or dictionary,
+                    # otherwise, we'd have to set each value independantly, which makes for long, inelegant methods.
                     for attr, col in pages[page].items():
-                        val = getattr(node,attr) + data[col] # Get current value using the attribute's name string
+                        try:
+                            val = getattr(node,attr) + data[col] # Get current value using the attribute's name string
+                        # except when we have to catch some exceptions
+                        #
+                        # This first exception catches the case when we are given a PyTime object, which occurs whenever
+                        # the interface encounters a date/time in the Excel interface. We cannot simply add the time objects
+                        # so we work around that in this case.
+                        except TypeError, inst:
+                            if inst.message == "unsupported operand type(s) for +: 'int' and 'time'":
+                                t = data[col] # get the data
+                                # And create a floating point number which is seconds since the epoch
+                                # Doing this, we can then add another time in seconds, then average them, and then
+                                # get the average of the time. I'm not entirely sure if it's useful, but it's done
+                                # in the original code, so I'll do it here
+                                #TODO: Explore adding a + operator to the TimeUtil function.
+                                d = time.mktime(time.strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
+                                val = getattr(node,attr) + d # Then add that to the current number
+                        # In this instance, we have an out of range tuple, so that means that we are trying
+                        # to access data at the end of a row that doesn't actually exist. Since values of 'None'
+                        # at the end of a returned row or column are removed, we could have a row that's too short
+                        # to hold data for things like T_Control, which is at the far end of a row.
+                        except IndexError, inst:
+                            if inst.message == "tuple index out of range":
+                                # If it's an attribute that we know about, then we can just keep the zero value
+                                # that's the default, or at least ignore this run because we have zero + zero.
+                                if attr in ['T_Control','D_Control','Q_Control']: pass
+                                else:
+                                    print attr, col, len(data)
+                                    raise
+
                         setattr(node,attr,val) # set the new value
-                        if not test and attr=="Slope": crap = val
-                        if test and page == 'Morphology Data': # we are in the last run, or have a null value, so we average
+                        if test: # we are in the last run, or have a null value, so we average
                             val = getattr(node,attr) / multiple
                             setattr(node,attr,val)
+                    # We are going to build the VegZone and Zonator instances We have to do this for each cardinal
+                    # direction and for 5 zones/direction. They are built in the StreamNode constructor and all
+                    # values are set to zero by default, so we can just add values here and feel confident the
+                    # addition will not fail.
+                    if page == 'TTools Data':
+                        #TODO: Create a method in the StreamNode that will automagically cycle this
+                        # Somehow, we should automagically cycle through all of the zones in all of
+                        # the directions in a single call... that would be sweet!
+                        for j,k,zone in node: # j is the cardinal direction, k is the zone number
+                            if k == 0: # If we're in the 0th zone
+                                zone.Elevation += data[7]
+                                try:
+                                    zone.Overhang += data[j + 150]
+                                except TypeError: # Overhang column is blank, meaning there's no overhang
+                                    pass
+                            else:
+                                zone.Elevation += data[j * 4 + 37 + k]
+                                zone.VHeight += data[j * 8 + 61 + k * 2]
+                                zone.VDensity += data[j * 8 + 60 + k * 2]
+                            if test:
+                                for attr in ["Elevation","Overhang","VHeight","VDensity"]:
+                                    val = getattr(zone,attr) # Get the value
+                                    val = val / multiple if val else val # Divide if not zero, or keep zero if it is
+                                    setattr(zone, attr, val)
+            if GotNodes: break # We're done, scram
+            #############################################################
+            #The original VB code has this method BFMorph, which calculates some things and
+            # spits them back to the spreadsheet. We want to keep everything in the node, but
+            # we'll spit these four things back to the spreadsheet for now, until we understand
+            # better what the purpose is. Unfortunately, this only calculates for each node, which
+            # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
+            # TODO: Figure out whether we should calculate this for each row, or if each node is enough.
+            try:
+                node.BFMorph()
+            except:
+                print node, node.Slope, node.Width_BF, node.Z, node.WD
+            self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
+            self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
+            self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
+            self.SetValue((i + 17, 14),node.BFXArea, sheet="Morphology Data")
+            ##############################################################
+            #Now that we have a stream node, we set the node's dx value, because
+            # we have most nodes that are long-sample-distance times multiple,
+            # but the last one may be shorter.
+            node.dx = long * (i+1)
             row += multiple
             self.StreamNodeList += node,
-            raise Exception("Not yet, we still have to finish what's commented below")
 
-#        for i in range(count):
-#
-#            dir = [] # List to save the seven directions
-#            for Direction in xrange(7):
-#                z = () #Tuple to store the zones 0-4
-#                for Zone in xrange(5):
-#                    if Zone == 0:
-#                        #TODO: See what this storage of elevation is used for, because it is also used above.
-#                        elev = self[i + 17, 7]
-#                        over = self[i + 17, Direction + 150]
-#                        elev = elev if elev else 0 # In case the values are None
-#                        over = over if over else 0
-#                        z += VegZone(elev, Overhang=over), #Overhang and Elevation
-#                        continue #No need to do any more for 0th zone
-#                    Elevation = self[i + 17, Direction * 4 + 37 + Zone]
-#                    VHeight = self[i + 17, Direction * 8 + 61 + Zone * 2]
-#                    VDensity = self[i + 17, Direction * 8 + 60 + Zone * 2]
-#                    # append to the ith zone
-#                    z += VegZone(Elevation,VHeight,VDensity),
-#                dir.append(z) # append to the proper direction
-#            node.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
-#
-#            #############################################################
-#            #The original VB code has this method BFMorph, which calculates some things and
-#            # spits them back to the spreadsheet. We want to keep everything in the node, but
-#            # we'll spit these four things back to the spreadsheet for now, until we understand
-#            # better what the purpose was
-#            node.BFMorph()
-#            self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
-#            self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
-#            self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
-#            self.SetValue((i + 17, 14),node.BFXArea, sheet="Morphology Data")
-#            ##############################################################
-#
-#            self.StreamNodeList += node, # Now add this node to the stream node list
-#            if not self.PB("Building Stream Nodes", i, count)[0]: raise Exception("Building streamnodes cancelled, model stopped")
+            # Here, we check if we get a cancel request from the progress bar. We set the maximum value of the progress
+            # bar to 1.5 times the number of variables just because... well... what the hell?
+            if not self.PB("Building Stream Nodes", row, self.Num_Q_Var*1.5)[0]:
+                raise Exception("Building streamnodes cancelled, model stopped")
+        self.PB.Hide()
+        raise Exception("Make sure that the node.dx stuff works, then make sure that breaking before the end always works")
 
     def LoadModelVariables(self,Node,theDistance,Count_Q_Var,Flag_HS):
         """Load model variables (see notes)"""
-        #I really don't understand what this subroutine is supposed to be doing.
-        # It is just copied from the visual basic code so that it functions the same
-        # way. It is probably in desperate need of optimization.
-        #TODO: Figure out a better way to define these averages, perhaps in BuildStreamNodes.
-        self.SetSheet('Morphology Data')
-        node = self.StreamNodeList[Node]
-
-        Flag_First = 1
-        while Node > 0 and round(theDistance, 2) < round(self[Count_Q_Var + 17, 4], 2):
-            Count_Q_Var = Count_Q_Var + 1
-        #======================================================
-        #Average Parameters Over Modeled Segments
-        #======================================================
-        I = 0
-        # This is a dictionary to hold totals for the averages.
-        # In the original code, it was {I2,I3,...,I8}
-        control_num = {'T_Control':0,'Q_Control':0,'D_Control':0,'Q_Accretion':0}
-        node.Q_Out_Total = 0
-        # Here's a list of attributes that we are calculating in the original
-        # VB code. This allows us to just loop over them, instead of individually
-        # calculating each one.
-        the_attrs = ['RiverKM', 'Slope','N','Width_BF','Width_B','Depth_BF','Z','X_Weight',
-                 'Embeddedness','Conductivity','ParticleSize','Aspect','Topo_W',
-                 'Topo_S','Topo_E','Latitude','Longitude','FLIR_Temp','FLIR_Time',
-                 'Q_Out','Q_Control','D_Control','T_Control','VHeight','VDensity',
-                 'Q_Accretion','Elevation']
-
-        calc = True
-        while calc:
-            """So, there's a weird loop in this subroutine (VB code) that I'm
-            simulating with a nested while statement"""
-            prevNode = self.StreamNodeList[Node - I]
-            for attr in the_attrs:
-                name = "the" + attr # Original code has 'the' in front of attribute names (i.e. theSlope for average of Slope)
-                x = getattr(node,name) # get the average value (or zero if it's not yet calculated)
-                y = x + prevNode.Slope # Add the current value
-                setattr(node, name, y)
-                if attr in control_num.keys(): control_num[attr] += 1
-            # NOTE: The VB code had certain totals (e.g. T_Control_Total) which have been renamed to 'the' (e.g. theT_Control)
-            # Temperature accretion is treated somewhat differently, and it should be calculated after
-            # Flow accretion, so we do it outside that loop
-            print prevNode
-            node.theT_Accretion += prevNode.T_Accretion * prevNode.Q_Accretion
-
-
-            for Direction in xrange(7):
-                for Zone in xrange(5):
-                    if Zone == 0:
-                        node.theZone[Direction][Zone].Elevation += prevNode.Zone[Direction][Zone].Elevation
-                        node.theZone[Direction][Zone].Overhang += prevNode.Zone[Direction][Zone].Overhang
-                        continue # Nothing else in the 0th zone
-                    node.theZone[Direction][Zone].Elevation += prevNode.Zone[Direction][Zone].Elevation
-                    node.theZone[Direction][Zone].VHeight +=  prevNode.Zone[Direction][Zone].VHeight
-                    node.theZone[Direction][Zone].VDensity += prevNode.Zone[Direction][Zone].VDensity
-            I = I + 1
-            if ((Count_Q_Var - I) < 0) or (prevNode.theRiverKM >= round((theDistance + dx / 1000), 3)): break
+        # The original VB code contained loops here to average the data in various arrays
+        # and then create new arrays with those averaged values. Rather, here we just
+        # create StreamNode instances with those averaged values in the BuildStreamNode
+        # method, then we do some other stuff here. We separate here and there mainly
+        # because there is one "holy-mother-of-god"-big class.
+        for node in StreamNodeList:
+            wet_area = node.theWidth_BF * self.IniParams.Dx
+            node.Area_Wetland += area
+            
+        
         #======================================================
         #Account for Inflow Volumes
         Count_Q_In = 0 #This was a global variable in the original code
         Flag_Inflow = 0
         I8 = Count_Q_In
         I7 = Count_Q_In
-        if Flag_First == 1:
-            Dummy = Count_Q_In
 
         if Count_Q_In < self.IniParams.InflowSites:
             while (theDistance <= self.Inflow_Distance[Count_Q_In]) and ((theDistance + dx / 1000) > Inflow_Distance[Count_Q_In]):
@@ -395,60 +411,8 @@ class HeatSourceInterface(DataSheet):
                 node.T_In[II] = node.T_In[II] / node.Q_In[II]
         Flag_Inflow = 0
 
-        node.theSlope /= I
-        node.theN /= I
-        node.theWidth_BF /= I
-        wet_area = node.theWidth_BF * self.IniParams.Dx
-        try: node.theArea_Wetland += area
-        except AttributeError: node.theArea_Wetland = wet_area
-        node.theWidth_B /= I
-        node.theDepth_BF /= I
-        node.theZ /= I
-        node.theX_Weight /= I
-        node.theEmbeddedness /= I
-        node.theConductivity /= I
-        node.theParticleSize /= I
-        node.theQ_Control = (node.theQ_Control / control_num['Q_Control']) if node.theQ_Control else 0
-        node.theQ_Accretion = node.theQ_Accretion if node.theQ_Accretion else 0
-        node.theT_Accretion = (node.theT_Accretion / node.theQ_Accretion) if node.theQ_Accretion else 0
-        node.theD_Control = (node.theD_Control / control_num['D_Control']) if node.theD_Control else 0
 
-        #======================================================
-        #Calculate Average elevations and land cover height and density
-        #theElevation(Node, Zone, Direction)
-        #theVHeight(Node, Zone, Direction)
-        #theVDensity(Node, Zone, Direction)
-        #Direction: 0 = Stream
-        #           1 = Northeast
-        #           2 = East
-        #           3 = Southeast
-        #           4 = South
-        #           5 = Southwest
-        #           6 = West
-        #           7 = Northwest
         node.theT_Control = (node.theT_Control / control_num['T_Control']) if node.theT_Control else 0
-
-        node.theAspect /= I
-        node.theTopo_W /= I
-        node.theTopo_S /= I
-        node.theTopo_E /= I
-        node.theLatitude /= I
-        node.theLongitude /= I
-        node.Gotit = 0
-        node.theFLIR_Time /= I
-        node.theFLIR_Temp /= I
-        node.theVHeight /= I
-        node.theVDensity /= I
-        for Direction in xrange(7):
-            for Zone in xrange(5):
-                if Zone == 0:
-                    node.theZone[Direction][Zone].Elevation /= I
-                    node.theZone[Direction][Zone].Overhang /= I
-                    continue # done with 0th zone
-                node.theZone[Direction][Zone].Elevation /= I
-                node.theZone[Direction][Zone].VHeight /= I
-                node.theZone[Direction][Zone].VDensity /= I
-                node.theZone[Direction][Zone].SlopeHeight = node.theZone[Direction][Zone].Elevation - node.theZone[Direction][0].Elevation
 
     def CalculateInitialConditions(self,Node, theDistance, Flag_BC, Flag_HS):
         """Initial conditions"""
