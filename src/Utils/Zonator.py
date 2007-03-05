@@ -15,6 +15,7 @@ class Zonator(EightFoldPath):
         if 'north' in kwargs.keys(): inNorth = kwargs['north']
         if 'south' in kwargs.keys(): inNorth = not kwargs['south']
         if len(args) > 7: raise HSClassError("Cannot have more than 7 directions")
+        # Now see how many arguments we have and act accordingly
         if len(args) == 1: # Possible list, tuple or dictionary
             if len(args[0]) > 7: raise HSClassError("Cannot have more than 7 directions")
             if isinstance(args[0],list) or isinstance(args[0],tuple):
@@ -24,6 +25,7 @@ class Zonator(EightFoldPath):
                 if inNorth: t = ("NE","E","SE","S","SW","W","NW") # Northern hemisphere
                 else: t = ("SW","W","NW","N","NE","E","SE")# Southern hem.
                 paths = [args[0][k] for k in t] # Build ordered list on the fly
+        # Not a single argument, assume they are individual VegZone instances
         else: paths = args
         # No we know we have a valid set of arguments, so we make sure that they
         # are all VegZone instances

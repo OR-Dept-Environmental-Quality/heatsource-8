@@ -64,18 +64,7 @@ app.MainLoop()
 # Next, a bunch of global variables were set. These globals are really bad form
 # and should be removed since they are not really 'global' in the python sense
 # anyway.
-# For now, we work directly from the HeatSourceInterface class.
 HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
-theDistance = HS.IniParams.Length # Bad form, IniParams should be local, but it's temporary
-Flag_HS = 0
-Node = 0
-Count_Q_Var = 0
-Count_Q_In = 0
-Flag_DryChannel = 0
-Flag_ChannelWidth = 0
-Flag_BC = 1
-Flag_StoptheModel = 0
-Counter_Atmospheric_Data = 1
 
 # If the needles in your eyes weren't enough, now things REALLY start getting painful!
 # This loop cycles over the model distance timesteps and calls the two functions
@@ -95,5 +84,3 @@ Counter_Atmospheric_Data = 1
 
 # This next method has been moved to the StreamNode, and it is not necessary to
 # have it in the above loop, especially since you can map a function to the StreamNodeList
-
-HS.Map(lambda x: x.ViewToSky())

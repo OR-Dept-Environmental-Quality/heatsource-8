@@ -8,6 +8,7 @@ from Utils.Zonator import Zonator
 from Utils.IniParams import IniParams
 from numpy import arange
 import math, time, datetime
+from StreamReach import StreamReach
 
 #Flag_HS values:
 #    0: Flow Router
@@ -20,8 +21,17 @@ class HeatSourceInterface(DataSheet):
         if not filename:
             raise Warning("Need a model filename!")
         DataSheet.__init__(self, filename)
-        self.StreamNodeList = ()
+        self.__initialize(Flag_HS) # Put all constructor stuff in a method for Psyco optimation
+
+    def __del__(self):
+        self.Close() # Close the file and quit Excel process
+
+    def __initialize(self, Flag_HS):
+        self.Reach = StreamReach()
         self.IniParams = IP = IniParams.getInstance()
+        # Build a quick progress bar
+        self.PB = ProgressBar(1000)
+        self.PB("Initializing Excel interface")
 
         #######################################################
         # Grab the initialization parameters from the Excel file.
@@ -70,36 +80,8 @@ class HeatSourceInterface(DataSheet):
         # from VB: Apparently, only one day is simulated for the shadelator
         if Flag_HS != 2: Days = self.IniParams.SimPeriod
         else: Days = 1
-        Hours = int(self.IniParams.SimPeriod * 24) if Flag_HS != 2 else 24
+        self.Hours = int(self.IniParams.SimPeriod * 24) if Flag_HS != 2 else 24
 
-        #Figure out the length of the data and store it (This could be changed)
-        self.UpdateQVarCount()
-
-        # Build a quick progress bar
-        self.PB = ProgressBar(self.IniParams.InflowSites + self.IniParams.ContSites + Hours + self.Num_Q_Var)
-
-        # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
-        #TODO: We need to clean up this syntax and logical progression
-#        self.GetBoundaryConditions(Hours)
-#        if Flag_HS != 2:
-#           self.GetInflowData()
-#           if Flag_HS == 1: self.GetContinuousData(Hours)
-#        self.ScanMorphology()
-        self.BuildStreamNodes()
-
-#        self.PB.Hide() #Hide the progressbar, but keep it live
-
-
-    def GetNode(self, index):
-        if isinstance(index,slice):
-            return self.StreamNodeList[index.start:index.stop:index.step]
-        else: return self.StreamNodeList[index]
-    def Map(self, func):
-        """Map a lambda function to the list of streamnodes, returning nothing"""
-        # this uses list comprehension instead of map() because of the Psyco modules problems with it.
-        [func(i) for i in self.StreamNodeList]
-
-    def UpdateQVarCount(self):
         # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
         # and incrementing a counter if the value was not blank. With the
@@ -108,7 +90,20 @@ class HeatSourceInterface(DataSheet):
         row = self[:,5][16:] # no row definition, 5th column- strip off the first 16 lines
         self.Num_Q_Var = len(row)
 
-    def GetBoundaryConditions(self, Hours):
+        # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
+        #TODO: We need to clean up this syntax and logical progression
+        self.GetBoundaryConditions()
+        self.GetInflowData()
+        self.ScanMorphology()
+        self.BuildStreamNodes()
+        self.GetInflowData()
+        self.GetContinuousData()
+        self.CalculateInitialConditions()
+        self.Reach.Map(lambda x: x.ViewToSky())
+
+        self.PB.Hide() #Hide the progressbar, but keep it live
+
+    def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
         # Boundary conditions
         self.Q_BC = []
@@ -127,36 +122,57 @@ class HeatSourceInterface(DataSheet):
         self.Cont_Air_Temp = [[] for i in xrange(self.IniParams.ContSites)]
         self.Cont_Distance = []
 
+        # Get the columns, which is faster than accessing cells
         col = 7
-        for I in xrange(Hours):
+        flow_col = self[:,col,"Continuous Data"]
+        temp_col = self[:,col+1,"Continuous Data"]
+        cloud_col = self[:,col+2,"Continuous Data"]
+        for I in xrange(self.Hours):
             # Get the flow boundary condition
-            val = self.GetValue((17 + I, col),"Continuous Data")
+            val = flow_col[16 + I][0] # We get the 0th index because each column is actually a 1-length row
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
             self.Q_BC.append(val)
             # Temperature boundary condition
-            t_val = self.GetValue((17 + I,col+1),"Continuous Data")
+            t_val = temp_col[16 + I][0]
             if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
             self.T_BC.append(t_val)
             # Cloudiness boundary condition
-            self.Cloudiness.append(self.GetValue((17 + I, col+2),"Continuous Data"))
-            self.PB("Reading boundary conditions",I,Hours)
+            self.Cloudiness.append(cloud_col[16 + I][0])
+            self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetInflowData(self):
         """Get accumulation data from the "Flow Data" page"""
+        #====================================================
+        # Account for inflow volumes
         for I in xrange(self.IniParams.InflowSites):
-            self.Inflow_Distance.append(self.GetValue((I + 17, 11),"Flow Data"))
-            for II in xrange(len(Hours)):
-                self.Inflow_Rate[I].append(self.GetValue((II + 17, 14 + I * 2),"Flow Data"))
-                self.Inflow_Temp[I].append(self.GetValue((17 + II, 15 + I * 2),"Flow Data"))
-                self.PB("Reading inflow data", I, self.IniParams.InflowSites)
-    def GetContinuousData(self, Hours):
+            # Get the stream node corresponding to the kilometer of this inflow site.
+            # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
+            # GetByKm() currently looks downstream
+            node = self.Reach.GetByKm(self.GetValue((I + 17, 11),"Flow Data"))
+            # Get entire flow and temp columns in one call each
+            flow_col = self[:, 14 + I * 2,"Flow Data"]
+            temp_col = self[:, 15 + I * 2,"Flow Data"]
+            for II in xrange(Hours):
+                flow = flow_col[II + 16][0]
+                temp = temp_col[II + 16][0]
+                node.Q_In[II] = flow
+                node.T_In[II] = temp * flow
+            if self.Flag_HS:
+                # Not sure what this does
+                node.T_In[II] = node.T_In[II] / node.Q_In[II]
+            self.PB("Getting inflow data", I, self.IniParams.InflowSites)
+
+    def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
         for I in xrange(self.IniParams.ContSites):
-            self.Cont_Distance.append(self.GetValue((I + 17, 4),"Continuous Data"))
-            for II in xrange(Hours):
-                self.Cont_Wind[I].append(self.GetValue((17 + II, 7 + (I * 4)),"Continuous Data"))
-                self.Cont_Humidity[I].append(self.GetValue((17 + II, 8 + (I * 4)),"Continuous Data"))
-                self.Cont_Air_Temp[I].append(self.GetValue((17 + II, 9 + (I * 4)),"Continuous Data"))
+            node = self.Reach.GetByKm(self.GetValue((I + 17, 4),"Continuous Data"))
+            wind_col = self[:,7 + (I * 4),"Continuous Data"]
+            humidity_col = self[:,8 + (I * 4),"Continuous Data"]
+            air_col = self[:,8 + (I * 4),"Continuous Data"]
+            for II in xrange(self.Hours):
+                node.Cont_Wind = wind_col[II + 16][0]
+                node.Cont_Humidity = humidity_col[II + 16][0]
+                node.Cont_Air_Temp = air_col[II + 16][0]
             self.PB("Reading continuous data", I, self.IniParams.ContSites)
 
     def ScanMorphology(self):
@@ -166,12 +182,17 @@ class HeatSourceInterface(DataSheet):
         # Included is a transcription of the original, which I've tried to interpret
         self.SetSheet('TTools Data')
         for theRow in xrange(17,self.Num_Q_Var + 16):
+            row = self[theRow,:][0] # Get the entire row, rather than accessing each cell, which is slow.
+                                    # We need to get the 0th index because it's the first of one row that's returned.
             for theCol in xrange(7,22):
-                if theCol == 9: continue
-                val = self[theRow,theCol]
+                if theCol == 9: continue #I guess this column can be blank
+                try:
+                    val = row[theCol]
+                except IndexError:
+                    raise Exception("Invalid data: row %i, cell %s ... Flow router terminated" %(theRow, self.excelize(theCol)))
                 if not (isinstance(val,float) or isinstance(val,int)) or \
                     val == "" or \
-                    self.Num_Q_Var <= 0:
+                    self.Num_Q_Var <= 0: # Crazy logic... should clean this up
                     raise Exception("Invalid data: row %i, cell %s: '%s' ... Flow router terminated" %(theRow, self.excelize(theCol),val))
             self.PB("Scanning morphology data", theRow, self.Num_Q_Var+16)
 
@@ -185,7 +206,7 @@ class HeatSourceInterface(DataSheet):
         node are the average values of the longitudinal samples that fall within that dx.
         For instance, if longrate=50 and dx=200, then the Slope for the node will be
         the average of 4 longitudinal slopes."""
-        self.StreamNodeList = () # Make sure we empty any current list
+        self.Reach = StreamReach() # Make sure we empty any current list
 
         long = self.IniParams.LongSample
         dx = self.IniParams.Dx
@@ -226,7 +247,7 @@ class HeatSourceInterface(DataSheet):
                   'Topo_E': 12,
                   'VHeight': 159,
                   'VDensity': 160}
-        pages = {'Morphology Data': morph, 'TTools Data': ttools}#, 'Flow Data': flow}
+        pages = {'Morphology Data': morph, 'TTools Data': ttools, 'Flow Data': flow}
 
         # This process is quite gruelling. I think that this can probably be cleaned up by
         # getting the entire data matrix in a single call, averaging every X group of values
@@ -243,6 +264,7 @@ class HeatSourceInterface(DataSheet):
         row = 17 # Current row
         # this is a boolean that allows us to use the while statement to cycle until we want to fail
         GotNodes = False
+        QuickExit = False
         while not GotNodes: # Until we get to the end of the data
             node = StreamNode()
             # We want to get the data for a number of datapoints and average them for a node, so
@@ -273,6 +295,7 @@ class HeatSourceInterface(DataSheet):
                         GotNodes = True # We're done, either way
                         if not i: # we're at the first pass, i==0
                             del node # Get rid of the node
+                            QuickExit = True # make a quick exit out of the loop
                             break # then scram
                         val = getattr(node,attr) / (i+1)
                         setattr(node,attr,val)
@@ -344,7 +367,7 @@ class HeatSourceInterface(DataSheet):
                                     val = getattr(zone,attr) # Get the value
                                     val = val / multiple if val else val # Divide if not zero, or keep zero if it is
                                     setattr(zone, attr, val)
-            if GotNodes: break # We're done, scram
+            if QuickExit: break # We're done, scram
             #############################################################
             #The original VB code has this method BFMorph, which calculates some things and
             # spits them back to the spreadsheet. We want to keep everything in the node, but
@@ -353,9 +376,11 @@ class HeatSourceInterface(DataSheet):
             # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
             # TODO: Figure out whether we should calculate this for each row, or if each node is enough.
             try:
+                node.dx = long * (i+1)
                 node.BFMorph()
             except:
                 print node, node.Slope, node.Width_BF, node.Z, node.WD
+                raise
             self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
             self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
             self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
@@ -364,69 +389,28 @@ class HeatSourceInterface(DataSheet):
             #Now that we have a stream node, we set the node's dx value, because
             # we have most nodes that are long-sample-distance times multiple,
             # but the last one may be shorter.
-            node.dx = long * (i+1)
             row += multiple
-            self.StreamNodeList += node,
+            self.Reach.append(node)
 
             # Here, we check if we get a cancel request from the progress bar. We set the maximum value of the progress
             # bar to 1.5 times the number of variables just because... well... what the hell?
             if not self.PB("Building Stream Nodes", row, self.Num_Q_Var*1.5)[0]:
                 raise Exception("Building streamnodes cancelled, model stopped")
-        self.PB.Hide()
-        raise Exception("Make sure that the node.dx stuff works, then make sure that breaking before the end always works")
 
-    def LoadModelVariables(self,Node,theDistance,Count_Q_Var,Flag_HS):
-        """Load model variables (see notes)"""
-        # The original VB code contained loops here to average the data in various arrays
-        # and then create new arrays with those averaged values. Rather, here we just
-        # create StreamNode instances with those averaged values in the BuildStreamNode
-        # method, then we do some other stuff here. We separate here and there mainly
-        # because there is one "holy-mother-of-god"-big class.
-        for node in StreamNodeList:
-            wet_area = node.theWidth_BF * self.IniParams.Dx
-            node.Area_Wetland += area
-            
-        
-        #======================================================
-        #Account for Inflow Volumes
-        Count_Q_In = 0 #This was a global variable in the original code
-        Flag_Inflow = 0
-        I8 = Count_Q_In
-        I7 = Count_Q_In
-
-        if Count_Q_In < self.IniParams.InflowSites:
-            while (theDistance <= self.Inflow_Distance[Count_Q_In]) and ((theDistance + dx / 1000) > Inflow_Distance[Count_Q_In]):
-                for II in xrange(Hours):
-                    # TODO: Move much of this to the StreamNode class
-                    self.Q_In[II] += self.Inflow_Rate[Count_Q_In][II]
-                    if Flag_HS == 1:
-                        node.T_In[II] = node.T_In[II] + self.Inflow_Temp[Count_Q_In][II] * self.Inflow_Rate[Count_Q_In][II]
-                Count_Q_In += 1
-                Flag_Inflow = 1
-                if Count_Q_In > Inflow_DistNodes: break
-        #======================================================
-        #Account for Inflow Temps
-        if Flag_Inflow == 1 and Flag_HS == 1:
-            for II in xrange(Hours):
-                node.T_In[II] = node.T_In[II] / node.Q_In[II]
-        Flag_Inflow = 0
-
-
-        node.theT_Control = (node.theT_Control / control_num['T_Control']) if node.theT_Control else 0
-
-    def CalculateInitialConditions(self,Node, theDistance, Flag_BC, Flag_HS):
+    def CalculateInitialConditions(self):
         """Initial conditions"""
+        #TODO: Nearly all of this should be moved to the StreamNode class
         #==================================================
         # Initial conditions for flow
         #TODO: This should be in StreamNode
-        node = self.StreamNodeList[Node]
+        node = self.Reach[Node]
         if Flag_BC: # TODO: What the hell is Flag_BC?
             node.Q[0] = self.Q_BC[0]
         else:
             if node.theQ_Control != 0:
                 node.Q[0] = node.theQ_Control
             else:
-                node.Q[0] = self.StreamNodeList[Node-1].Q[0] + node.Q_In[theHour] - node.theQ_Out + node.theQ_Accretion
+                node.Q[0] = self.Reach[Node-1].Q[0] + node.Q_In[theHour] - node.Q_Out + node.Q_Accretion
         node.Q[1] = node.Q[0]
         #=======================================================
         #Set Temperature Initial Conditions
@@ -466,7 +450,7 @@ class HeatSourceInterface(DataSheet):
             if Flag_BC == 1:
                 node.theDepth[0] = 1
             else:
-                node.theDepth[0] = self.StreamNodeList[Node-1].theDepth[0]
+                node.theDepth[0] = self.Reach[Node-1].theDepth[0]
             Q_Est = node.Q[0]
             if Q_Est < 0.0071: #Channel is going dry
                 Flag_SkipNode = True
@@ -521,11 +505,11 @@ class HeatSourceInterface(DataSheet):
                 Converge = abs(Fy / dFy)
                 if Converge < 0.001: break
                 Count_Iterations = Count_Iterations + 1
-            node.theDepth[0] = D_Est
+            node.Depth[0] = D_Est
             node.AreaX[0] = A_Est
-            node.theVelocity[0] = node.Q[0] / node.AreaX[0]
-            node.theWidth = node.theWidth_B + 2 * node.theZ * node.theDepth[0]
-            node.Celerity = node.theVelocity[0] + math.sqrt(9.8 * node.theDepth[0]) #TODO: Check this with respect to gravity rounding error
+            node.Velocity[0] = node.Q[0] / node.AreaX[0]
+            node.Width = node.Width_B + 2 * node.Z * node.Depth[0]
+            node.Celerity = node.Velocity[0] + math.sqrt(9.8 * node.Depth[0]) #TODO: Check this with respect to gravity rounding error
             if self.IniParams.Flag_Muskingum == 0 and Flag_HS < 2 and Flag_SkipNode == 0:
                 if dt > dx / node.Celerity: dt = dx / node.Celerity
         else:
@@ -540,19 +524,27 @@ class HeatSourceInterface(DataSheet):
             node.Q[0] = 0
             node.Celerity = 0
 
+        raise Exception("Method not cleaned up")
+
+
     def SetupSheets1(self):
+        num = 0
+        max = 20
         for page in ("Solar Potential","Solar Surface","Solar Received","Longwave",\
               "Evaporation","Convection","Total Heat","Conduction","Evaporation Rate",\
               "Temperature","Hydraulics","Daily Heat Flux"):
             name = "Output - %s" % page
             self.Clear("F16:IV16",name)
             self.Clear("17:50000",name)
+            self.PB("Clearing old data", num, max)
+            num+=1
         self.Clear("A13:D10000", "Chart-TIR")
         self.Clear("A13:c10000", "Chart-Shade")
         self.Clear("17:50000", "Chart-Diel Temp")
         self.Clear("13:50000", "Chart-Heat Flux")
         self.Clear("13:50000","Chart-Shade")
         self.Clear("13:50000", "Chart-Solar Flux")
+        self.PB("Clearing old data", num + 6, max)
 
     def SetupSheets2(self,Node, Count_Q_Var, theDistance):
         """Set the values for a particular node and distance.

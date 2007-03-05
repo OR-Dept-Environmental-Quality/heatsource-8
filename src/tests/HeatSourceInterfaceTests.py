@@ -38,7 +38,7 @@ class TestDataSheet(TestCase):
 #             ('Z', 0.5),
 #             ('X_Weight', 0.0),
 #             ('Conductivity', 30/1000),
-#             ('Particle_Size', 250),
+#             ('ParticleSize', 250),
 #             ('Embeddedness', 0.2),
 #             ('Q_Control', 0.3),
 #             ('D_Control', 0.4),
