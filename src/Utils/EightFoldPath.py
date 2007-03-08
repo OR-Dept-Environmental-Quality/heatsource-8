@@ -16,7 +16,7 @@ class EightFoldPath(object):
         else: self.dirs = ("SW","W","NW","N","NE","E","SE")
         # Dictionary to hold, for each direction, whatever we want.
         # We set it to None initially so that iteration works with an empty object
-        self.paths = dict([(k,None) for k in self.dirs])
+        self.paths = dict(list((k,None) for k in self.dirs))
         # If given a dirs arg (list or tuple) where len(dirs)==8, then set each direction
         # to the value of the appropriate index
         if dirs:

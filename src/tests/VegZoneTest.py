@@ -16,7 +16,7 @@ class TestVegZone(TestCase):
         self.assertNotEqual(v1[0:4],v2[0:4])
         self.assertEqual(v1[0:2],v2[0:2])
         self.assertEqual(v1.Overhang, v2.VDensity)
-        self.assertEqual(v1.Overhang, None)
+        self.assertEqual(v1.Overhang, 0)
         self.assertRaises(AttributeError,getattr,v1,'test')
         self.assertRaises(AttributeError,setattr,v1,'test',3)
         v1.Overhang = 15

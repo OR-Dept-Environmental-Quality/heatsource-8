@@ -44,13 +44,9 @@ class VegZone(object):
     def __iter__(self):
         return (getattr(self,i) for i in self.__slots__)
     def __getitem__(self, index):
-        if isinstance(index,str):
-            return getattr(self,index)
-        elif isinstance(index,slice):
-            l = tuple(i for i in self)
-            return l[index.start:index.stop:index.step]
-        elif isinstance(index,int):
-            return getattr(self, self.__slots__[index])
+        if isinstance(index,str): return getattr(self,index)
+        elif isinstance(index,slice): return tuple(self)[index.start:index.stop:index.step]
+        elif isinstance(index,int): return getattr(self, self.__slots__[index])
     def __setitem__(self, index, value):
         #NOTE: No item in this class can be negative, so we ensure that here.
         value = 0 if value < 0 else value

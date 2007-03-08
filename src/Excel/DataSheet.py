@@ -52,17 +52,17 @@ class DataSheet(ExcelDocument):
             if not col.stop: raise Exception("Column needs a stopping point")
             #Then we make sure that both row and column have a starting point, which can be None coming in.
             # Here, we set it to the stopping point if it's None.
-            rstart = row.start if row.start else row.stop
+            rstart = row.start or row.stop
             rstop = row.stop
-            cstart = col.start if col.start else col.stop
+            cstart = col.start or col.stop
             cstop = col.stop
         elif not col or col == blank: # We want a full row or rows
             if not row or row == blank: raise Exception("Must choose row(s) and/or column(s) to get data")
-            rstart = row.start if row.start else row.stop
+            rstart = row.start or row.stop
             rstop = row.stop
         elif not row or row == blank: # We want a full column or columns,
             if not col or col == blank: raise Exception("Must choose row(s) and/or column(s) to get data")
-            cstart = col.start if col.start else col.stop
+            cstart = col.start or col.stop
             cstop = col.stop
         else: raise Exception("Logical error in %s" % self.__class__.__name__)
 
@@ -75,7 +75,7 @@ class DataSheet(ExcelDocument):
         if not isinstance(value,tuple):
             return value
         # Otherwise, build a list for processing
-        else: value = [i for i in value]
+        else: value = list(value)
 
         # Having gotten the range, we may have overshot our available data. For instance, we may have
         # Chosen rows 1-5 when only 1-3 have data, or similar with columns. The resulting forms are:

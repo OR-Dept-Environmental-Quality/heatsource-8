@@ -1,14 +1,18 @@
 from __future__ import division
+from numpy import arange
+import math, time, datetime
+
 from DataSheet import DataSheet
+from StreamNode import StreamNode
+
 from Utils.Time import TimeUtil
 from Utils.ProgressBar import ProgressBar
-from StreamNode import StreamNode
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
 from Utils.IniParams import IniParams
-from numpy import arange
-import math, time, datetime
-from StreamReach import StreamReach
+from Utils.BoundCond import BoundCond
+from Utils.AttrList import PlaceList, TimeList
+from Utils.DataPoint import DataPoint
 
 #Flag_HS values:
 #    0: Flow Router
@@ -27,8 +31,9 @@ class HeatSourceInterface(DataSheet):
         self.Close() # Close the file and quit Excel process
 
     def __initialize(self, Flag_HS):
-        self.Reach = StreamReach()
+        self.Reach = PlaceList(attr='km', orderdn=True)
         self.IniParams = IP = IniParams.getInstance()
+        self.BC = BC = BoundCond.getInstance()
         # Build a quick progress bar
         self.PB = ProgressBar(1000)
         self.PB("Initializing Excel interface")
@@ -70,13 +75,6 @@ class HeatSourceInterface(DataSheet):
 
         self.SetupSheets1()
 
-        # TODO: These are only used in the VB routine SubEvaporativeFlux, so they should be moved there
-        # What the hell are they, anyway?
-        self.IniParams.the_a = self.GetValue("IV3","Land Cover Codes")
-        self.IniParams.the_b = self.GetValue("IV4","Land Cover Codes")
-
-        self.Nodes = round(1 + (self.IniParams.Length / (self.IniParams.Dx / 1000)))  #Model distance nodes
-
         # from VB: Apparently, only one day is simulated for the shadelator
         if Flag_HS != 2: Days = self.IniParams.SimPeriod
         else: Days = 1
@@ -99,16 +97,17 @@ class HeatSourceInterface(DataSheet):
         self.GetInflowData()
         self.GetContinuousData()
         self.CalculateInitialConditions()
-        self.Reach.Map(lambda x: x.ViewToSky())
+        self.Reach.ViewToSky()
+        self.Reach.CalcInitialConditions()
 
         self.PB.Hide() #Hide the progressbar, but keep it live
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
         # Boundary conditions
-        self.Q_BC = []
-        self.T_BC = []
-        self.Cloudiness = []
+        self.BC.Q= TimeList()
+        self.BC.T = TimeList()
+        self.BC.Cloudiness = TimeList()
 
         # These are storage of inflow and continuous data information
         self.IniParams.InflowSites = int(self.IniParams.InflowSites)
@@ -124,20 +123,22 @@ class HeatSourceInterface(DataSheet):
 
         # Get the columns, which is faster than accessing cells
         col = 7
+        time_col = self[:,col-1,"Continuous Data"]
         flow_col = self[:,col,"Continuous Data"]
         temp_col = self[:,col+1,"Continuous Data"]
         cloud_col = self[:,col+2,"Continuous Data"]
         for I in xrange(self.Hours):
+            time = self.Time.MakeDatetime(time_col[16+I][0])
             # Get the flow boundary condition
             val = flow_col[16 + I][0] # We get the 0th index because each column is actually a 1-length row
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
-            self.Q_BC.append(val)
+            self.BC.Q.append(DataPoint(val,time))
             # Temperature boundary condition
             t_val = temp_col[16 + I][0]
             if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
-            self.T_BC.append(t_val)
+            self.BC.Q.append(DataPoint(t_val,time))
             # Cloudiness boundary condition
-            self.Cloudiness.append(cloud_col[16 + I][0])
+            self.BC.Cloudiness.append(DataPoint(cloud_col[16 + I][0],time))
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetInflowData(self):
@@ -165,7 +166,7 @@ class HeatSourceInterface(DataSheet):
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
         for I in xrange(self.IniParams.ContSites):
-            node = self.Reach.GetByKm(self.GetValue((I + 17, 4),"Continuous Data"))
+            node = self.Reach[self.GetValue((I + 17, 4),"Continuous Data"),1][0] # Index by kilometer, first element of return list only
             wind_col = self[:,7 + (I * 4),"Continuous Data"]
             humidity_col = self[:,8 + (I * 4),"Continuous Data"]
             air_col = self[:,8 + (I * 4),"Continuous Data"]
@@ -206,7 +207,7 @@ class HeatSourceInterface(DataSheet):
         node are the average values of the longitudinal samples that fall within that dx.
         For instance, if longrate=50 and dx=200, then the Slope for the node will be
         the average of 4 longitudinal slopes."""
-        self.Reach = StreamReach() # Make sure we empty any current list
+        del self.Reach[:] # Make sure we empty any current list
 
         long = self.IniParams.LongSample
         dx = self.IniParams.Dx
@@ -368,6 +369,16 @@ class HeatSourceInterface(DataSheet):
                                     val = val / multiple if val else val # Divide if not zero, or keep zero if it is
                                     setattr(zone, attr, val)
             if QuickExit: break # We're done, scram
+            # Calculate the distance step, which is the longitudinal sample rate times
+            # however many steps we've made. Note: this is not times 'multiple' because
+            # we may be getting fewer nodes than that.
+            try:
+                node.dx = long * (i+1)
+                node.BFMorph()
+            except: # Shit, something happened, WTF?
+                print node, node.Slope, node.Width_BF, node.Z, node.WD
+                raise
+
             #############################################################
             #The original VB code has this method BFMorph, which calculates some things and
             # spits them back to the spreadsheet. We want to keep everything in the node, but
@@ -375,12 +386,6 @@ class HeatSourceInterface(DataSheet):
             # better what the purpose is. Unfortunately, this only calculates for each node, which
             # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
             # TODO: Figure out whether we should calculate this for each row, or if each node is enough.
-            try:
-                node.dx = long * (i+1)
-                node.BFMorph()
-            except:
-                print node, node.Slope, node.Width_BF, node.Z, node.WD
-                raise
             self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
             self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
             self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
@@ -399,24 +404,6 @@ class HeatSourceInterface(DataSheet):
 
     def CalculateInitialConditions(self):
         """Initial conditions"""
-        #TODO: Nearly all of this should be moved to the StreamNode class
-        #==================================================
-        # Initial conditions for flow
-        #TODO: This should be in StreamNode
-        node = self.Reach[Node]
-        if Flag_BC: # TODO: What the hell is Flag_BC?
-            node.Q[0] = self.Q_BC[0]
-        else:
-            if node.theQ_Control != 0:
-                node.Q[0] = node.theQ_Control
-            else:
-                node.Q[0] = self.Reach[Node-1].Q[0] + node.Q_In[theHour] - node.Q_Out + node.Q_Accretion
-        node.Q[1] = node.Q[0]
-        #=======================================================
-        #Set Temperature Initial Conditions
-        # TODO: This should be in StreamNode
-        if Flag_HS == 1:
-            node.T[0] = node.T[1] = node.Temp_Sed = self.T_BC[theHour]
         #======================================================
         #Set Atmospheric Counter
         #TODO: To StreamNode??
@@ -424,108 +411,7 @@ class HeatSourceInterface(DataSheet):
             while Cont_Distance[Counter_Atmospheric_Data] >= (theDistance + dx / 1000):
                 Counter_Atmospheric_Data = Counter_Atmospheric_Data + 1
             node.Atmospheric_Data = Counter_Atmospheric_Data
-        #======================================================
-        #Calculate Initial Condition Hydraulics
-        if node.theQ_Control: node.Q[0] = node.theQ_Control
-        if node.theD_Control: node.theDepth[0] = node.theD_Control
-        #======================================================
-        #Control Depth
-
-        if node.theD_Control:
-            node.AreaX[0] = node.theDepth[0] * (node.theWidth_B + node.theZ * node.theDepth[0])
-            node.Pw = node.theWidth_B + 2 * node.theDepth[0] * math.sqrt(1 + node.theZ ** 2)
-            if node.Pw <= 0: node.Pw = 0.00001
-            node.Rh = node.AreaX[0] / node.Pw
-            Flag_SkipNode = False
-            # Not sure if this should go here. The problem is it is undefined before this if/else
-            # statement, and is not otherwise defined in the if portion, but it is needed AFTER
-            # this statement, so if we hit this if portion, we have an undefined variable below.
-            # TODO: Figure out what we are really trying to do here.
-            Q_Est = node.Q[0]
-        #======================================================
-        #No Control Depth
-        else:
-            if node.theSlope <= 0:
-                raise Exception("Slope cannot be less than or equal to zero unless you enter a control depth.")
-            if Flag_BC == 1:
-                node.theDepth[0] = 1
-            else:
-                node.theDepth[0] = self.Reach[Node-1].theDepth[0]
-            Q_Est = node.Q[0]
-            if Q_Est < 0.0071: #Channel is going dry
-                Flag_SkipNode = True
-                if Flag_HS == 1: T_Last = node.T[0]
-                if Flag_DryChannel == 0: pass
-                    # TODO: Implement dry channel controls
-#                    If Sheet2.Range("IV22").Value = 1 Then
-#                        Style = vbYesNo + vbCritical                   ' Define buttons.
-#                        Title = "Heat Source - Channel Is Going Dry"  ' Define title
-#                        Msg = "The channel is going dry at " & Round(theDistance, 2) & " river KM.  The model will either skip these 'dry stream segments' or you can stop this model run and change input data.  Do you want to continue this model run?"
-#                        response = MsgBox(Msg, Style, Title, Help, Ctxt)
-#                        If response = vbYes Then ' Continue Model run
-#                            Flag_DryChannel = 1
-#                        Else    'Stop Model Run and Change Input Data
-#                            End
-#                        End If
-#                    Else
-#                        Flag_DryChannel = 1
-#                    End If
-            else:    #Channel has sufficient flow
-                Flag_SkipNode = False
-
-        if not Flag_SkipNode:
-            Converge = 100000
-            dy = 0.01
-            D_Est = node.theDepth[0]
-            A_Est = node.AreaX[0]
-            Count_Iterations = 0
-            while True:
-                if D_Est == 0: D_Est = 10
-                A_Est = D_Est * (node.theWidth_B + node.theZ * D_Est)
-                node.Pw = node.theWidth_B + 2 * D_Est * math.sqrt(1 + node.theZ ** 2)
-                if node.Pw <= 0: node.Pw = 0.00001
-                node.Rh = A_Est / node.Pw
-                Fy = A_Est * (node.Rh ** (2 / 3)) - (node.theN) * Q_Est / math.sqrt(node.theSlope)
-                thed = D_Est + dy
-                A_Est = thed * (node.theWidth_B + node.theZ * thed)
-                node.Pw = node.theWidth_B + 2 * thed * math.sqrt(1 + node.theZ ** 2)
-                if node.Pw <= 0: node.Pw = 0.00001
-                node.Rh = A_Est / node.Pw
-                Fyy = A_Est * (node.Rh ** (2 / 3)) - (node.theN) * Q_Est / math.sqrt(node.theSlope)
-                dFy = (Fyy - Fy) / dy
-                if dFy == 0: dFy = 0.99
-                thed = D_Est - Fy / dFy
-                D_Est = thed
-                if D_Est < 0 or D_Est > 1000000000000 or Count_Iterations > 1000:
-                    D_Est = 10 * Rnd #Randomly reseed initial value and step
-                    #dy = 1 / ((200 - 100 + 1) * Rnd + 100) # Leftover comment from original code
-                    Converge = 10
-                    Count_Iterations = 0
-                dy = 0.01
-                Converge = abs(Fy / dFy)
-                if Converge < 0.001: break
-                Count_Iterations = Count_Iterations + 1
-            node.Depth[0] = D_Est
-            node.AreaX[0] = A_Est
-            node.Velocity[0] = node.Q[0] / node.AreaX[0]
-            node.Width = node.Width_B + 2 * node.Z * node.Depth[0]
-            node.Celerity = node.Velocity[0] + math.sqrt(9.8 * node.Depth[0]) #TODO: Check this with respect to gravity rounding error
-            if self.IniParams.Flag_Muskingum == 0 and Flag_HS < 2 and Flag_SkipNode == 0:
-                if dt > dx / node.Celerity: dt = dx / node.Celerity
-        else:
-            Q_Est = 0
-            node.theDepth[0] = 0
-            node.AreaX[0] = 0
-            node.Pw = 0
-            node.Rh = 0
-            node.theWidth = 0
-            node.theDepthAve = 0
-            node.theVelocity[0] = 0
-            node.Q[0] = 0
-            node.Celerity = 0
-
-        raise Exception("Method not cleaned up")
-
+        raise Exception("Not yet")
 
     def SetupSheets1(self):
         num = 0

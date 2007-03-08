@@ -1,14 +1,16 @@
 from __future__ import division
-import math
+import math,wx
+from scipy.optimize.minpack import newton
 from Utils.IniParams import IniParams
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
+from Utils.BoundCond import BoundCond
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
     def __init__(self, **kwargs):
         self.IniParams = IniParams.getInstance()
-
+        self.BC = BoundCond.getInstance() # Class to hold various boundary conditions
         # Attributes, which are either values from the spreadsheet if distance step
         # equals the longitudinal sample rate, or averages if the distance step is
         # a multiple of the sample rate.
@@ -20,11 +22,15 @@ class StreamNode(object):
                  'Topo_S','Topo_E','Latitude','Longitude','FLIR_Temp','FLIR_Time',
                  'Q_Out','Q_Control','D_Control','T_Control','VHeight','VDensity',
                  'Q_Accretion','T_Accretion','Elevation','BFWidth','WD','Temp_Sed',
-                 'Area_Wetland','Q_Out_Total','Q_Control_Total']
+                 'Area_Wetland','Q_Out_Total','Q_Control_Total','Rh','Pw']
         # Set all the attributes to zero, or set from the constructor
         for attr in attrs:
             x = kwargs[attr] if attr in kwargs.keys() else 0
             setattr(self,attr,x)
+
+        self.km = self.RiverKM # create an attribute for sorting in the PlaceList object.
+        self.prev_km = None# Upstream Node
+        self.next_km = None# Downstream Node
 
         # Some variables that had two values
         lsts = ['AreaX','Depth','Q','T','Velocity']
@@ -108,6 +114,10 @@ class StreamNode(object):
         self.__DN = node
     Upstream = property(GetUp, SetUp)
     Downstream = property(GetDn, SetDn)
+    def GetQ(self):
+        """Return value of Q calculated from current conditions"""
+        return (1/self.n)*self.A*(self.Rh**(2/3))*(self.S**(1/5))
+    Q_calc = property(GetQ)
 
     def checkZ(self):
         # bottom depth cannot be zero, which will happen if the equation:
@@ -195,11 +205,115 @@ class StreamNode(object):
             VTS_Total = VTS_Total + LC_Angle_Max
         self.View_To_Sky = (1 - VTS_Total / (7 * 90))
 
-    def CalcInitialCond(self, Q_BC, Flag_BC=False):
-        if Flag_BC:
+    def CalcIC(self, Q_BC, T_BC):
+        # IC for flow
+        if not self.Upstream: # Are we the most upstream node?
             self.Q[0] = Q_BC[0]
         else:
             if self.Q_Control != 0:
                 self.Q[0] = self.Q_Control
             else:
-                self.Q[0] = self.Upstream.Q[0] + self.Q_In
+                self.Q[0] = self.Upstream.Q[0] + self.Q_In[0] + self.Q_Accretion - self.Q_Out
+        self.Q[1] = self.Q[0]
+        # IC for Temperature
+        if Flag_HS == 1:
+            self.T[0] = self.t[1] = self.Temp_Sed = self.T_BC[0]
+        # IC for Hydraulics
+        self.Q[0] = self.Q_Control if self.Q_Control else self.Q[0]
+        self.Depth[0] = self.D_Control if self.D_Control else self.Depth[0]
+
+        # Depth IC
+        # With Control Depth
+        Flag_SkipNode = False
+        if self.D_Control:
+            # Calculate the area, which is, at this point, still calculated as bankfull
+            # area because bottom width has not been changed at this point and has been
+            # calculated using bankfull width.
+            # ASSUMPTION: Cross-sectional area is calculated using bankfull width
+            # Look at Chow's Open Channel Hydraulics, Table 2-1 for details on these equations
+            self.AreaX[0] = self.Depth[0] * (self.Width_B + self.Z * self.Depth[0])
+            # Wetted Perimeter
+            self.Pw = self.Width_B + 2 * self.Depth[0] * math.sqrt(1 + self.Z**2)
+            self.Pw = 0.00001 if self.Pw <= 0 else self.Pw
+            self.Rh = self.AreaX[0] / self.Pw
+            Flag_SkipNode = False
+
+        #No Control Depth
+        else:
+            if self.theSlope <= 0:
+                raise Exception("Slope cannot be less than or equal to zero unless you enter a control depth.")
+            self.Depth[0] = self.Upslope.Depth[0] if self.Upslope else 1
+            if self.Q[0] < 0.0071: #Channel is going dry
+                Flag_SkipNode = True
+                self.T_Last = self.T[0] # What is this?
+                if not self.IniParams.DryChannel:
+                    msg = "The channel is going dry at %s.  The model will either skip these 'dry stream segments' or you can stop this model run and change input data.  Do you want to continue this model run?" % self
+                    dlg = wx.MessageDialog(self, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
+                    if dlg.ShowModal() == wx.ID_OK:
+                        self.IniParams.DryChannel = True
+                    else:
+                        raise Exception("Dry channel, model run ended by user")
+                    dlg.Destroy()
+            else:    #Channel has sufficient flow
+                Flag_SkipNode = False
+        SetWettedDepth(Flag_SkipNode)
+
+    def SetWettedDepth(self, zero=False):
+        """Use Newton-Raphson method to calculate wetted depth from current conditions
+
+        Details on this can be found in the HeatSource manual Sec. 3.2.
+        More general details on the technique can be found in Applied Hydrology
+        in section 10.4.
+        This method uses the newton() function from SciPy because it is highly optimized
+        and very fast. Rather than do this entire calculation by hand, we just send the
+        function to newton() and get an answer. The only problem is that without a
+        defined derivative function, the secant method is used, which is slightly
+        less accurate than the tangent method. It shouldn't matter, but if it does, we
+        can add a derivative function
+        """
+        # The original code tested whether we skipped a particular node and set everything
+        # to zero if we did. That functionality is kept here just in case.
+        # TODO: Remove this if it's not necessary.
+        if zero:
+            Q_Est = 0
+            self.Depth[0] = 0
+            self.AreaX[0] = 0
+            self.Pw = 0
+            self.Rh = 0
+            self.Width = 0
+            self.DepthAve = 0
+            self.Velocity[0] = 0
+            self.Q[0] = 0
+            self.Celerity = 0
+            return
+        # Some lambdas to use in the calculation
+        A = lambda x: x * (self.Width_B + self.Z * x) # Cross-sectional area
+        Pw = lambda x: self.Width_B + 2 * x * math.sqrt(1+self.Z**2) # Wetted Perimeter
+        Rh = lambda x: A(x)/Pw(x) # Hydraulic Radius
+        # The function def is given in the HeatSource manual Sec 3.2
+        Yj = lambda x: A(x) * (Rh(x)**(2/3)) - ((self.Q[0]*self.N)/(self.Slope**(1/2))) # f(y)
+        # get the results of SciPy's Newton-Raphson iteration
+        # Notes:
+        # fprime is the derivative of the function- this is something we might consider
+        # args is something that I'm not sure of... perhaps arguments to the function?
+        # tol is the error tolerance.
+        # maxiter is the maximum number of iterations to try before re-trying.
+        # There could be some error checking done here if it was necessary, for example, putting
+        # this function call in a try/except block to test for a ValueError or other exception that
+        # is returned if the max iterations are reached. However, with the exception of craziness,
+        # the function is not hairy enough to cause problems, and should converge within 10 steps
+        depth = newton(Yj, 10, fprime=None, args=(), tol=1.48e-008, maxiter=500)
+
+        self.Depth[0] = depth
+        self.AreaX[0] = A(depth)
+        self.Velocity[0] = self.Q[0] / self.AreaX[0]
+        self.Width = self.Width_B + 2 * self.Z * self.Depth[0]
+        self.Celerity = self.Velocity[0] + math.sqrt(9.861 * self.Depth[0])
+        # NOTE: Check whether it is safe to always ensure this check can always be performed.
+        # In the original code, dt was set to dx/celerity if certain conditions were true, the
+        # main one is the if statement below. Because of the relationship between celerity, dx
+        # and dt (see Chow's 'Open Channel Hydraulics' sec. 18-6), I'm assuming this shouldn't
+        # fail. This may be an invalid assumption if I turn out to be a dolt.
+        if self.IniParams.dt > dx / self.Celerity:
+            #dt = dx / self.Celerity
+            raise Exception("Timestep needs adjustment (Possible error in Programming)")
