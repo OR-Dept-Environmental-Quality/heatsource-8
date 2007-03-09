@@ -18,7 +18,9 @@ class TimeUtil(object):
         except AttributeError, detail:
             if detail.__str__() == "'datetime.datetime' object has no attribute 'Format'":
                 self.y, self.m, self.d, self.H, self.M, self.S = t.timetuple()[:6]
-            else: raise AttributeError(detail)
+            else:
+                print t
+                raise AttributeError(detail)
     def MakeDatetime(self, t, tz="US/Pacific"):
         dst = pytz.timezone(tz) # Make a local timezone object
         self.makeTuple(t)

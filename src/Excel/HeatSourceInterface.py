@@ -96,9 +96,8 @@ class HeatSourceInterface(DataSheet):
         self.BuildStreamNodes()
         self.GetInflowData()
         self.GetContinuousData()
-        self.CalculateInitialConditions()
-        self.Reach.ViewToSky()
-        self.Reach.CalcInitialConditions()
+        [i.ViewToSky() for i in self.Reach]
+        [i.CalcIC() for i in self.Reach]
 
         self.PB.Hide() #Hide the progressbar, but keep it live
 
@@ -149,10 +148,10 @@ class HeatSourceInterface(DataSheet):
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
-            node = self.Reach.GetByKm(self.GetValue((I + 17, 11),"Flow Data"))
+            node = self.Reach[self.GetValue((I + 17, 11),"Flow Data"),1]
             # Get entire flow and temp columns in one call each
-            flow_col = self[:, 14 + I * 2,"Flow Data"]
-            temp_col = self[:, 15 + I * 2,"Flow Data"]
+            flow_col = self[:, 13 + I * 2,"Flow Data"]
+            temp_col = self[:, 14 + I * 2,"Flow Data"]
             for II in xrange(Hours):
                 flow = flow_col[II + 16][0]
                 temp = temp_col[II + 16][0]
@@ -166,14 +165,16 @@ class HeatSourceInterface(DataSheet):
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
         for I in xrange(self.IniParams.ContSites):
-            node = self.Reach[self.GetValue((I + 17, 4),"Continuous Data"),1][0] # Index by kilometer, first element of return list only
-            wind_col = self[:,7 + (I * 4),"Continuous Data"]
-            humidity_col = self[:,8 + (I * 4),"Continuous Data"]
-            air_col = self[:,8 + (I * 4),"Continuous Data"]
+            node = self.Reach[self.GetValue((I + 17, 4),"Continuous Data"),1] # Index by kilometer
+            wind_col = self[:,11 + (I * 4),"Continuous Data"]
+            humidity_col = self[:,12 + (I * 4),"Continuous Data"]
+            air_col = self[:,13 + (I * 4),"Continuous Data"]
+            time_col = self[:,6,"Continuous Data"]
             for II in xrange(self.Hours):
-                node.Cont_Wind = wind_col[II + 16][0]
-                node.Cont_Humidity = humidity_col[II + 16][0]
-                node.Cont_Air_Temp = air_col[II + 16][0]
+                time = self.Time.MakeDatetime(time_col[II + 16][0])
+                node.Cont_Wind.append(DataPoint(wind_col[II + 16][0],time=time))
+                node.Cont_Humidity.append(DataPoint(humidity_col[II + 16][0],time=time))
+                node.Cont_Air_Temp.append(DataPoint(air_col[II + 16][0], time=time))
             self.PB("Reading continuous data", I, self.IniParams.ContSites)
 
     def ScanMorphology(self):
@@ -401,17 +402,6 @@ class HeatSourceInterface(DataSheet):
             # bar to 1.5 times the number of variables just because... well... what the hell?
             if not self.PB("Building Stream Nodes", row, self.Num_Q_Var*1.5)[0]:
                 raise Exception("Building streamnodes cancelled, model stopped")
-
-    def CalculateInitialConditions(self):
-        """Initial conditions"""
-        #======================================================
-        #Set Atmospheric Counter
-        #TODO: To StreamNode??
-        if Flag_HS == 1:
-            while Cont_Distance[Counter_Atmospheric_Data] >= (theDistance + dx / 1000):
-                Counter_Atmospheric_Data = Counter_Atmospheric_Data + 1
-            node.Atmospheric_Data = Counter_Atmospheric_Data
-        raise Exception("Not yet")
 
     def SetupSheets1(self):
         num = 0

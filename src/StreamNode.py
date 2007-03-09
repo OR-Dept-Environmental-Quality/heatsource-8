@@ -5,6 +5,7 @@ from Utils.IniParams import IniParams
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
 from Utils.BoundCond import BoundCond
+from Utils.AttrList import TimeList
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
@@ -39,9 +40,15 @@ class StreamNode(object):
             setattr(self, attr, x)
 
         # Variables that are lists
-        lsts = ['Q_In','Cont_Wind','Cont_Humidity','Cont_Air_Temp']
+        lsts = ['Q_In']
         for attr in lsts:
             x = kwargs[attr] if attr in kwargs.keys() else []
+            setattr(self, attr, x)
+        
+        # TimeList objects to hold continuous data
+        lsts = ['Cont_Wind','Cont_Humidity','Cont_Air_Temp']
+        for attr in lsts:
+            x = kwargs[attr] if attr in kwargs.keys() else TimeList()
             setattr(self, attr, x)
 
         # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
