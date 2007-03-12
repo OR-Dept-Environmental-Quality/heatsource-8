@@ -82,5 +82,4 @@ HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
 
 
 
-# This next method has been moved to the StreamNode, and it is not necessary to
-# have it in the above loop, especially since you can map a function to the StreamNodeList
+del HS

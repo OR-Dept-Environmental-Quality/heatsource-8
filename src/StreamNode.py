@@ -44,7 +44,7 @@ class StreamNode(object):
         for attr in lsts:
             x = kwargs[attr] if attr in kwargs.keys() else []
             setattr(self, attr, x)
-        
+
         # TimeList objects to hold continuous data
         lsts = ['Cont_Wind','Cont_Humidity','Cont_Air_Temp']
         for attr in lsts:
@@ -109,18 +109,10 @@ class StreamNode(object):
 
     # This is a property-based attribute holding a reference to the upstream and the downstream
     # neighbor
-    def GetUp(self): return self.__UP
-    def GetDn(self): return self.__DN
-    def SetUp(self, node):
-        if node: # Node can be 'None' meaning we are most upstream node
-            if not isinstance(node, StreamNode): raise Exception("Value must be a StreamNode instance")
-        self.__UP = node
-    def SetDn(self, node):
-        if node: # Node can be 'None' meaning we are most downstream node
-            if not isinstance(node, StreamNode): raise Exception("Value must be a StreamNode instance")
-        self.__DN = node
-    Upstream = property(GetUp, SetUp)
-    Downstream = property(GetDn, SetDn)
+    def GetUp(self): return self.prev_km
+    def GetDn(self): return self.next_km
+    Upstream = property(GetUp)
+    Downstream = property(GetDn)
     def GetQ(self):
         """Return value of Q calculated from current conditions"""
         return (1/self.n)*self.A*(self.Rh**(2/3))*(self.S**(1/5))
@@ -201,7 +193,7 @@ class StreamNode(object):
                 else:
                     OH = 0
                 Dummy1 = self.Zone[D][Z].VHeight + self.Zone[D][Z].SlopeHeight
-                Dummy2 = self.dx * (Z - 0.5) - OH
+                Dummy2 = self.IniParams.TransSample * (Z - 0.5) - OH
                 if Dummy2 <= 0:
                     Dummy2 = 0.0001
                 LC_Angle = (180 / math.pi) * math.atan(Dummy1 / Dummy2) * self.Zone[D][Z].VDensity
@@ -212,10 +204,10 @@ class StreamNode(object):
             VTS_Total = VTS_Total + LC_Angle_Max
         self.View_To_Sky = (1 - VTS_Total / (7 * 90))
 
-    def CalcIC(self, Q_BC, T_BC):
+    def CalcIC(self):
         # IC for flow
         if not self.Upstream: # Are we the most upstream node?
-            self.Q[0] = Q_BC[0]
+            self.Q[0] = self.BC.Q[0]
         else:
             if self.Q_Control != 0:
                 self.Q[0] = self.Q_Control
@@ -223,8 +215,7 @@ class StreamNode(object):
                 self.Q[0] = self.Upstream.Q[0] + self.Q_In[0] + self.Q_Accretion - self.Q_Out
         self.Q[1] = self.Q[0]
         # IC for Temperature
-        if Flag_HS == 1:
-            self.T[0] = self.t[1] = self.Temp_Sed = self.T_BC[0]
+        self.T[0] = self.T[1] = self.Temp_Sed = self.BC.T[0]
         # IC for Hydraulics
         self.Q[0] = self.Q_Control if self.Q_Control else self.Q[0]
         self.Depth[0] = self.D_Control if self.D_Control else self.Depth[0]
@@ -263,7 +254,7 @@ class StreamNode(object):
                     dlg.Destroy()
             else:    #Channel has sufficient flow
                 Flag_SkipNode = False
-        SetWettedDepth(Flag_SkipNode)
+        self.SetWettedDepth(Flag_SkipNode)
 
     def SetWettedDepth(self, zero=False):
         """Use Newton-Raphson method to calculate wetted depth from current conditions
@@ -321,6 +312,7 @@ class StreamNode(object):
         # main one is the if statement below. Because of the relationship between celerity, dx
         # and dt (see Chow's 'Open Channel Hydraulics' sec. 18-6), I'm assuming this shouldn't
         # fail. This may be an invalid assumption if I turn out to be a dolt.
-        if self.IniParams.dt > dx / self.Celerity:
+        if self.IniParams.dT > self.dx / self.Celerity:
             #dt = dx / self.Celerity
             raise Exception("Timestep needs adjustment (Possible error in Programming)")
+        

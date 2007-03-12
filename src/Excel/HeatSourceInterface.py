@@ -49,8 +49,8 @@ class HeatSourceInterface(DataSheet):
         IP.Length = self.GetValue("I6")
         IP.LongSample = self.GetValue("I7")
         IP.TransSample = self.GetValue("I8")
-        IP.InflowSites = self.GetValue("I9")
-        IP.ContSites = self.GetValue("I10")
+        IP.InflowSites = int(self.GetValue("I9"))
+        IP.ContSites = int(self.GetValue("I10"))
         IP.FlushDays = self.GetValue("I11")
         IP.TimeZone = self.GetValue("I12")
         IP.SimPeriod = self.GetValue("I13")
@@ -71,8 +71,6 @@ class HeatSourceInterface(DataSheet):
                       "Output - Evaporation","Output - Convection","Output - Conduction",
                       "Output - Total Heat","Output - Evaporation Rate", "Output - Daily Heat Flux")
 
-        dt = self.IniParams.DT * 60 #Time step to seconds
-
         self.SetupSheets1()
 
         # from VB: Apparently, only one day is simulated for the shadelator
@@ -89,15 +87,15 @@ class HeatSourceInterface(DataSheet):
         self.Num_Q_Var = len(row)
 
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
-        #TODO: We need to clean up this syntax and logical progression
+        # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
-        self.GetInflowData()
         self.ScanMorphology()
         self.BuildStreamNodes()
         self.GetInflowData()
         self.GetContinuousData()
-        [i.ViewToSky() for i in self.Reach]
-        [i.CalcIC() for i in self.Reach]
+        map(lambda x:x.ViewToSky(),self.Reach)
+        map(lambda x:x.CalcIC(),self.Reach)
+        self.SetupSheets2()
 
         self.PB.Hide() #Hide the progressbar, but keep it live
 
@@ -108,17 +106,15 @@ class HeatSourceInterface(DataSheet):
         self.BC.T = TimeList()
         self.BC.Cloudiness = TimeList()
 
-        # These are storage of inflow and continuous data information
-        self.IniParams.InflowSites = int(self.IniParams.InflowSites)
-        self.Inflow_Rate = [[] for i in xrange(self.IniParams.InflowSites)]
-        self.Inflow_Temp = [[] for i in xrange(self.IniParams.InflowSites)]
-        self.Inflow_Distance = []
-
-        self.IniParams.ContSites = int(self.IniParams.ContSites)
-        self.Cont_Humidity = [[] for i in xrange(self.IniParams.ContSites)]
-        self.Cont_Wind = [[] for i in xrange(self.IniParams.ContSites)]
-        self.Cont_Air_Temp = [[] for i in xrange(self.IniParams.ContSites)]
-        self.Cont_Distance = []
+#        Delete these lines if they are not needed
+#        self.Inflow_Rate = [[] for i in xrange(self.IniParams.InflowSites)]
+#        self.Inflow_Temp = [[] for i in xrange(self.IniParams.InflowSites)]
+#        self.Inflow_Distance = []
+#
+#        self.Cont_Humidity = [[] for i in xrange(self.IniParams.ContSites)]
+#        self.Cont_Wind = [[] for i in xrange(self.IniParams.ContSites)]
+#        self.Cont_Air_Temp = [[] for i in xrange(self.IniParams.ContSites)]
+#        self.Cont_Distance = []
 
         # Get the columns, which is faster than accessing cells
         col = 7
@@ -135,7 +131,7 @@ class HeatSourceInterface(DataSheet):
             # Temperature boundary condition
             t_val = temp_col[16 + I][0]
             if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
-            self.BC.Q.append(DataPoint(t_val,time))
+            self.BC.T.append(DataPoint(t_val,time))
             # Cloudiness boundary condition
             self.BC.Cloudiness.append(DataPoint(cloud_col[16 + I][0],time))
             self.PB("Reading boundary conditions",I,self.Hours)
@@ -208,6 +204,7 @@ class HeatSourceInterface(DataSheet):
         node are the average values of the longitudinal samples that fall within that dx.
         For instance, if longrate=50 and dx=200, then the Slope for the node will be
         the average of 4 longitudinal slopes."""
+        #TODO: My god, no method should be this long, we need a redesign here!
         del self.Reach[:] # Make sure we empty any current list
 
         long = self.IniParams.LongSample
@@ -261,7 +258,6 @@ class HeatSourceInterface(DataSheet):
         # One idea for this is to subclass sheets from DataSheet and have a MorphologySheet,
         # a FlowSheet, etc. Then, we could tie the StreamNode class directly to the DataSheet
         # subclass and have this done internally.
-        # TODO: Optimize, or otherwise try to clean up this syntax.
 
         row = 17 # Current row
         # this is a boolean that allows us to use the while statement to cycle until we want to fail
@@ -325,7 +321,6 @@ class HeatSourceInterface(DataSheet):
                                 # Doing this, we can then add another time in seconds, then average them, and then
                                 # get the average of the time. I'm not entirely sure if it's useful, but it's done
                                 # in the original code, so I'll do it here
-                                #TODO: Explore adding a + operator to the TimeUtil function.
                                 d = time.mktime(time.strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
                                 val = getattr(node,attr) + d # Then add that to the current number
                         # In this instance, we have an out of range tuple, so that means that we are trying
@@ -350,9 +345,6 @@ class HeatSourceInterface(DataSheet):
                     # values are set to zero by default, so we can just add values here and feel confident the
                     # addition will not fail.
                     if page == 'TTools Data':
-                        #TODO: Create a method in the StreamNode that will automagically cycle this
-                        # Somehow, we should automagically cycle through all of the zones in all of
-                        # the directions in a single call... that would be sweet!
                         for j,k,zone in node: # j is the cardinal direction, k is the zone number
                             if k == 0: # If we're in the 0th zone
                                 zone.Elevation += data[7]
@@ -361,9 +353,12 @@ class HeatSourceInterface(DataSheet):
                                 except TypeError: # Overhang column is blank, meaning there's no overhang
                                     pass
                             else:
-                                zone.Elevation += data[j * 4 + 37 + k]
-                                zone.VHeight += data[j * 8 + 61 + k * 2]
-                                zone.VDensity += data[j * 8 + 60 + k * 2]
+                                ecol = (j * 4) + 42 + (k-1)
+                                hcol = (j * 8) + 71 + ((k-1) * 2)
+                                dcol = (j * 8) + 70 + ((k-1) * 2)
+                                zone.Elevation += data[ecol]
+                                zone.VHeight += data[hcol]
+                                zone.VDensity += data[dcol]
                             if test:
                                 for attr in ["Elevation","Overhang","VHeight","VDensity"]:
                                     val = getattr(zone,attr) # Get the value
@@ -386,11 +381,10 @@ class HeatSourceInterface(DataSheet):
             # we'll spit these four things back to the spreadsheet for now, until we understand
             # better what the purpose is. Unfortunately, this only calculates for each node, which
             # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
-            # TODO: Figure out whether we should calculate this for each row, or if each node is enough.
-            self.SetValue((i + 17, 11),node.BottomWidth, sheet="Morphology Data")
-            self.SetValue((i + 17, 12),node.MaxDepth, sheet="Morphology Data")
-            self.SetValue((i + 17, 13),node.AveDepth, sheet="Morphology Data")
-            self.SetValue((i + 17, 14),node.BFXArea, sheet="Morphology Data")
+            self.SetValue((i + 16, 11),node.BottomWidth, sheet="Morphology Data")
+            self.SetValue((i + 16, 12),node.MaxDepth, sheet="Morphology Data")
+            self.SetValue((i + 16, 13),node.AveDepth, sheet="Morphology Data")
+            self.SetValue((i + 16, 14),node.BFXArea, sheet="Morphology Data")
             ##############################################################
             #Now that we have a stream node, we set the node's dx value, because
             # we have most nodes that are long-sample-distance times multiple,
@@ -422,20 +416,30 @@ class HeatSourceInterface(DataSheet):
         self.Clear("13:50000", "Chart-Solar Flux")
         self.PB("Clearing old data", num + 6, max)
 
-    def SetupSheets2(self,Node, Count_Q_Var, theDistance):
-        """Set the values for a particular node and distance.
+    def SetupSheets2(self):
+        # This next block was originally in SetupSheets2 in the VB code.
+        for i in xrange(self.Num_Q_Var):
+            self.SetSheet("Morphology Data")
+            cellval = {}
+            cellval[1] = self[i + 17, 1] # Location Info
+            cellval[2] = self[i + 17, 2] # HS Node
+            cellval[3] = self[i + 17, 3] # Long Distance
+            cellval[4] = round(self[i + 17, 4], 3)     # Stream km
+            for page in ("Solar Potential","Solar Surface","Solar Received","Longwave",\
+                  "Evaporation","Convection","Total Heat","Conduction","Evaporation Rate",\
+                  "Temperature","Daily Heat Flux", "Hydraulics"):
+                name = "Output - %s" % page
+                for j in cellval.keys():
+                    self.SetValue((i+16,j),cellval[j],sheet=name)
+            self.PB("Doing more sheet setup\nThis is an annoyingly long process",i,self.Num_Q_Var)
 
-        "There must be a better way... right?" He asked God."""
-        self.SetSheet("Morphology Data")
-        val = {}
-        val[2] = self[Count_Q_Var + 17, 2] # Location Info
-        val[3] = self[Count_Q_Var + 17, 3] # HS Node
-        val[4] = self[Count_Q_Var + 17, 4] # Long Distance
-        val[5] = round(theDistance, 3)     # Stream km
-
-        for page in ("Solar Potential","Solar Surface","Solar Received","Longwave",\
-              "Evaporation","Convection","Total Heat","Conduction","Evaporation Rate",\
-              "Temperature","Daily Heat Flux", "Hydraulics"):
-            name = "Output - %s" % page
-            for i in val.keys():
-                self.SetValue((Node+17,i),val[i],sheet=name)
+    def CalcHydroStability(self):
+        """Ensure stability of the timestep using the technique from pg 82 of the HS manual"""
+        Maxdt = 1e6
+        for node in self.Reach:
+            Dummy = self.dx / (node.Velocity[0] + math.sqrt(9.861 * node.Depth[0]))
+            if Dummy < Maxdt: Maxdt = Dummy
+            Dummy = (node.Rh ** (4 / 3)) / (9.861 * node.Velocity[0] * (node.N ** 2))
+            if Dummy < Maxdt: Maxdt = Dummy
+        if Maxdt < self.IniParams.dT: self.dT = Maxdt
+        else: self.dT = self.IniParams.dT
