@@ -18,15 +18,18 @@ class StreamNode(object):
         # TODO: There are possibly meaningless attributes here.
         # For instance, Q_Out and Q_Out_Total. It may not be necessary to have both,
         # but we need to find out what they do.
-        attrs = ['RiverKM', 'Slope','N','Width_BF','Width_B','Depth_BF','Z','X_Weight',
+        self.RiverKM = None
+        self.Area_Wetland = 0
+        self.Pw = 0
+        self.Rh = 0
+        attrs = ['Slope','N','Width_BF','Width_B','Depth_BF','Z','X_Weight',
                  'Embeddedness','Conductivity','ParticleSize','Aspect','Topo_W',
                  'Topo_S','Topo_E','Latitude','Longitude','FLIR_Temp','FLIR_Time',
                  'Q_Out','Q_Control','D_Control','T_Control','VHeight','VDensity',
-                 'Q_Accretion','T_Accretion','Elevation','BFWidth','WD','Temp_Sed',
-                 'Area_Wetland','Q_Out_Total','Q_Control_Total','Rh','Pw']
+                 'Q_Accretion','T_Accretion','Elevation','WD','Temp_Sed']
         # Set all the attributes to zero, or set from the constructor
         for attr in attrs:
-            x = kwargs[attr] if attr in kwargs.keys() else 0
+            x = kwargs[attr] if attr in kwargs.keys() else []
             setattr(self,attr,x)
 
         self.km = self.RiverKM # create an attribute for sorting in the PlaceList object.
@@ -39,14 +42,8 @@ class StreamNode(object):
             x = kwargs[attr] if attr in kwargs.keys() else [0,0]
             setattr(self, attr, x)
 
-        # Variables that are lists
-        lsts = ['Q_In']
-        for attr in lsts:
-            x = kwargs[attr] if attr in kwargs.keys() else []
-            setattr(self, attr, x)
-
         # TimeList objects to hold continuous data
-        lsts = ['Cont_Wind','Cont_Humidity','Cont_Air_Temp']
+        lsts = ['Cont_Wind','Cont_Humidity','Cont_Air_Temp','Q_In','T_In']
         for attr in lsts:
             x = kwargs[attr] if attr in kwargs.keys() else TimeList()
             setattr(self, attr, x)
@@ -159,10 +156,10 @@ class StreamNode(object):
             node.SlopeHeight = node.SlopeHeight if node.SlopeHeight > 0 else 0
 
         # Estimate depth of the trapazoid from the width/depth ratio
-        self.AveDepth = self.BFWidth/self.WD
+        self.AveDepth = self.Width_BF/self.WD
         # Calculated the bottom of the channel by subtracting the differences between
         # Top and bottom of the trapazoid
-        self.BottomWidth = self.BFWidth - (2 * self.AveDepth * self.dx)
+        self.BottomWidth = self.Width_BF - (2 * self.AveDepth * self.dx)
         # Calculate the area of this newly estimated trapazoid
         self.BFXArea = (self.BottomWidth + (self.dx * self.AveDepth)) * self.AveDepth
         # NOTE: What follows is a strange calculation of the max depth, that was taken from
@@ -204,59 +201,7 @@ class StreamNode(object):
             VTS_Total = VTS_Total + LC_Angle_Max
         self.View_To_Sky = (1 - VTS_Total / (7 * 90))
 
-    def CalcIC(self):
-        # IC for flow
-        if not self.Upstream: # Are we the most upstream node?
-            self.Q[0] = self.BC.Q[0]
-        else:
-            if self.Q_Control != 0:
-                self.Q[0] = self.Q_Control
-            else:
-                self.Q[0] = self.Upstream.Q[0] + self.Q_In[0] + self.Q_Accretion - self.Q_Out
-        self.Q[1] = self.Q[0]
-        # IC for Temperature
-        self.T[0] = self.T[1] = self.Temp_Sed = self.BC.T[0]
-        # IC for Hydraulics
-        self.Q[0] = self.Q_Control if self.Q_Control else self.Q[0]
-        self.Depth[0] = self.D_Control if self.D_Control else self.Depth[0]
-
-        # Depth IC
-        # With Control Depth
-        Flag_SkipNode = False
-        if self.D_Control:
-            # Calculate the area, which is, at this point, still calculated as bankfull
-            # area because bottom width has not been changed at this point and has been
-            # calculated using bankfull width.
-            # ASSUMPTION: Cross-sectional area is calculated using bankfull width
-            # Look at Chow's Open Channel Hydraulics, Table 2-1 for details on these equations
-            self.AreaX[0] = self.Depth[0] * (self.Width_B + self.Z * self.Depth[0])
-            # Wetted Perimeter
-            self.Pw = self.Width_B + 2 * self.Depth[0] * math.sqrt(1 + self.Z**2)
-            self.Pw = 0.00001 if self.Pw <= 0 else self.Pw
-            self.Rh = self.AreaX[0] / self.Pw
-            Flag_SkipNode = False
-
-        #No Control Depth
-        else:
-            if self.theSlope <= 0:
-                raise Exception("Slope cannot be less than or equal to zero unless you enter a control depth.")
-            self.Depth[0] = self.Upslope.Depth[0] if self.Upslope else 1
-            if self.Q[0] < 0.0071: #Channel is going dry
-                Flag_SkipNode = True
-                self.T_Last = self.T[0] # What is this?
-                if not self.IniParams.DryChannel:
-                    msg = "The channel is going dry at %s.  The model will either skip these 'dry stream segments' or you can stop this model run and change input data.  Do you want to continue this model run?" % self
-                    dlg = wx.MessageDialog(self, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
-                    if dlg.ShowModal() == wx.ID_OK:
-                        self.IniParams.DryChannel = True
-                    else:
-                        raise Exception("Dry channel, model run ended by user")
-                    dlg.Destroy()
-            else:    #Channel has sufficient flow
-                Flag_SkipNode = False
-        self.SetWettedDepth(Flag_SkipNode)
-
-    def SetWettedDepth(self, zero=False):
+    def SetWettedDepth(self, Q_est=None):
         """Use Newton-Raphson method to calculate wetted depth from current conditions
 
         Details on this can be found in the HeatSource manual Sec. 3.2.
@@ -269,27 +214,13 @@ class StreamNode(object):
         less accurate than the tangent method. It shouldn't matter, but if it does, we
         can add a derivative function
         """
-        # The original code tested whether we skipped a particular node and set everything
-        # to zero if we did. That functionality is kept here just in case.
-        # TODO: Remove this if it's not necessary.
-        if zero:
-            Q_Est = 0
-            self.Depth[0] = 0
-            self.AreaX[0] = 0
-            self.Pw = 0
-            self.Rh = 0
-            self.Width = 0
-            self.DepthAve = 0
-            self.Velocity[0] = 0
-            self.Q[0] = 0
-            self.Celerity = 0
-            return
+        Q = Q_est or self.Q[0]
         # Some lambdas to use in the calculation
         A = lambda x: x * (self.Width_B + self.Z * x) # Cross-sectional area
         Pw = lambda x: self.Width_B + 2 * x * math.sqrt(1+self.Z**2) # Wetted Perimeter
         Rh = lambda x: A(x)/Pw(x) # Hydraulic Radius
         # The function def is given in the HeatSource manual Sec 3.2
-        Yj = lambda x: A(x) * (Rh(x)**(2/3)) - ((self.Q[0]*self.N)/(self.Slope**(1/2))) # f(y)
+        Yj = lambda x: A(x) * (Rh(x)**(2/3)) - ((Q*self.N)/(self.Slope**(1/2))) # f(y)
         # get the results of SciPy's Newton-Raphson iteration
         # Notes:
         # fprime is the derivative of the function- this is something we might consider
@@ -302,6 +233,8 @@ class StreamNode(object):
         # the function is not hairy enough to cause problems, and should converge within 10 steps
         depth = newton(Yj, 10, fprime=None, args=(), tol=1.48e-008, maxiter=500)
 
+
+        raise Exception("these should be given as a return value, since we need to set different things")
         self.Depth[0] = depth
         self.AreaX[0] = A(depth)
         self.Velocity[0] = self.Q[0] / self.AreaX[0]
@@ -312,7 +245,248 @@ class StreamNode(object):
         # main one is the if statement below. Because of the relationship between celerity, dx
         # and dt (see Chow's 'Open Channel Hydraulics' sec. 18-6), I'm assuming this shouldn't
         # fail. This may be an invalid assumption if I turn out to be a dolt.
-        if self.IniParams.dT > self.dx / self.Celerity:
+        if self.IniParams.dt > self.dx / self.Celerity:
             #dt = dx / self.Celerity
             raise Exception("Timestep needs adjustment (Possible error in Programming)")
-        
+
+    def CalcStreamGeom(self, Q_est=None, failSlope=None):
+        """Calculate the stream geometry
+
+        failSlope is a boolean that tells us whether whe should allow a zero slope
+        and calculate it as we calculate control depths, or whether we should fail when
+        we encounter a slope of zero."""
+        # IC for flow
+        if not self.Upstream: # Are we the most upstream node?
+            self.Q[0] = self.BC.Q[0]
+        else:
+            if self.Q_Control != 0:
+                self.Q[0] = self.Q_Control
+            else:
+                self.Q[0] = self.Upstream.Q[0] + self.Q_In[0] + self.Q_Accretion - self.Q_Out
+        self.Q[1] = self.Q[0]
+        # IC for Temperature
+        self.T[0] = self.T[1] = self.Temp_Sed = self.BC.T[0]
+        # IC for Hydraulics
+        self.Q[0] = self.Q_Control or self.Q[0]
+        self.Depth[0] = self.D_Control or self.Depth[0]
+
+        Q_est = Q_est or self.Q[0]
+
+        # Depth IC
+        # With Control Depth
+        if self.D_Control or (self.D_Control and self.theSlope <= 0):
+            # Calculate the area, which is, at this point, still calculated as bankfull
+            # area because bottom width has not been changed at this point and has been
+            # calculated using bankfull width.
+            # ASSUMPTION: Cross-sectional area is calculated using bankfull width
+            # Look at Chow's Open Channel Hydraulics, Table 2-1 for details on these equations
+            self.AreaX[0] = self.Depth[0] * (self.Width_B + self.Z * self.Depth[0])
+            # Wetted Perimeter
+            self.Pw = self.Width_B + 2 * self.Depth[0] * math.sqrt(1 + self.Z**2)
+            self.Pw = 0.00001 if self.Pw <= 0 else self.Pw
+            self.Rh = self.AreaX[0] / self.Pw
+            self.Flag_SkipNode = False
+
+        #No Control Depth
+        else:
+            self.Depth[0] = self.Upslope.Depth[0] if self.Upslope else 1
+            if Q_est < 0.0071: #Channel is going dry
+                self.Flag_SkipNode = True
+                self.T_Last = self.T[0] # What is this?
+                if not self.IniParams.DryChannel:
+                    msg = "The channel is going dry at %s.  The model will either skip these 'dry stream segments' or you can stop this model run and change input data.  Do you want to continue this model run?" % self
+                    dlg = wx.MessageDialog(self, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
+                    if dlg.ShowModal() == wx.ID_OK:
+                        self.IniParams.DryChannel = True
+                    else:
+                        raise Exception("Dry channel, model run ended by user")
+                    dlg.Destroy()
+                # Set the values to zero for a dry channel.
+                self.Depth[0] = 0
+                self.AreaX[0] = 0
+                self.Pw = 0
+                self.Rh = 0
+                self.Width = 0
+                self.DepthAve = 0
+                self.Velocity[0] = 0
+                self.Q[0] = 0
+                self.Celerity = 0
+                return # No need to run SetWettedDepth()
+            else: self.Flag_SkipNode = False
+        self.SetWettedDepth(Q_est)
+
+    def CalcHydraulics(self, time):
+        # Convenience variables
+        dt = self.IniParams.dt
+        dx = self.dx
+        #======================================================
+        #Calculate Initial Condition Hydraulics
+        if self.Q_Control: self.Q[0] = self.Q_Control
+        if self.D_Control: self.Depth[1] = self.D_Control
+        if not self.Upstream:
+            self.Q[0] = self.BC.Q[time,0] #index by time
+            Q_In_0 = self.Q[0]
+            Q_In_1 = self.Q[1]
+            Q_Out_0 = self.Q[0]
+            self.T[0] = self.BC.T[time,0] # index by time
+        else:
+            Q_In_0 = self.Upstream.Q[0]
+            Q_In_1 = self.Upstream.Q[1]
+            Q_Out_0 = self.Upstream.Q[0]
+
+        #===================================================
+        #Calculate flow volumes in reaches for both times
+        # This is set to false in the standard model files. It's commented out here because
+        # the Evap_Rate variable is set AFTER this subroutine is run in the original VB code.
+        # Thus, in the first timestep, we have an Evap_Rate equal to whatever's in the buffer.
+        # It's here mainly as a record.
+        # if self.IniParams.Flag_EvapLoss:
+        #     EvapVol = Evap_Rate * self.Width * self.dx
+        Mix = self.Q_Accretion - self.Q_Out # - EvapVol
+        if len(self.Q_In) > 0:
+            Mix += self.Q_In[time,-1]
+        V_In_0 = ((Mix + Q_In_0) * dt) or 0
+        V_In_1 = ((Mix + Q_In_1) * dt) or 0
+        V_Out_0 = (Q_Out_0 * dt) or 0
+        #======================================================
+        # TODO: Make sure this is supposed to do the same thing here as in Initial Conditions
+        self.CalcStreamGeom(Mix + Q_In_1) # Calculate conditions and set wetted depth
+
+        if not self.Flag_SkipNode:
+            if not self.Upstream: #Start - Boundary Condition Check "If"
+                self.Depth[1] = self.Depth[0]
+                self.Q[1] = self.Q[0]
+                self.AreaX[1] = self.AreaX[0]
+                self.Velocity[1] = self.Q[1] / self.AreaX[1]
+            elif self.IniParams.Muskingum: #Run Muskingum-Cunge
+                A = self.Q[0] / (2 * self.Width * self.Slope)
+                B = (5 / 3) * self.Velocity[0] * dx
+                self.X_Weight = 0.5 * (1 - A / B)
+                if self.X_Weight > 0.5:
+                    self.X_Weight = 0.5
+                elif self.X_Weight < 0:
+                    self.X_Weight = 0
+                K = dx / (5 * self.Velocity[0] / 3) #Wave celerity
+                V_Stored = (K * Q_Out_0) + K * self.X_Weight * (Q_In_0 - Q_Out_0)
+                V_Reach = V_Stored + V_In_1
+                if V_Reach < 0: #Unstable - Decrease dt or increase dx
+                    Dummy3 = 2 * K * (1 - self.X_Weight)
+                    if dt > Dummy3:
+                        raise Exception("Hydraulics are unstable. For this finite element, the time step should be less than %0.3f minutes." % (Dummy3 / 60))
+                    else:
+                        Dummy3 = 2 * K * (1 - self.X_Weight)
+                        raise Exception("Hydraulics are unstable. For this finite element, the time step should be greater than %0.3f minutes." % (Dummy3 / 60))
+                #======================================================
+                #Calc wedge flow in cell Q(1,1)
+                if not self.Upstream:
+                    #======================================================
+                    #Calc Musk. Coeffs
+                    D = 2 * K * (1 - self.X_Weight) + dt
+                    C1 = (dt - 2 * K * self.X_Weight) / D
+                    C2 = (dt + 2 * K * self.X_Weight) / D
+                    C3 = (2 * K * (1 - self.X_Weight) - dt) / D
+                    C4 = C1 + C2 + C3
+                    V_Out_1 = (C1 * V_In_1 + C2 * V_In_0 + C3 * V_Out_0) or 0
+                    #======================================================
+                    #Calc Flow
+                    self.Q[1] = V_Out_1 / dt
+                    if self.Q_Control:
+                        self.Q[1] = self.Q_Control
+                        V_Out_1 = self.Q[1] * dt
+
+                self.CalcStreamGeom(self.Q[1]) # Update the stream geometry
+
+            # The following explicit method was copied over and transliterated, but it is only
+            # used if one of the secret, hidden flags are set in the Excel spreadsheet, so
+            # it is not used.
+            # If this is to be used, we have to rethink
+            elif not self.IniParams.Muskingum: #Explicit Hydraulic Method
+                dR = self.Downslope.Depth[0]
+                dL = self.Upslope.Depth[0]
+                dM = self.Depth[0]
+                Wm = self.Width
+                WR = self.Downslope.Width
+                WL = self.Upslope.Width
+                vR = self.Downslope.Velocity[0]
+                vL = self.Upslope.Velocity[0]
+                vM = self.Velocity[0]
+                So = self.Slope
+                #Solve for the wetted depth using (3-26) from documentation
+                dM = dM + (dt / (2 * dx)) * (dM * (vL - vR) + vM * (dL - dR))
+                if not dM:
+                    raise Exception("This is going to call a divide by zero error!")
+                #Solve for friction slope using (3-28) from documentation
+                self.AreaX[1] = dM * (self.Width_B + self.Z * dM)
+                self.Pw = self.Width_B + 2 * dM * math.sqrt(1 + self.Z ** 2)
+                self.Rh = self.AreaX[1] / self.Pw
+                Sf = ((((vR + vL) ^ 2) / 2) * (self.n ** 2)) / (self.Rh ** (4 / 3))
+                #Solve for velocity using (3-27) from documentation
+                A = vM + (dt / (2 * dx)) * vM * (vR - vL)
+                B = ((dt * 9.8 / (2 * dx)) * (dR - dL)) - (dt * 9.8 * (So - Sf))
+                self.Velocity[1] = A + B
+                #Calculate flow as a function of velocity and depth
+                self.SetWettedDepth(Mix + Q_In_1)
+
+        if not self.Flag_SkipNode:
+            #======================================================
+            #Calc hyporheic flow in cell Q(0,1)
+            Dummy1 = self.Conductivity * (1 - self.Embeddedness) #Ratio Conductivity of dominant sunstrate
+            Dummy2 = 0.00002 * self.Embeddedness  #Ratio Conductivity of sand - low range
+            Horizontal_Conductivity = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
+            Dummy1 = self.ParticleSize * (1 - self.Embeddedness) #Ratio Size of dominant substrate
+            Dummy2 = 0.062 * self.Embeddedness  #Ratio Conductivity of sand - low range
+            thePorosity = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
+            #Calculate head at top (ho) and bottom (hL) of reach
+            if not self.Upstream:
+                ho = self.Slope * dx
+                hL = 0
+            else:
+                ho = self.Upstream.Depth[1] + self.Slope * dx
+                hL = self.Depth[1]
+            #Calculate Hyporheic Flows
+            self.Hyporheic_Exchange = abs(thePorosity * self.Pw * Horizontal_Conductivity * (ho ** 2 - hL ** 2) / (2 * dx))
+            if self.Hyporheic_Exchange > self.Q[1]:
+                    self.Hyporheic_Exchange = self.Q[1]
+            #===================================================
+            #Calculate tendency to stratify
+            try:
+                self.Froude_Densiometric = math.sqrt(1 / (9.8 * 0.000001)) * dx * self.Q[1] / (self.Depth[1] * self.AreaX[1] * dx)
+            except:
+                print self.Depth, self.AreaX, dx
+                raise
+            #===================================================
+        else: #Skip Node - No Flow in Channel
+            self.Hyporheic_Exchange = 0
+            self.T[0] = 0
+            self.Froude_Densiometric = 0
+
+        #===================================================
+        #Check to see if wetted widths exceed bankfull widths
+        #TODO: This has to be reimplemented somehow, because Excel is involved
+        # connected to the backend. Meaning this class has NO understanding of what the Excel
+        # spreadsheet is. Thus, something must be propigated backward to the parent class
+        # to fiddle with the spreadsheet. Perhaps we can write a report to a text file or
+        # something. I'm very hesitant to connect this too tightly with the interface.
+        Flag_StoptheModel = False
+        if self.Width > self.Width_BF and not self.IniParams.Flag_ChannelWidth:
+
+            I = self.RiverKM - dx / 1000
+            II = self.RiverKM
+            msg = "The wetted width is exceeding the BFW at river KM %0.3f to %0.3f.  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" %(round(I, 3), round(II, 3), round(self.AreaX[1], 2))
+            dlg = wx.MessageDialog(self, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
+            if dlg.ShowModal() == wx.ID_OK:
+                # Put this in a public place so we don't ask again.
+                self.IniParams.Flag_ChannelWidth = True
+                Flag_StoptheModel = False
+            else:    #Stop Model Run and Change Input Data
+                Flag_StoptheModel = True
+                self.IniParams.Flag_ChannelWidth = True
+            dlg.Destroy()
+#        if Flag_StoptheModel:
+#            I = 0
+#            while self[(17 + I, 5),"Morphology Data"] < self.RiverKM
+#                I += 1
+#            Dummy = self[17, 5) - Sheet1.Cells(18, 5)
+#            For II = I - CInt(dx / (Dummy * 1000)) To I
+#                If II >= 0 Then Sheet1.Cells(17 + II, 26) = Round(AreaX(Node, 1) + 0.1, 2)
+#            Next II

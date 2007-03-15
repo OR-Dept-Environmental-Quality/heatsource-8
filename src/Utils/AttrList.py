@@ -193,7 +193,9 @@ class AttrList(list):
                 ind = -1 if look == -1 else 0
                 return list(ifilter(test,self))[ind]
             except IndexError:
-                raise IndexError("No value possible for %s=%s." %(self.attr, index))
+                print map(lambda x:x.t,self)
+                raise IndexError("No value possible for attribute %s: %s." %(self.attr, index))
+
 
         else: # We are working with a slice, so we need to do a bit more work.
             # First, get a minimum and maximum value to work with, since a slice can have None

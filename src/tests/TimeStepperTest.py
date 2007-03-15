@@ -5,16 +5,11 @@ from datetime import datetime, timedelta
 
 class TestTimeStepper(TestCase):
     def setUp(self):
-        self.TS = TimeStepper.getInstance()
+        self.TS = TimeStepper(datetime.now(),timedelta(hours=1.5),datetime.now()+timedelta(days=10))
 
     def test_GetSet(self):
-        start = datetime.now()
-        minute = timedelta(minutes=1)
-        stop = start + timedelta(days=10)
-        dT = timedelta(hours=1)
-
-        self.TS.start = start
-        self.TS.dT = dT
-        self.TS.stop = stop
-
         print self.TS.start, self.TS.dT, self.TS.stop
+        #for i in self.TS:
+        #    print i
+        for t,n in self.TS.itercount():
+            print t,n

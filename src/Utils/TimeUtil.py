@@ -1,6 +1,20 @@
 from __future__ import division
 import datetime, pytz, time, math
 
+def CalcHydroStability(reach, iniparams):
+    """Ensure stability of the timestep using the technique from pg 82 of the HS manual
+    
+    This is only used if we are not using Muskingum routing, at least in the original code."""
+    Maxdt = 1e6
+    for node in reach:
+        Dummy = node.dx / (node.Velocity[0] + math.sqrt(9.861 * node.Depth[0]))
+        if Dummy < Maxdt: Maxdt = Dummy
+        Dummy = (node.Rh ** (4 / 3)) / (9.861 * node.Velocity[0] * (node.N ** 2))
+        if Dummy < Maxdt: Maxdt = Dummy
+    if Maxdt < iniparams.dt: dt = Maxdt
+    else: dt = iniparams.dt
+    return dt
+
 class TimeUtil(object):
     """Return a pytz.datetime object built from a time taken from the data"""
     def __init__(self):

@@ -1,5 +1,7 @@
 from SingletonMixin import Singleton
-    
+from AttrList import TimeList
+
+
 class BoundCond(Singleton):
     """Class to hold the boundary conditions for a specific StreamReach
 
@@ -9,6 +11,6 @@ class BoundCond(Singleton):
     to a regular class, which should be easy
     """
     def __init__(self):
-        self.__Q = []
-        self.__T = []
-        self.__C = []
+        self.Q = TimeList()
+        self.T = TimeList()
+        self.C = TimeList()

@@ -1,7 +1,8 @@
 from __future__ import division
 import math
-
-from Utils.Time import TimeUtil
+from datetime import datetime, timedelta
+from Utils.TimeUtil import TimeUtil
+from Utils.SingletonMixin import Singleton
 
 # TODO: Remove all members of SolarRad that are not needed.
 # There are likely a lot of calculations made only to be used in a later calculation. Maintaining
@@ -9,26 +10,26 @@ from Utils.Time import TimeUtil
 # memory space and load times. We should trim this down by making temporary calculations temporary so that
 # the memory buffers are cleared when they are not needed.
 
-class SolarRad(object):
-    def __init__(self, lat, long):
+class SolarRad(Singleton):
+    def __init__(self):
         self.DST = None # Holder for a time object
         self.UTC = None # datetime object is Coordinated Universal Time (Greenwich Mean Time in the ol' days)
         self.JD = None # Julian Date
         self.JDC = None # Julian Century
-        self.latitude = lat
-        self.longitude = long
-        self.t = TimeUtil()
+        self.TimeUtil = TimeUtil()
+    def TestDtime(self, dtime):
+        if not isinstance(dtime, datetime):
+            raise Exception("%s must be used with a Python datetime.datetime instance, not %s"% \
+                            (self.__class__.__name__, dtime.__class__.__name__))
     def SetTime(self,dtime):
         """Create julian date and julian century as defined in HeatSource manual"""
-        self.DST = self.t.MakeDatetime(dtime) # Creates a datetime object, somewhat smart method
-        self.JD,self.JDC = self.t.GetJD(self.DST) # Then create julian date and century in UTC
+        self.TestDtime(dtime)
+        self.JD,self.JDC = self.TimeUtil.GetJD(dtime) # Then create julian date and century in UTC
+        if not self.JD or not self.JDC:
+            raise Exception("No Julian date calculated")
 
-    def ResetSolarVars(self,dtime):
+    def ResetSolarVars(self, dtime):
         """Reset solar variables for time=dtime which is a datetime object"""
-        ########################################################
-        ## All of the following equations are copied EXACTLY from HeatSource, the only
-        ## corrections are those made for converting VB to Python syntax and the changing of
-        ## the variable name (e.g. MeanObliquity -> self.MeanObliquity
         self.SetTime(dtime)
         #======================================================
         #Obliquity of the eliptic
@@ -87,8 +88,9 @@ class SolarRad(object):
         Dummy5 = math.sin(2 * self.GeoMeanAnomalySun * math.pi / 180)
         self.Et = 4 * (Dummy * Dummy1 - 2 * self.Eccentricity * Dummy2 + 4 * self.Eccentricity * Dummy * Dummy2 * Dummy3 - 0.5 * (Dummy ** 2) * Dummy4 - 1.25 * (self.Eccentricity ** 2) * Dummy5) * (180/math.pi)
 
-    def CalcSolarPosition(self):
+    def CalcSolarPosition(self, dtime, lat, lon):
         """Calculates relative position of sun"""
+        self.ResetSolarVars(dtime)
         #####################################
         ## Numerical methods are copied from Heat Source VB code except where noted
 
@@ -101,23 +103,23 @@ class SolarRad(object):
 
         #======================================================
         #Solar Time (minutes)
-        SolarTime = hour + minute + second + (self.Et - 4 * (-1*self.longitude) + tz)
+        SolarTime = hour + minute + second + (self.Et - 4 * (-1*long) + tz)
         while SolarTime > 1440: # TODO: What is our goal here?
             SolarTime -= 1440  # this loop should likely be cleaned up
         HourAngle = SolarTime / 4 - 180
         if HourAngle < -180: HourAngle += 360
         #======================================================
         #Uncorrected Solar Zenith (degrees)
-        Dummy = math.sin(self.latitude * math.pi / 180) * math.sin(self.SolarDeclination * math.pi / 180) + math.cos(self.latitude * math.pi / 180) * math.cos(self.SolarDeclination * math.pi / 180) * math.cos(HourAngle * math.pi / 180)
+        Dummy = math.sin(lat * math.pi / 180) * math.sin(self.SolarDeclination * math.pi / 180) + math.cos(lat * math.pi / 180) * math.cos(self.SolarDeclination * math.pi / 180) * math.cos(HourAngle * math.pi / 180)
         if Dummy > 1: Dummy = 1
         elif Dummy < -1: Dummy = -1
         Dummy1 = math.acos(Dummy)
         self.SolarZenith = Dummy1 * 180 / math.pi
         #======================================================
         #Solar Azimuth (degrees)
-        Dummy = math.cos(self.latitude * math.pi / 180) * math.sin(self.SolarZenith * math.pi / 180)
+        Dummy = math.cos(lat * math.pi / 180) * math.sin(self.SolarZenith * math.pi / 180)
         if abs(Dummy) > 0.001:
-            self.SolarAzimuth = (math.sin(self.latitude * math.pi / 180) * math.cos(self.SolarZenith * math.pi / 180) - math.sin(self.SolarDeclination * math.pi / 180)) / Dummy
+            self.SolarAzimuth = (math.sin(lat * math.pi / 180) * math.cos(self.SolarZenith * math.pi / 180) - math.sin(self.SolarDeclination * math.pi / 180)) / Dummy
             # TODO: Find out what this is supposed to do!!
             # We test to see if it's greater than one, then if so, we test to see if it's less than zero...
             # This makes no logical sense.
@@ -129,7 +131,7 @@ class SolarRad(object):
             self.SolarAzimuth = 180 - (math.acos(self.SolarAzimuth) * 180 / math.pi)
             if HourAngle > 0: self.SolarAzimuth = -1*self.SolarAzimuth
         else:
-            if self.latitude > 0:
+            if lat > 0:
                 self.SolarAzimuth = 180
             else:
                 self.SolarAzimuth = 0

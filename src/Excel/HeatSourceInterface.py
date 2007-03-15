@@ -1,11 +1,12 @@
 from __future__ import division
 from numpy import arange
-import math, time, datetime
+import math, time
+from datetime import datetime, timedelta
 
 from DataSheet import DataSheet
 from StreamNode import StreamNode
 
-from Utils.Time import TimeUtil
+from Utils.TimeUtil import TimeUtil
 from Utils.ProgressBar import ProgressBar
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
@@ -13,6 +14,7 @@ from Utils.IniParams import IniParams
 from Utils.BoundCond import BoundCond
 from Utils.AttrList import PlaceList, TimeList
 from Utils.DataPoint import DataPoint
+from Utils.TimeStepper import TimeStepper
 
 #Flag_HS values:
 #    0: Flow Router
@@ -44,7 +46,7 @@ class HeatSourceInterface(DataSheet):
         self.SetSheet("TTools Data")
         IP.Name = self.GetValue("I2")
         IP.Date = self.GetValue("I3")
-        IP.DT = self.GetValue("I4")
+        IP.dt = self.GetValue("I4")
         IP.Dx = self.GetValue("I5")
         IP.Length = self.GetValue("I6")
         IP.LongSample = self.GetValue("I7")
@@ -54,14 +56,20 @@ class HeatSourceInterface(DataSheet):
         IP.FlushDays = self.GetValue("I11")
         IP.TimeZone = self.GetValue("I12")
         IP.SimPeriod = self.GetValue("I13")
-        # I don't understand where these values are stored, so I've left it exactly as
-        # it was in the original VB code, except that I place the values in the IniParams class
-        IP.Flag_EvapLoss = self.GetValue("IV1","Land Cover Codes")
-        IP.Flag_Muskingum = self.GetValue("IS1","Land Cover Codes")
-        IP.Flag_Emergent = self.GetValue("IV5","Land Cover Codes")
         ######################################################
-        # Create a time manipulator
-        self.Time = TimeUtil()
+
+        #######################################################
+        ## Time class objects
+        # Create a time manipulator for making time objects
+        self.TimeUtil = TimeUtil()
+
+        # Create a TimeStepper iterator
+        dt = timedelta(minutes=IP.dt)
+        start = self.TimeUtil.MakeDatetime(IP.Date)
+        stop = start + timedelta(days=IP.SimPeriod)
+        self.Timer = TimeStepper(start, dt, stop)
+        ##########################################################
+
         # Page names- maybe a useless tuple, we'll see
         self.pages = ("TTools Data", "Land Cover Codes", "Morphology Data", "Flow Data",
                       "Continuous Data", "Chart-Diel Temp","Validation Data", "Chart-TIR",
@@ -94,10 +102,11 @@ class HeatSourceInterface(DataSheet):
         self.GetInflowData()
         self.GetContinuousData()
         map(lambda x:x.ViewToSky(),self.Reach)
-        map(lambda x:x.CalcIC(),self.Reach)
-        self.SetupSheets2()
+        map(lambda x:x.CalcStreamGeom(),self.Reach)
+        # TODO: Uncomment this after debugging
+        #self.SetupSheets2()
 
-        self.PB.Hide() #Hide the progressbar, but keep it live
+        del self.PB
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
@@ -106,16 +115,6 @@ class HeatSourceInterface(DataSheet):
         self.BC.T = TimeList()
         self.BC.Cloudiness = TimeList()
 
-#        Delete these lines if they are not needed
-#        self.Inflow_Rate = [[] for i in xrange(self.IniParams.InflowSites)]
-#        self.Inflow_Temp = [[] for i in xrange(self.IniParams.InflowSites)]
-#        self.Inflow_Distance = []
-#
-#        self.Cont_Humidity = [[] for i in xrange(self.IniParams.ContSites)]
-#        self.Cont_Wind = [[] for i in xrange(self.IniParams.ContSites)]
-#        self.Cont_Air_Temp = [[] for i in xrange(self.IniParams.ContSites)]
-#        self.Cont_Distance = []
-
         # Get the columns, which is faster than accessing cells
         col = 7
         time_col = self[:,col-1,"Continuous Data"]
@@ -123,7 +122,7 @@ class HeatSourceInterface(DataSheet):
         temp_col = self[:,col+1,"Continuous Data"]
         cloud_col = self[:,col+2,"Continuous Data"]
         for I in xrange(self.Hours):
-            time = self.Time.MakeDatetime(time_col[16+I][0])
+            time = self.TimeUtil.MakeDatetime(time_col[16+I][0])
             # Get the flow boundary condition
             val = flow_col[16 + I][0] # We get the 0th index because each column is actually a 1-length row
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
@@ -148,14 +147,14 @@ class HeatSourceInterface(DataSheet):
             # Get entire flow and temp columns in one call each
             flow_col = self[:, 13 + I * 2,"Flow Data"]
             temp_col = self[:, 14 + I * 2,"Flow Data"]
+            time_col = self[:, 12, "Flow Data"]
             for II in xrange(Hours):
+                time = self.TimeUtil.MakeDatetime(time_col[II+16][0])
                 flow = flow_col[II + 16][0]
                 temp = temp_col[II + 16][0]
-                node.Q_In[II] = flow
-                node.T_In[II] = temp * flow
-            if self.Flag_HS:
-                # Not sure what this does
-                node.T_In[II] = node.T_In[II] / node.Q_In[II]
+                node.Q_In.append(DataPoint(flow, time=time))
+                val = temp * flow if self.Flag_HS else temp
+                node.T_In.append(DataPoint(val, time=time))
             self.PB("Getting inflow data", I, self.IniParams.InflowSites)
 
     def GetContinuousData(self):
@@ -167,7 +166,7 @@ class HeatSourceInterface(DataSheet):
             air_col = self[:,13 + (I * 4),"Continuous Data"]
             time_col = self[:,6,"Continuous Data"]
             for II in xrange(self.Hours):
-                time = self.Time.MakeDatetime(time_col[II + 16][0])
+                time = self.TimeUtil.MakeDatetime(time_col[II + 16][0])
                 node.Cont_Wind.append(DataPoint(wind_col[II + 16][0],time=time))
                 node.Cont_Humidity.append(DataPoint(humidity_col[II + 16][0],time=time))
                 node.Cont_Air_Temp.append(DataPoint(air_col[II + 16][0], time=time))
@@ -260,9 +259,14 @@ class HeatSourceInterface(DataSheet):
         # subclass and have this done internally.
 
         row = 17 # Current row
+        # Take a list and divide its sum by either the length of the list, or 1 if it's of zero length
+        def average(lst):
+            iszero = lambda x: len(x) or 1
+            return sum(lst)/iszero(lst)
         # this is a boolean that allows us to use the while statement to cycle until we want to fail
         GotNodes = False
         QuickExit = False
+
         while not GotNodes: # Until we get to the end of the data
             node = StreamNode()
             # We want to get the data for a number of datapoints and average them for a node, so
@@ -272,9 +276,14 @@ class HeatSourceInterface(DataSheet):
                 if GotNodes: break # If we set GotNodes to true in an inner loop, we don't necessarily break out of this one.
                 test = i == multiple-1 #Are we in the last pass?
                 # Set the river mile, we set this each time because we want the river mile
-                # to equal the last mile for the combined (averaged) data.
+                # to equal the last mile for the combined (averaged) data. In other words, each
+                # node accounts for its river mile, and all the upstream river miles until the
+                # next node.
                 val = self[row+i,4,'Morphology Data']
-                node.RiverKM = val if val else node.RiverKM
+                # We don't use a simple "if not val" because the last node would probably be
+                # zero, which is valid (stream mouth). Thus, we want to see if the value IS the
+                # class None
+                node.RiverKM = val if (val is not None) else node.RiverKM
                 for page in pages:
                     # Row of all available data grabbed in a single 'get' call
                     # We get the 0th item because what's returned is actually a row of rows, but with only one.
@@ -295,34 +304,34 @@ class HeatSourceInterface(DataSheet):
                             del node # Get rid of the node
                             QuickExit = True # make a quick exit out of the loop
                             break # then scram
-                        val = getattr(node,attr) / (i+1)
-                        setattr(node,attr,val)
+                        # Then we send the list to the ave lambda to average it, and set the attribute
+                        # to the resulting value
+                        setattr(node,attr,average(getattr(node,attr)))
                         # Make sure we get the vegzones
                         for j,k,zone in node: # use StreamNode.__iter__(), we can ignore the indexes, we just want the zone.
                             for attr in ["Elevation","Overhang","VHeight","VDensity"]:
-                                val = getattr(zone,attr) # Get the value
-                                val = val / (i+1) if val else val # Divide if not zero, or keep zero if it is
-                                setattr(zone, attr, val)
+                                setattr(zone, attr, average(getattr(zone,attr)))
                         break
                     # using [get|set]attr() allows us to do all of this with a single list or dictionary,
                     # otherwise, we'd have to set each value independantly, which makes for long, inelegant methods.
                     for attr, col in pages[page].items():
                         try:
-                            val = getattr(node,attr) + data[col] # Get current value using the attribute's name string
-                        # except when we have to catch some exceptions
-                        #
-                        # This first exception catches the case when we are given a PyTime object, which occurs whenever
-                        # the interface encounters a date/time in the Excel interface. We cannot simply add the time objects
-                        # so we work around that in this case.
-                        except TypeError, inst:
-                            if inst.message == "unsupported operand type(s) for +: 'int' and 'time'":
-                                t = data[col] # get the data
+                            val = data[col] # Get current value using the attribute's name string
+                            if val is None:
+                                if test: # we are in the last run, or have a null value, so we average
+                                    setattr(node,attr,average(getattr(node,attr)))
+                                continue
+                            # except when we have to catch some exceptions
+                            #
+                            # This first exception catches the case when we are given a PyTime object, which occurs whenever
+                            # the interface encounters a date/time in the Excel interface. We cannot simply add the time objects
+                            # so we work around that in this case.
+                            if attr == "FLIR_Time":
                                 # And create a floating point number which is seconds since the epoch
                                 # Doing this, we can then add another time in seconds, then average them, and then
                                 # get the average of the time. I'm not entirely sure if it's useful, but it's done
                                 # in the original code, so I'll do it here
-                                d = time.mktime(time.strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
-                                val = getattr(node,attr) + d # Then add that to the current number
+                                val = time.mktime(time.strptime(val.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
                         # In this instance, we have an out of range tuple, so that means that we are trying
                         # to access data at the end of a row that doesn't actually exist. Since values of 'None'
                         # at the end of a returned row or column are removed, we could have a row that's too short
@@ -336,10 +345,9 @@ class HeatSourceInterface(DataSheet):
                                     print attr, col, len(data)
                                     raise
 
-                        setattr(node,attr,val) # set the new value
+                        getattr(node,attr).append(val) # set the new value
                         if test: # we are in the last run, or have a null value, so we average
-                            val = getattr(node,attr) / multiple
-                            setattr(node,attr,val)
+                            setattr(node,attr,average(getattr(node,attr)))
                     # We are going to build the VegZone and Zonator instances We have to do this for each cardinal
                     # direction and for 5 zones/direction. They are built in the StreamNode constructor and all
                     # values are set to zero by default, so we can just add values here and feel confident the
@@ -347,23 +355,21 @@ class HeatSourceInterface(DataSheet):
                     if page == 'TTools Data':
                         for j,k,zone in node: # j is the cardinal direction, k is the zone number
                             if k == 0: # If we're in the 0th zone
-                                zone.Elevation += data[7]
+                                zone.Elevation.append(data[7])
                                 try:
-                                    zone.Overhang += data[j + 150]
+                                    zone.Overhang.append(data[j + 151])
                                 except TypeError: # Overhang column is blank, meaning there's no overhang
                                     pass
                             else:
-                                ecol = (j * 4) + 42 + (k-1)
-                                hcol = (j * 8) + 71 + ((k-1) * 2)
-                                dcol = (j * 8) + 70 + ((k-1) * 2)
-                                zone.Elevation += data[ecol]
-                                zone.VHeight += data[hcol]
-                                zone.VDensity += data[dcol]
+                                ecol = data[(j * 4) + 42 + (k-1)]
+                                hcol = data[(j * 8) + 71 + ((k-1) * 2)]
+                                dcol = data[(j * 8) + 70 + ((k-1) * 2)]
+                                zone.Elevation.append(ecol)
+                                zone.VHeight.append(hcol)
+                                zone.VDensity.append(dcol)
                             if test:
                                 for attr in ["Elevation","Overhang","VHeight","VDensity"]:
-                                    val = getattr(zone,attr) # Get the value
-                                    val = val / multiple if val else val # Divide if not zero, or keep zero if it is
-                                    setattr(zone, attr, val)
+                                    setattr(zone, attr, average(getattr(zone,attr)))
             if QuickExit: break # We're done, scram
             # Calculate the distance step, which is the longitudinal sample rate times
             # however many steps we've made. Note: this is not times 'multiple' because
@@ -431,15 +437,4 @@ class HeatSourceInterface(DataSheet):
                 name = "Output - %s" % page
                 for j in cellval.keys():
                     self.SetValue((i+16,j),cellval[j],sheet=name)
-            self.PB("Doing more sheet setup\nThis is an annoyingly long process",i,self.Num_Q_Var)
-
-    def CalcHydroStability(self):
-        """Ensure stability of the timestep using the technique from pg 82 of the HS manual"""
-        Maxdt = 1e6
-        for node in self.Reach:
-            Dummy = self.dx / (node.Velocity[0] + math.sqrt(9.861 * node.Depth[0]))
-            if Dummy < Maxdt: Maxdt = Dummy
-            Dummy = (node.Rh ** (4 / 3)) / (9.861 * node.Velocity[0] * (node.N ** 2))
-            if Dummy < Maxdt: Maxdt = Dummy
-        if Maxdt < self.IniParams.dT: self.dT = Maxdt
-        else: self.dT = self.IniParams.dT
+            self.PB("Clearing the Excel sheet and entering new\nvalues. This is an annoyingly long process",i,self.Num_Q_Var)

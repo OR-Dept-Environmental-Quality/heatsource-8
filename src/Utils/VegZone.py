@@ -28,6 +28,7 @@ class VegZone(object):
     """
     __slots__ = ['Elevation','VHeight','VDensity','Overhang','SlopeHeight']
     def __init__(self, *args, **kwargs):
+        default = [[],[],[],[],0] # Default values
         # We only deal with the first 3 attributes on a normal basis.
         max = len(self.__slots__)
         if len(args) > max or len(kwargs) > max or (len(args) + len(kwargs) > max):
@@ -35,7 +36,7 @@ class VegZone(object):
         # Set all the args or default to zero
         for i in xrange(len(self.__slots__)):
             try: setattr(self, self.__slots__[i], args[i])
-            except IndexError: setattr(self, self.__slots__[i], 0)
+            except IndexError: setattr(self, self.__slots__[i], default[i])
         # Then fill with kwargs, if any
         for k,v in kwargs.iteritems():
             setattr(self, k, v)
