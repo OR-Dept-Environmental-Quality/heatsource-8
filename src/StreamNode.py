@@ -6,6 +6,7 @@ from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
 from Utils.BoundCond import BoundCond
 from Utils.AttrList import TimeList
+from warnings import warn
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
@@ -234,7 +235,7 @@ class StreamNode(object):
         depth = newton(Yj, 10, fprime=None, args=(), tol=1.48e-008, maxiter=500)
 
 
-        raise Exception("these should be given as a return value, since we need to set different things")
+        warn("these should be given as a return value, since we need to set different things")
         self.Depth[0] = depth
         self.AreaX[0] = A(depth)
         self.Velocity[0] = self.Q[0] / self.AreaX[0]
