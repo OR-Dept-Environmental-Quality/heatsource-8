@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Pacific/Pago_Pago.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Pago_Pago(DstTzInfo):
     '''Pacific/Pago_Pago timezone definition. See datetime.tzinfo for details'''

@@ -1,6 +1,6 @@
 '''tzinfo timezone information for Atlantic/South_Georgia.'''
-from pytz.tzinfo import StaticTzInfo
-from pytz.tzinfo import memorized_timedelta as timedelta
+from PyTZ.tzinfo import StaticTzInfo
+from PyTZ.tzinfo import memorized_timedelta as timedelta
 
 class South_Georgia(StaticTzInfo):
     '''Atlantic/South_Georgia timezone definition. See datetime.tzinfo for details'''

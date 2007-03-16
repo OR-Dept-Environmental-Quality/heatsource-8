@@ -1,6 +1,6 @@
 '''tzinfo timezone information for Pacific/Tarawa.'''
-from pytz.tzinfo import StaticTzInfo
-from pytz.tzinfo import memorized_timedelta as timedelta
+from PyTZ.tzinfo import StaticTzInfo
+from PyTZ.tzinfo import memorized_timedelta as timedelta
 
 class Tarawa(StaticTzInfo):
     '''Pacific/Tarawa timezone definition. See datetime.tzinfo for details'''

@@ -1,6 +1,6 @@
 '''tzinfo timezone information for Etc/GMT0.'''
-from pytz.tzinfo import StaticTzInfo
-from pytz.tzinfo import memorized_timedelta as timedelta
+from PyTZ.tzinfo import StaticTzInfo
+from PyTZ.tzinfo import memorized_timedelta as timedelta
 
 class GMT0(StaticTzInfo):
     '''Etc/GMT0 timezone definition. See datetime.tzinfo for details'''

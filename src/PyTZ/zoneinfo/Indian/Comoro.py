@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Indian/Comoro.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Comoro(DstTzInfo):
     '''Indian/Comoro timezone definition. See datetime.tzinfo for details'''

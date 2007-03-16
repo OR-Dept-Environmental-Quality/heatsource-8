@@ -31,7 +31,7 @@ from tzinfo import AmbiguousTimeError, unpickler
 # of them.
 # 
 # t = gettext.translation(
-#         'pytz', os.path.join(os.path.dirname(__file__), 'locales'),
+#         'PyTZ', os.path.join(os.path.dirname(__file__), 'locales'),
 #         fallback=True
 #         )
 # def _(timezone_name):
@@ -96,7 +96,7 @@ class UTC(datetime.tzinfo):
     that it unpickles using the single module global instance defined beneath
     this class declaration.
 
-    Also contains extra attributes and methods to match other pytz tzinfo
+    Also contains extra attributes and methods to match other PyTZ tzinfo
     instances.
     """
     zone = "UTC"
@@ -169,7 +169,7 @@ _UTC.__safe_for_unpickling__ = True
 
 
 def _p(*args):
-    """Factory function for unpickling pytz tzinfo instances.
+    """Factory function for unpickling PyTZ tzinfo instances.
 
     Just a wrapper around tzinfo.unpickler to save a few bytes in each pickle
     by shortening the path.
@@ -214,7 +214,7 @@ def country_timezones(iso3166_code):
 
 class _FixedOffset(datetime.tzinfo):
 
-    zone = None # to match the standard pytz API
+    zone = None # to match the standard PyTZ API
 
     def __init__(self, minutes):
         if abs(minutes) >= 1440:
@@ -235,7 +235,7 @@ class _FixedOffset(datetime.tzinfo):
         return None
 
     def __repr__(self):
-        return 'pytz.FixedOffset(%d)' % self._minutes
+        return 'PyTZ.FixedOffset(%d)' % self._minutes
 
     def localize(self, dt, is_dst=False):
         '''Convert naive time to local time'''
@@ -254,13 +254,13 @@ def FixedOffset(offset, _tzinfos = {}):
     
         >>> one = FixedOffset(-330)
         >>> one
-        pytz.FixedOffset(-330)
+        PyTZ.FixedOffset(-330)
         >>> one.utcoffset(datetime.datetime.now())
         datetime.timedelta(-1, 66600)
 
         >>> two = FixedOffset(1380)
         >>> two
-        pytz.FixedOffset(1380)
+        PyTZ.FixedOffset(1380)
         >>> two.utcoffset(datetime.datetime.now())
         datetime.timedelta(0, 82800)
     
@@ -318,8 +318,8 @@ FixedOffset.__safe_for_unpickling__ = True
 def _test():
     import doctest, os, sys
     sys.path.insert(0, os.pardir)
-    import pytz
-    return doctest.testmod(pytz)
+    import PyTZ
+    return doctest.testmod(PyTZ)
 
 if __name__ == '__main__':
     _test()

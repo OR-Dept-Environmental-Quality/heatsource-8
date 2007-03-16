@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Pacific/Kiritimati.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Kiritimati(DstTzInfo):
     '''Pacific/Kiritimati timezone definition. See datetime.tzinfo for details'''

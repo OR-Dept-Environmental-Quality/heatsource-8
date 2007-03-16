@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Australia/Broken_Hill.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Broken_Hill(DstTzInfo):
     '''Australia/Broken_Hill timezone definition. See datetime.tzinfo for details'''

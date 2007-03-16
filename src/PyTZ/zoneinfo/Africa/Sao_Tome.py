@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Africa/Sao_Tome.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Sao_Tome(DstTzInfo):
     '''Africa/Sao_Tome timezone definition. See datetime.tzinfo for details'''

@@ -1,7 +1,7 @@
 '''tzinfo timezone information for America/Coral_Harbour.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Coral_Harbour(DstTzInfo):
     '''America/Coral_Harbour timezone definition. See datetime.tzinfo for details'''

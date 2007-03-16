@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Asia/Urumqi.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Urumqi(DstTzInfo):
     '''Asia/Urumqi timezone definition. See datetime.tzinfo for details'''

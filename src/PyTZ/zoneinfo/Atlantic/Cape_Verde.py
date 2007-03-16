@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Atlantic/Cape_Verde.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Cape_Verde(DstTzInfo):
     '''Atlantic/Cape_Verde timezone definition. See datetime.tzinfo for details'''

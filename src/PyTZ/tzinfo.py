@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, tzinfo
 from bisect import bisect_right
 from sets import Set
 
-import pytz
+import PyTZ
 
 __all__ = []
 
@@ -99,7 +99,7 @@ class StaticTzInfo(BaseTzInfo):
     def __reduce__(self):
         # Special pickle to zone remains a singleton and to cope with
         # database changes. 
-        return pytz._p, (self.zone,)
+        return PyTZ._p, (self.zone,)
 
 
 class DstTzInfo(BaseTzInfo):
@@ -149,7 +149,7 @@ class DstTzInfo(BaseTzInfo):
 
         To test, first we need to do some setup
 
-        >>> from pytz import timezone
+        >>> from PyTZ import timezone
         >>> utc = timezone('UTC')
         >>> eastern = timezone('US/Eastern')
         >>> fmt = '%Y-%m-%d %H:%M:%S %Z (%z)'
@@ -195,7 +195,7 @@ class DstTzInfo(BaseTzInfo):
         is_dst is used to determine the correct timezone in the ambigous
         period at the end of daylight savings time.
         
-        >>> from pytz import timezone
+        >>> from PyTZ import timezone
         >>> fmt = '%Y-%m-%d %H:%M:%S %Z (%z)'
         >>> amdam = timezone('Europe/Amsterdam')
         >>> dt  = datetime(2004, 10, 31, 2, 0, 0)
@@ -308,7 +308,7 @@ class DstTzInfo(BaseTzInfo):
     def __reduce__(self):
         # Special pickle to zone remains a singleton and to cope with
         # database changes.
-        return pytz._p, (
+        return PyTZ._p, (
                 self.zone,
                 _to_seconds(self._utcoffset),
                 _to_seconds(self._dst),
@@ -328,16 +328,16 @@ class AmbiguousTimeError(Exception):
        
 
 def unpickler(zone, utcoffset=None, dstoffset=None, tzname=None):
-    """Factory function for unpickling pytz tzinfo instances.
+    """Factory function for unpickling PyTZ tzinfo instances.
     
     This is shared for both StaticTzInfo and DstTzInfo instances, because
     database changes could cause a zones implementation to switch between
-    these two base classes and we can't break pickles on a pytz version
+    these two base classes and we can't break pickles on a PyTZ version
     upgrade.
     """
     # Raises a KeyError if zone no longer exists, which should never happen
     # and would be a bug.
-    tz = pytz.timezone(zone)
+    tz = PyTZ.timezone(zone)
 
     # A StaticTzInfo - just return it
     if utcoffset is None:

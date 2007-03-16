@@ -1,7 +1,7 @@
 '''tzinfo timezone information for America/North_Dakota/New_Salem.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class New_Salem(DstTzInfo):
     '''America/North_Dakota/New_Salem timezone definition. See datetime.tzinfo for details'''

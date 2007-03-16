@@ -1,7 +1,7 @@
 '''tzinfo timezone information for Pacific/Chatham.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Chatham(DstTzInfo):
     '''Pacific/Chatham timezone definition. See datetime.tzinfo for details'''

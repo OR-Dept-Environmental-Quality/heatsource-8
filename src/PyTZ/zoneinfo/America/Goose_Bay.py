@@ -1,7 +1,7 @@
 '''tzinfo timezone information for America/Goose_Bay.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Goose_Bay(DstTzInfo):
     '''America/Goose_Bay timezone definition. See datetime.tzinfo for details'''

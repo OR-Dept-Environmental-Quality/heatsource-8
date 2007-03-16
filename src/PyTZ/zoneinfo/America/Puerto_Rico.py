@@ -1,7 +1,7 @@
 '''tzinfo timezone information for America/Puerto_Rico.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Puerto_Rico(DstTzInfo):
     '''America/Puerto_Rico timezone definition. See datetime.tzinfo for details'''

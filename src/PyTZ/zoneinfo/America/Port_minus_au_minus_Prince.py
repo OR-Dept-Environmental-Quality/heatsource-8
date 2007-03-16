@@ -1,7 +1,7 @@
 '''tzinfo timezone information for America/Port_minus_au_minus_Prince.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Port_minus_au_minus_Prince(DstTzInfo):
     '''America/Port_minus_au_minus_Prince timezone definition. See datetime.tzinfo for details'''

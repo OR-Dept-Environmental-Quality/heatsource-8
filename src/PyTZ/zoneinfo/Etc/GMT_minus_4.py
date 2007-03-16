@@ -1,6 +1,6 @@
 '''tzinfo timezone information for Etc/GMT_minus_4.'''
-from pytz.tzinfo import StaticTzInfo
-from pytz.tzinfo import memorized_timedelta as timedelta
+from PyTZ.tzinfo import StaticTzInfo
+from PyTZ.tzinfo import memorized_timedelta as timedelta
 
 class GMT_minus_4(StaticTzInfo):
     '''Etc/GMT_minus_4 timezone definition. See datetime.tzinfo for details'''

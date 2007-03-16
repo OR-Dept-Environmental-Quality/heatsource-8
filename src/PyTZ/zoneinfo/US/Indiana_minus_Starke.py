@@ -1,7 +1,7 @@
 '''tzinfo timezone information for US/Indiana_minus_Starke.'''
-from pytz.tzinfo import DstTzInfo
-from pytz.tzinfo import memorized_datetime as d
-from pytz.tzinfo import memorized_ttinfo as i
+from PyTZ.tzinfo import DstTzInfo
+from PyTZ.tzinfo import memorized_datetime as d
+from PyTZ.tzinfo import memorized_ttinfo as i
 
 class Indiana_minus_Starke(DstTzInfo):
     '''US/Indiana_minus_Starke timezone definition. See datetime.tzinfo for details'''

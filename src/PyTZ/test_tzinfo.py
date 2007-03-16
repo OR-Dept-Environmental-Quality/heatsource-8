@@ -12,13 +12,13 @@ sys.path.insert(0, os.pardir)
 
 import unittest, doctest
 from datetime import datetime, tzinfo, timedelta
-import pytz, reference
+import PyTZ, reference
 
 fmt = '%Y-%m-%d %H:%M:%S %Z%z'
 
 NOTIME = timedelta(0)
 
-UTC = pytz.timezone('UTC')
+UTC = PyTZ.timezone('UTC')
 REF_UTC = reference.utc
 
 class BasicTest(unittest.TestCase):
@@ -36,7 +36,7 @@ class BasicTest(unittest.TestCase):
 
 
 class USEasternDSTStartTestCase(unittest.TestCase):
-    tzinfo = pytz.timezone('US/Eastern')
+    tzinfo = PyTZ.timezone('US/Eastern')
 
     # 24 hours before DST changeover
     transition_time = datetime(2002, 4, 7, 7, 0, 0, tzinfo=UTC)
@@ -170,7 +170,7 @@ class USEasternDSTStartTestCase(unittest.TestCase):
 
 
 class USEasternDSTEndTestCase(USEasternDSTStartTestCase):
-    tzinfo = pytz.timezone('US/Eastern')
+    tzinfo = PyTZ.timezone('US/Eastern')
     transition_time = datetime(2002, 10, 27, 6, 0, 0, tzinfo=UTC)
     before = {
         'tzname': 'EDT',
@@ -216,7 +216,7 @@ class WarsawWMTEndTestCase(USEasternDSTStartTestCase):
     # In 1915, Warsaw changed from Warsaw to Central European time.
     # This involved the clocks being set backwards, causing a end-of-DST
     # like situation without DST being involved.
-    tzinfo = pytz.timezone('Europe/Warsaw')
+    tzinfo = PyTZ.timezone('Europe/Warsaw')
     transition_time = datetime(1915, 8, 4, 22, 36, 0, tzinfo=UTC)
     before = {
         'tzname': 'WMT',
@@ -233,7 +233,7 @@ class WarsawWMTEndTestCase(USEasternDSTStartTestCase):
 class VilniusWMTEndTestCase(USEasternDSTStartTestCase):
     # At the end of 1916, Vilnius changed timezones putting its clock
     # forward by 11 minutes 35 seconds. Neither timezone was in DST mode.
-    tzinfo = pytz.timezone('Europe/Vilnius')
+    tzinfo = PyTZ.timezone('Europe/Vilnius')
     instant = timedelta(seconds=31)
     transition_time = datetime(1916, 12, 31, 22, 36, 00, tzinfo=UTC)
     before = {
@@ -283,7 +283,7 @@ class ReferenceUSEasternDSTEndTestCase(USEasternDSTEndTestCase):
 
 class LocalTestCase(unittest.TestCase):
     def testLocalize(self):
-        loc_tz = pytz.timezone('Europe/Amsterdam')
+        loc_tz = PyTZ.timezone('Europe/Amsterdam')
 
         loc_time = loc_tz.localize(datetime(1930, 5, 10, 0, 0, 0))
         # Actually +00:19:32, but Python datetime rounds this
@@ -305,13 +305,13 @@ class LocalTestCase(unittest.TestCase):
         loc_time = loc_tz.localize(datetime(2004, 4, 1, 0, 0, 0))
         self.failUnlessEqual(loc_time.strftime('%Z%z'), 'CEST+0200')
 
-        tz = pytz.timezone('Europe/Amsterdam')
+        tz = PyTZ.timezone('Europe/Amsterdam')
         loc_time = loc_tz.localize(datetime(1943, 3, 29, 1, 59, 59))
         self.failUnlessEqual(loc_time.strftime('%Z%z'), 'CET+0100')
 
 
         # Switch to US
-        loc_tz = pytz.timezone('US/Eastern')
+        loc_tz = PyTZ.timezone('US/Eastern')
 
         # End of DST ambiguity check
         loc_time = loc_tz.localize(datetime(1918, 10, 27, 1, 59, 59), is_dst=1)
@@ -320,7 +320,7 @@ class LocalTestCase(unittest.TestCase):
         loc_time = loc_tz.localize(datetime(1918, 10, 27, 1, 59, 59), is_dst=0)
         self.failUnlessEqual(loc_time.strftime('%Z%z'), 'EST-0500')
 
-        self.failUnlessRaises(pytz.AmbiguousTimeError,
+        self.failUnlessRaises(PyTZ.AmbiguousTimeError,
                 loc_tz.localize, datetime(1918, 10, 27, 1, 59, 59), is_dst=None
                 )
 
@@ -339,7 +339,7 @@ class LocalTestCase(unittest.TestCase):
         self.failUnlessEqual(loc_time.strftime('%Z%z'), 'EST-0500')
 
     def testNormalize(self):
-        tz = pytz.timezone('US/Eastern')
+        tz = PyTZ.timezone('US/Eastern')
         dt = datetime(2004, 4, 4, 7, 0, 0, tzinfo=UTC).astimezone(tz)
         dt2 = dt - timedelta(minutes=10)
         self.failUnlessEqual(
@@ -357,7 +357,7 @@ class LocalTestCase(unittest.TestCase):
         # utcoffset in Amsterdam was not a whole minute until 1937
         # However, we fudge this by rounding them, as the Python
         # datetime library 
-        tz = pytz.timezone('Europe/Amsterdam')
+        tz = PyTZ.timezone('Europe/Amsterdam')
         utc_dt = datetime(1914, 1, 1, 13, 40, 28, tzinfo=UTC) # correct
         utc_dt = utc_dt.replace(second=0) # But we need to fudge it
         loc_dt = utc_dt.astimezone(tz)
@@ -375,7 +375,7 @@ class LocalTestCase(unittest.TestCase):
 
     def no_testCreateLocaltime(self):
         # It would be nice if this worked, but it doesn't.
-        tz = pytz.timezone('Europe/Amsterdam')
+        tz = PyTZ.timezone('Europe/Amsterdam')
         dt = datetime(2004, 10, 31, 2, 0, 0, tzinfo=tz)
         self.failUnlessEqual(
                 dt.strftime(fmt),
@@ -384,8 +384,8 @@ class LocalTestCase(unittest.TestCase):
 
 def test_suite():
     suite = unittest.TestSuite()
-    suite.addTest(doctest.DocTestSuite('pytz'))
-    suite.addTest(doctest.DocTestSuite('pytz.tzinfo'))
+    suite.addTest(doctest.DocTestSuite('PyTZ'))
+    suite.addTest(doctest.DocTestSuite('PyTZ.tzinfo'))
     suite.addTest(unittest.defaultTestLoader.loadTestsFromModule(
         __import__('__main__')
         ))

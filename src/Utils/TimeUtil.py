@@ -16,7 +16,7 @@ def CalcHydroStability(reach, iniparams):
     return dt
 
 class TimeUtil(object):
-    """Return a pytz.datetime object built from a time taken from the data"""
+    """Return a PyTZ.datetime object built from a time taken from the data"""
     def __init__(self):
         # Make places to hold Julian date for inter-method communication
         self.JD = None

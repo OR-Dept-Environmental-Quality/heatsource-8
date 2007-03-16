@@ -1,6 +1,6 @@
 '''tzinfo timezone information for Pacific/Port_Moresby.'''
-from pytz.tzinfo import StaticTzInfo
-from pytz.tzinfo import memorized_timedelta as timedelta
+from PyTZ.tzinfo import StaticTzInfo
+from PyTZ.tzinfo import memorized_timedelta as timedelta
 
 class Port_Moresby(StaticTzInfo):
     '''Pacific/Port_Moresby timezone definition. See datetime.tzinfo for details'''

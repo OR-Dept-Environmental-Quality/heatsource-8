@@ -1,6 +1,6 @@
 '''tzinfo timezone information for Africa/Bujumbura.'''
-from pytz.tzinfo import StaticTzInfo
-from pytz.tzinfo import memorized_timedelta as timedelta
+from PyTZ.tzinfo import StaticTzInfo
+from PyTZ.tzinfo import memorized_timedelta as timedelta
 
 class Bujumbura(StaticTzInfo):
     '''Africa/Bujumbura timezone definition. See datetime.tzinfo for details'''
