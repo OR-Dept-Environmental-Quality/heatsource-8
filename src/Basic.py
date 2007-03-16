@@ -13,7 +13,7 @@ app.MainLoop()
 
 """Junker test class to make sure things are running and test out options"""
 IniParams = IniParams.getInstance()
-HS = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls")
+HS = HeatSourceInterface("..\\Toketee_CCC.xls")
 # There's a timestepper built in HS, so we'll just use that for now
 Timer = HS.Timer
 # HS also builds the stream reach, but that should be local to here.

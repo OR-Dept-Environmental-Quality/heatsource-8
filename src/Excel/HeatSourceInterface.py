@@ -109,10 +109,6 @@ class HeatSourceInterface(DataSheet):
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
-        self.BC.Q = TimeList()
-        self.BC.T = TimeList()
-        self.BC.Cloudiness = TimeList()
-
         # Get the columns, which is faster than accessing cells
         col = 7
         row = 16
@@ -131,7 +127,7 @@ class HeatSourceInterface(DataSheet):
             if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
             self.BC.T.append(DataPoint(t_val,time))
             # Cloudiness boundary condition
-            self.BC.Cloudiness.append(DataPoint(cloud_col[row + I][0],time))
+            self.BC.C.append(DataPoint(cloud_col[row + I][0],time))
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetInflowData(self):

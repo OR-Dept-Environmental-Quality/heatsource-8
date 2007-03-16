@@ -2,7 +2,7 @@ from __future__ import division
 
 class StreamChannel(object):
     """Class that describes the geometry of a stream channel
-    
+
     This class includes all of the mathematics and geometry
     routines to define a trapezoidal stream channel, including
     methods for calculation of wetted depth from discharge
@@ -93,3 +93,32 @@ class StreamChannel(object):
             if Delta < 0.0001: break
             D_Est += 0.01
         self.MaxDepth = D_Est
+
+    def GetWettedDepth(self, Q_est=None):
+        """Use Newton-Raphson method to calculate wetted depth from current conditions
+
+        Details on this can be found in the HeatSource manual Sec. 3.2.
+        More general details on the technique can be found in Applied Hydrology
+        in section 10.4.
+        """
+        Q = Q_est or self.Q[0]
+        # Some lambdas to use in the calculation
+        A = lambda x: x * (self.Width_B + self.Z * x) # Cross-sectional area
+        Pw = lambda x: self.Width_B + 2 * x * math.sqrt(1+self.Z**2) # Wetted Perimeter
+        Rh = lambda x: A(x)/Pw(x) # Hydraulic Radius
+        # The function def is given in the HeatSource manual Sec 3.2
+        Yj = lambda x: A(x) * (Rh(x)**(2/3)) - ((Q*self.N)/(self.Slope**(1/2))) # f(y)
+        # get the results of SciPy's Newton-Raphson iteration
+        # Notes:
+        # fprime is the derivative of the function- this is something we might consider
+        # args is something that I'm not sure of... perhaps arguments to the function?
+        # tol is the error tolerance.
+        # maxiter is the maximum number of iterations to try before re-trying.
+        # There could be some error checking done here if it was necessary, for example, putting
+        # this function call in a try/except block to test for a ValueError or other exception that
+        # is returned if the max iterations are reached. However, with the exception of craziness,
+        # the function is not hairy enough to cause problems, and should converge within 10 steps
+        depth = newton(Yj, 10, fprime=None, args=(), tol=1.48e-008, maxiter=500)
+
+        (x*(w+(z*x))*((x*(w+(z*x)))/(w+(2*x*sqrt(1+z^2))))^(2/3))-((Q*n)/(s^0.5))
+        warn("these should be given as a return value, since we need to set different things")

@@ -7,6 +7,7 @@ from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
 from Utils.BoundCond import BoundCond
 from Utils.AttrList import TimeList
+from Utils.Maths import NewtonRaphson
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
@@ -60,6 +61,9 @@ class StreamNode(object):
                 z += VegZone(),
             dir.append(z) # append to the proper direction
         self.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
+
+
+
 
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.RiverKM)
@@ -201,7 +205,7 @@ class StreamNode(object):
                     LC_Angle_Max = LC_Angle
             VTS_Total = VTS_Total + LC_Angle_Max
         self.View_To_Sky = (1 - VTS_Total / (7 * 90))
-
+    def A(self,dw): return dw
     def SetWettedDepth(self, Q_est=None):
         """Use Newton-Raphson method to calculate wetted depth from current conditions
 
@@ -216,25 +220,32 @@ class StreamNode(object):
         can add a derivative function
         """
         Q = Q_est or self.Q[0]
+        z1 = math.sqrt(1+self.Z**2) # Convenience. This value is used alot
+        W = self.Width_B # More convenience
         # Some lambdas to use in the calculation
-        A = lambda x: x * (self.Width_B + self.Z * x) # Cross-sectional area
-        Pw = lambda x: self.Width_B + 2 * x * math.sqrt(1+self.Z**2) # Wetted Perimeter
+        A = lambda x: x * (W + self.Z * x) # Cross-sectional area
+        Pw = lambda x: W + 2 * x * z1 # Wetted Perimeter
         Rh = lambda x: A(x)/Pw(x) # Hydraulic Radius
         # The function def is given in the HeatSource manual Sec 3.2
-        Yj = lambda x: A(x) * (Rh(x)**(2/3)) - ((Q*self.N)/(self.Slope**(1/2))) # f(y)
-        # get the results of SciPy's Newton-Raphson iteration
-        # Notes:
-        # fprime is the derivative of the function- this is something we might consider
-        # args is something that I'm not sure of... perhaps arguments to the function?
-        # tol is the error tolerance.
-        # maxiter is the maximum number of iterations to try before re-trying.
-        # There could be some error checking done here if it was necessary, for example, putting
-        # this function call in a try/except block to test for a ValueError or other exception that
-        # is returned if the max iterations are reached. However, with the exception of craziness,
-        # the function is not hairy enough to cause problems, and should converge within 10 steps
+        Fd = lambda x: A(x) * (Rh(x)**(2/3)) - ((Q*self.N)/(self.Slope**(1/2)))
+        # The following is the derivative of Fd. We have to calculate some intermediary steps, because
+        # it is quite hairy.
+        
+        #This is the denominator that is used frequently.
+        den = lambda x: 3 * (2*x*z1 + W)
+        # And a numerator we see alot
+        num = lambda x: x*self.Z + W
+        # Some exponents we see alot
+        e5 = 5/3
+        e2 = 2/3
+        # Now we get down to it. The derivative has three main portions, We calculate each portion
+        # individually in order to simplify our lives.
+        
+        
+        
         depth = newton(Yj, 10, fprime=None, args=(), tol=1.48e-008, maxiter=500)
 
-
+        (x*(w+(z*x))*((x*(w+(z*x)))/(w+(2*x*sqrt(1+z^2))))^(2/3))-((Q*n)/(s^0.5))
         warn("these should be given as a return value, since we need to set different things")
         self.Depth[0] = depth
         self.AreaX[0] = A(depth)

@@ -1,5 +1,17 @@
 """Test module to spit out and check HeatSource information"""
+import os
+path = os.path
 from warnings import simplefilter
+
+def GetRelative(name, levels):
+    """Return a path to a file 'name' that is 'levels' directory 
+    levels above the current directory in the tree"""
+    dir = path.split(os.getcwd())
+    for i in xrange(levels):
+        dir = path.split(dir[0])
+    return path.join(dir[0], name)
+
+
 ########################################
 # Import the graphical user interface library, and start it up so that
 # we can spit out a progress bar
@@ -17,7 +29,7 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This assumes this file exists.
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
-HS = HeatSourceInterface("c:\\eclipse\\HeatSource\\Toketee_CCC.xls")
+HS = HeatSourceInterface(GetRelative('Toketee_CCC.xls',1))
 ###########################################
 
 ############################################
@@ -25,7 +37,7 @@ HS = HeatSourceInterface("c:\\eclipse\\HeatSource\\Toketee_CCC.xls")
 
 # Filenames are easier to change as a variable, remember to escape the
 # backslashes
-filename = "c:\\Temp\\data.out"
+filename = "d:\\Temp\\data.out"
 f = open(filename, 'w') # Open the file writable
 # Note that the open() function returns a class instance that is actually a file object.
 # This is another example of the power of classes and Object-Orientation. If we did this
@@ -103,6 +115,5 @@ for cond in BC:
 # the BC variable has 4, not 3 attributes. They are Q, T, C and Cloudiness. Meaning that I fucked up the way
 # the list is built and added the list to the BoundCond class. This is exactly the type of error that it
 # would REALLY help to find now. I've left it as an illustration.
-
 
 f.close() # CLOSE THE FILE!!
