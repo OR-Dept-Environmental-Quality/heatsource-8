@@ -11,6 +11,9 @@ class BoundCond(Singleton):
     to a regular class, which should be easy
     """
     def __init__(self):
-        self.Q = TimeList()
-        self.T = TimeList()
-        self.C = TimeList()
+        self.Q = TimeList() # Discharge conditions
+        self.T = TimeList() # Temperature conditions
+        self.C = TimeList() # Cloudiness conditions
+    def __iter__(self):
+        for lst in [self.Q, self.T, self.C]:
+            yield lst

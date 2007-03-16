@@ -2,7 +2,7 @@ from __future__ import division
 from numpy import arange
 import math, time
 from datetime import datetime, timedelta
-
+from HSGlobals import *
 from DataSheet import DataSheet
 from StreamNode import StreamNode
 
@@ -97,12 +97,12 @@ class HeatSourceInterface(DataSheet):
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
         # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
-        self.ScanMorphology()
-        self.BuildStreamNodes()
-        self.GetInflowData()
-        self.GetContinuousData()
-        map(lambda x:x.ViewToSky(),self.Reach)
-        map(lambda x:x.CalcStreamGeom(),self.Reach)
+        #self.ScanMorphology()
+        #self.BuildStreamNodes()
+        #self.GetInflowData()
+        #self.GetContinuousData()
+        #map(lambda x:x.ViewToSky(),self.Reach)
+        #map(lambda x:x.CalcStreamGeom(),self.Reach)
         # TODO: Uncomment this after debugging
         #self.SetupSheets2()
 
@@ -110,11 +110,6 @@ class HeatSourceInterface(DataSheet):
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
-        # Boundary conditions
-        self.BC.Q= TimeList()
-        self.BC.T = TimeList()
-        self.BC.Cloudiness = TimeList()
-
         # Get the columns, which is faster than accessing cells
         col = 7
         time_col = self[:,col-1,"Continuous Data"]

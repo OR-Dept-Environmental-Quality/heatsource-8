@@ -1,12 +1,12 @@
 from __future__ import division
 import math,wx
+from warnings import warn
 from scipy.optimize.minpack import newton
 from Utils.IniParams import IniParams
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
 from Utils.BoundCond import BoundCond
 from Utils.AttrList import TimeList
-from warnings import warn
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
