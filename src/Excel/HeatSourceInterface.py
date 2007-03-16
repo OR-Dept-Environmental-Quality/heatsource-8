@@ -2,7 +2,6 @@ from __future__ import division
 from numpy import arange
 import math, time
 from datetime import datetime, timedelta
-from HSGlobals import *
 from DataSheet import DataSheet
 from StreamNode import StreamNode
 
