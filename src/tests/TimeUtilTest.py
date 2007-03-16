@@ -1,13 +1,14 @@
 from unittest import TestCase
 from Excel.HeatSourceInterface import HeatSourceInterface
-from Utils.Time import TimeUtil
-from pytz import timezone,utc
+from Utils.TimeUtil import TimeUtil
+from PyTZ import timezone,utc
 import datetime
 
 class TestDataSheet(TestCase):
     def setUp(self):
         self.time = TimeUtil()
         pst = timezone('US/Pacific')
+        print pst, dir(pst), pst.__class__.__name__
         self.date1 = datetime.datetime(2007, 2, 12, 9, 35, 15,tzinfo=pst)
         self.date2 = datetime.datetime(2001, 7, 8, 1, 0, 0, tzinfo=pst)
         self.JD, self.JDC = 2454144.23281,0.0711631159

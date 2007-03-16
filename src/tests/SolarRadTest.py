@@ -2,7 +2,7 @@ from unittest import TestCase
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Utils.Time import TimeUtil
 from SolarRad import SolarRad
-from pytz import timezone,utc
+from PyTZ import timezone,utc
 import datetime
 
 class TestDataSheet(TestCase):

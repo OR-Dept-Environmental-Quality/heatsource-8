@@ -96,12 +96,12 @@ class HeatSourceInterface(DataSheet):
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
         # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
-        #self.ScanMorphology()
-        #self.BuildStreamNodes()
-        #self.GetInflowData()
-        #self.GetContinuousData()
-        #map(lambda x:x.ViewToSky(),self.Reach)
-        #map(lambda x:x.CalcStreamGeom(),self.Reach)
+        self.ScanMorphology()
+        self.BuildStreamNodes()
+        self.GetInflowData()
+        self.GetContinuousData()
+        map(lambda x:x.ViewToSky(),self.Reach)
+        map(lambda x:x.CalcStreamGeom(),self.Reach)
         # TODO: Uncomment this after debugging
         #self.SetupSheets2()
 
@@ -109,8 +109,13 @@ class HeatSourceInterface(DataSheet):
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
+        self.BC.Q = TimeList()
+        self.BC.T = TimeList()
+        self.BC.Cloudiness = TimeList()
+
         # Get the columns, which is faster than accessing cells
         col = 7
+        row = 16
         time_col = self[:,col-1,"Continuous Data"]
         flow_col = self[:,col,"Continuous Data"]
         temp_col = self[:,col+1,"Continuous Data"]
@@ -118,15 +123,15 @@ class HeatSourceInterface(DataSheet):
         for I in xrange(self.Hours):
             time = self.TimeUtil.MakeDatetime(time_col[16+I][0])
             # Get the flow boundary condition
-            val = flow_col[16 + I][0] # We get the 0th index because each column is actually a 1-length row
+            val = flow_col[row + I][0] # We get the 0th index because each column is actually a 1-length row
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
             self.BC.Q.append(DataPoint(val,time))
             # Temperature boundary condition
-            t_val = temp_col[16 + I][0]
+            t_val = temp_col[row + I][0]
             if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
             self.BC.T.append(DataPoint(t_val,time))
             # Cloudiness boundary condition
-            self.BC.Cloudiness.append(DataPoint(cloud_col[16 + I][0],time))
+            self.BC.Cloudiness.append(DataPoint(cloud_col[row + I][0],time))
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetInflowData(self):

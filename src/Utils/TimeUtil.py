@@ -1,5 +1,5 @@
 from __future__ import division
-import datetime, pytz, time, math
+import datetime, PyTZ, time, math
 
 def CalcHydroStability(reach, iniparams):
     """Ensure stability of the timestep using the technique from pg 82 of the HS manual
@@ -36,12 +36,12 @@ class TimeUtil(object):
                 print t
                 raise AttributeError(detail)
     def MakeDatetime(self, t, tz="US/Pacific"):
-        dst = pytz.timezone(tz) # Make a local timezone object
+        dst = PyTZ.timezone(tz) # Make a local timezone object
         self.makeTuple(t)
         return datetime.datetime(self.y,self.m,self.d,self.H,self.M,self.S,tzinfo=dst) #Create a datetime object that is set to the local timezone
     def FracJD(self, t):
         """Takes a datetime object in UTC and returns a fractional julian date"""
-        if not t.tzinfo == pytz.utc:
+        if not t.tzinfo == PyTZ.utc:
             t = self.GetUTC(t)
         self.makeTuple(t)
         dec_day = self.d + (self.H + (self.M + self.S/60)/60)/24
@@ -70,5 +70,5 @@ class TimeUtil(object):
         return 24 - (t.utcoffset().seconds/3600)
     def GetUTC(self, t):
         """Return UTC version of a datetime object"""
-        s = t.replace(tzinfo=pytz.utc) # Replace our timezone info
+        s = t.replace(tzinfo=PyTZ.utc) # Replace our timezone info
         return s - t.tzinfo._utcoffset #then subtract the offset and return the object
