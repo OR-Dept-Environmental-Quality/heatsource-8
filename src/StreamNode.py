@@ -8,10 +8,12 @@ from Utils.Zonator import Zonator
 from Utils.BoundCond import BoundCond
 from Utils.AttrList import TimeList
 from Utils.Maths import NewtonRaphson
+from StreamChannel import StreamChannel
 
-class StreamNode(object):
+class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
     def __init__(self, **kwargs):
+        StreamChannel.__init__(self):
         self.IniParams = IniParams.getInstance()
         self.BC = BoundCond.getInstance() # Class to hold various boundary conditions
         # Attributes, which are either values from the spreadsheet if distance step
@@ -115,36 +117,9 @@ class StreamNode(object):
     def GetDn(self): return self.next_km
     Upstream = property(GetUp)
     Downstream = property(GetDn)
-    def GetQ(self):
-        """Return value of Q calculated from current conditions"""
-        return (1/self.n)*self.A*(self.Rh**(2/3))*(self.S**(1/5))
-    Q_calc = property(GetQ)
 
-    def checkZ(self):
-        # bottom depth cannot be zero, which will happen if the equation:
-        # BFWidth - (2 * z * depth) <= 0
-        # Substituting BFWidth/WD for depth and solving for dx or depth tells us that
-        # this case will be true when z >= WD/2. Thus, we test for this case and deal with it
-        # up front.
-        if self.Z >= self.WD/2:
-            raise Warning("Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.Z, self.WD))
-            self.Z = 0.99 * (self.WD/2)
-
-    def BFMorph(self):
-        """Calculate cross-sectional channel morphology
-
-        Assumes a trapazoidal channel and calculates the average depth, cross-sectional area
-        and bottom width. The original VB code contained a couple of questionable loops
-        These loops basically recalculated until the calculated cross-sectional area
-        equalled the bankfull cross-sectional area. The outcome of this was that the area
-        of the trapazoidal stream cross-section was calculated as a rectangle where the
-        long edge was the bankfull width and the short edge was the average depth. This is
-        larger than the true trapazoidinal shape. It didn't seem that this new, too large,
-        cross-sectional area was actually used in the program, but it was spit out to the
-        spreadsheet, so it's calculated here.
-        """
-        self.checkZ()
-
+    def BFMorth(self):
+        "Placeholder-"
         # this was originally in the LoadModelVariables subroutine of the VB code, but it
         # makes more sense to do all the node-specific geomorph calculations here.
         self.Area_Wetland += self.Width_BF * self.dx
@@ -159,28 +134,6 @@ class StreamNode(object):
             # ASSUMPTION: We make an assumption that the zone's elevation cannot be less than the
             # stream's elevation. Not necessarily a valid assumption, but potentially unharmful.
             node.SlopeHeight = node.SlopeHeight if node.SlopeHeight > 0 else 0
-
-        # Estimate depth of the trapazoid from the width/depth ratio
-        self.AveDepth = self.Width_BF/self.WD
-        # Calculated the bottom of the channel by subtracting the differences between
-        # Top and bottom of the trapazoid
-        self.BottomWidth = self.Width_BF - (2 * self.AveDepth * self.dx)
-        # Calculate the area of this newly estimated trapazoid
-        self.BFXArea = (self.BottomWidth + (self.dx * self.AveDepth)) * self.AveDepth
-        # NOTE: What follows is a strange calculation of the max depth, that was taken from
-        # the original VB code. It basically increases depth until the area equals the
-        # area of the bankfull rectangle (see the note in the docstring). This is not
-        # an accurate representation of the maximum bankfull depth, but is included for
-        # legacy reasons.
-        BW = self.BottomWidth
-        D_Est = self.AveDepth
-        XArea = BW / self.WD
-        # Here, we add to depth until the area equals the bankfull area.
-        while True:
-            Delta = (XArea - (BW + self.Z * D_Est) * D_Est)
-            if Delta < 0.0001: break
-            D_Est += 0.01
-        self.MaxDepth = D_Est
 
     def ViewToSky(self):
         #TODO: This method needs to be tested against the values obtained by the VB code
@@ -205,46 +158,10 @@ class StreamNode(object):
                     LC_Angle_Max = LC_Angle
             VTS_Total = VTS_Total + LC_Angle_Max
         self.View_To_Sky = (1 - VTS_Total / (7 * 90))
-    def A(self,dw): return dw
-    def SetWettedDepth(self, Q_est=None):
-        """Use Newton-Raphson method to calculate wetted depth from current conditions
 
-        Details on this can be found in the HeatSource manual Sec. 3.2.
-        More general details on the technique can be found in Applied Hydrology
-        in section 10.4.
-        This method uses the newton() function from SciPy because it is highly optimized
-        and very fast. Rather than do this entire calculation by hand, we just send the
-        function to newton() and get an answer. The only problem is that without a
-        defined derivative function, the secant method is used, which is slightly
-        less accurate than the tangent method. It shouldn't matter, but if it does, we
-        can add a derivative function
-        """
-        Q = Q_est or self.Q[0]
-        z1 = math.sqrt(1+self.Z**2) # Convenience. This value is used alot
-        W = self.Width_B # More convenience
-        # Some lambdas to use in the calculation
-        A = lambda x: x * (W + self.Z * x) # Cross-sectional area
-        Pw = lambda x: W + 2 * x * z1 # Wetted Perimeter
-        Rh = lambda x: A(x)/Pw(x) # Hydraulic Radius
-        # The function def is given in the HeatSource manual Sec 3.2
-        Fd = lambda x: A(x) * (Rh(x)**(2/3)) - ((Q*self.N)/(self.Slope**(1/2)))
-        # The following is the derivative of Fd. We have to calculate some intermediary steps, because
-        # it is quite hairy.
-        
-        #This is the denominator that is used frequently.
-        den = lambda x: 3 * (2*x*z1 + W)
-        # And a numerator we see alot
-        num = lambda x: x*self.Z + W
-        # Some exponents we see alot
-        e5 = 5/3
-        e2 = 2/3
-        # Now we get down to it. The derivative has three main portions, We calculate each portion
-        # individually in order to simplify our lives.
-        
-        
-        
-        depth = newton(Yj, 10, fprime=None, args=(), tol=1.48e-008, maxiter=500)
 
+    def SetDepthDependant(self):
+        """Placeholder-"""
         (x*(w+(z*x))*((x*(w+(z*x)))/(w+(2*x*sqrt(1+z^2))))^(2/3))-((Q*n)/(s^0.5))
         warn("these should be given as a return value, since we need to set different things")
         self.Depth[0] = depth
