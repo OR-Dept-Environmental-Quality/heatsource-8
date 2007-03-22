@@ -143,13 +143,16 @@ class HeatSourceInterface(DataSheet):
             flow_col = self[:, 13 + I * 2,"Flow Data"]
             temp_col = self[:, 14 + I * 2,"Flow Data"]
             time_col = self[:, 12, "Flow Data"]
+            tribs = TimeList()
             for II in xrange(Hours):
                 time = self.TimeUtil.MakeDatetime(time_col[II+16][0])
                 flow = flow_col[II + 16][0]
                 temp = temp_col[II + 16][0]
-                node.Q_In.append(DataPoint(flow, time=time))
+                tribs.append(DataPoint(flow, time=time))
                 val = temp * flow if self.Flag_HS else temp
                 node.T_In.append(DataPoint(val, time=time))
+            # Set the node's tributary list to the inflow list
+            node.Q_tribs = tribs
             self.PB("Getting inflow data", I, self.IniParams.InflowSites)
 
     def GetContinuousData(self):
@@ -160,11 +163,17 @@ class HeatSourceInterface(DataSheet):
             humidity_col = self[:,12 + (I * 4),"Continuous Data"]
             air_col = self[:,13 + (I * 4),"Continuous Data"]
             time_col = self[:,6,"Continuous Data"]
+            wind_lst = TimeList()
+            air_lst = TimeList()
+            hum_lst = TimeList()
             for II in xrange(self.Hours):
                 time = self.TimeUtil.MakeDatetime(time_col[II + 16][0])
                 node.Cont_Wind.append(DataPoint(wind_col[II + 16][0],time=time))
                 node.Cont_Humidity.append(DataPoint(humidity_col[II + 16][0],time=time))
                 node.Cont_Air_Temp.append(DataPoint(air_col[II + 16][0], time=time))
+            node.Wind = wind_lst
+            node.T_air = air_lst
+            node.Humidity = hum_lst
             self.PB("Reading continuous data", I, self.IniParams.ContSites)
 
     def ScanMorphology(self):
@@ -365,6 +374,8 @@ class HeatSourceInterface(DataSheet):
                             if test:
                                 for attr in ["Elevation","Overhang","VHeight","VDensity"]:
                                     setattr(zone, attr, average(getattr(zone,attr)))
+                                zone.SlopeHeight = zone.Elevation - node.Zone[j][0].Elevation
+
             if QuickExit: break # We're done, scram
             # Calculate the distance step, which is the longitudinal sample rate times
             # however many steps we've made. Note: this is not times 'multiple' because
