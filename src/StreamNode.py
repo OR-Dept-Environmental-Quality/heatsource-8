@@ -13,10 +13,10 @@ from StreamChannel import StreamChannel
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
     # Define members in __slots__ to ensure that later member names cannot be added accidentally
-    __slots__ = ["Embeddedness","Conductivity","ParticleSize",  # From Morphology Data sheet
+    __slots__ = ["Embeddedness","Conductivity","ParticleSize","Porosity",  # From Morphology Data sheet
                  "Aspect","Topo_W","Topo_S","Topo_E","Latitude","Longitude","Elevation", # Geographic params
                  "FLIR_Temp","FLIR_Time", # FLIR data
-                 "T_Control","T_Accretion","Temp_Sed","T_In", # Temperature attrs
+                 "T_cont","T_sed","T_in", # Temperature attrs
                  "VHeight","VDensity",  #Vegetation params
                  "Wind","Humidity","T_air", # Continuous data
                  "IniParams","Zone","BC" # Initialization parameters, Zonator and boundary conditions
@@ -26,7 +26,7 @@ class StreamNode(StreamChannel):
         self.IniParams = IniParams.getInstance()
         self.BC = BoundCond.getInstance() # Class to hold various boundary conditions
         # Set all the attributes to bare lists, or set from the constructor
-        for attr in attrs:
+        for attr in self.__slots__:
             x = kwargs[attr] if attr in kwargs.keys() else []
             setattr(self,attr,x)
 
@@ -84,13 +84,6 @@ class StreamNode(StreamChannel):
             for j in xrange(5):
                 yield i,j,self.Zone[i][j]
 
-    # This is a property-based attribute holding a reference to the upstream and the downstream
-    # neighbor
-    def GetUp(self): return self.prev_km
-    def GetDn(self): return self.next_km
-    Upstream = property(GetUp)
-    Downstream = property(GetDn)
-
     def ViewToSky(self):
         #TODO: This method needs to be tested against the values obtained by the VB code
         #======================================================
@@ -122,38 +115,21 @@ class StreamNode(StreamChannel):
         # Iterate down the stream channel, calculating the discharges
         self.CalculateDischarge()
 
-        
-        #======================================================
-        #Calc hyporheic flow in cell Q(0,1)
-        Dummy1 = self.Conductivity * (1 - self.Embeddedness) #Ratio Conductivity of dominant sunstrate
-        Dummy2 = 0.00002 * self.Embeddedness  #Ratio Conductivity of sand - low range
-        Horizontal_Conductivity = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
-        Dummy1 = self.ParticleSize * (1 - self.Embeddedness) #Ratio Size of dominant substrate
-        Dummy2 = 0.062 * self.Embeddedness  #Ratio Conductivity of sand - low range
-        thePorosity = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
-        #Calculate head at top (ho) and bottom (hL) of reach
-        if not self.Upstream:
-            ho = self.Slope * dx
-            hL = 0
-        else:
-            ho = self.Upstream.Depth[1] + self.Slope * dx
-            hL = self.Depth[1]
-        #Calculate Hyporheic Flows
-        self.Hyporheic_Exchange = abs(thePorosity * self.Pw * Horizontal_Conductivity * (ho ** 2 - hL ** 2) / (2 * dx))
-        if self.Hyporheic_Exchange > self.Q[1]:
-                self.Hyporheic_Exchange = self.Q[1]
-        #===================================================
-        #Calculate tendency to stratify
-        try:
-            self.Froude_Densiometric = math.sqrt(1 / (9.8 * 0.000001)) * dx * self.Q[1] / (self.Depth[1] * self.AreaX[1] * dx)
-        except:
-            print self.Depth, self.AreaX, dx
-            raise
-        #===================================================
-        else: #Skip Node - No Flow in Channel
-            self.Hyporheic_Exchange = 0
-            self.T[0] = 0
-            self.Froude_Densiometric = 0
+        ################################################################
+        ### This section seems unused in the original code. It calculates a stratification
+        # tendency factor. We can implement it (possibly in StreamChannel) if we need to
+#        #===================================================
+#        #Calculate tendency to stratify
+#        try:
+#            self.Froude_Densiometric = math.sqrt(1 / (9.8 * 0.000001)) * dx * self.Q[1] / (self.Depth[1] * self.AreaX[1] * dx)
+#        except:
+#            print self.Depth, self.AreaX, dx
+#            raise
+#        #===================================================
+#        else: #Skip Node - No Flow in Channel
+#            self.Hyporheic_Exchange = 0
+#            self.T[0] = 0
+#            self.Froude_Densiometric = 0
 
         #===================================================
         #Check to see if wetted widths exceed bankfull widths

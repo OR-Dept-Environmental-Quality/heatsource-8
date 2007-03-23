@@ -1,5 +1,5 @@
 from __future__ import division
-from warning import warn
+from warnings import warn
 from itertools import imap
 
 class StreamChannel(object):
@@ -39,16 +39,19 @@ class StreamChannel(object):
                  "Q_tribs",  # Inputs from tribs. This is a TimeList class object
                  "Q_in",     # Inputs from "accretion" in cubic meters per second
                  "Q_out",    # Withdrawls from the stream, in cubic meters per second
+                 "Q_hyp",    # Hyporheic flow
                  "km",       # River kilometer, from mouth
                  "next_km",  # Reference to next (downstream) river channel instance (Set externally)
                  "prev_km",  # Reference to prevous (Upstream) river channel instance (also set externally)
                  "Q_bc",      # Boundary conditions, in a TimeList class, for discharge.
                  "E",        # Evaporation rate (currently unused)
-                 "dt"        # This is the timestep (for kinematic wave movement, etc.)
+                 "dt",        # This is the timestep (for kinematic wave movement, etc.)
+                 "phi",      # Porosity of the bed
+                 "K_h"      # Horizontal bed conductivity
                  ]
     def __init__(self):
         # Set all attributes to None, so we can do testing without raising an AttributeError
-        for attr in self.__slots__.keys():
+        for attr in self.__slots__:
             setattr(self, attr, None)
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
@@ -60,7 +63,7 @@ class StreamChannel(object):
         Q -= Q_out # Output volume
         Q += Q_tribs[t,-1] # Tributary volume
         if self.E: # Evaporation volume
-            Q -= self.E * dx * W_w
+            Q -= self.E * self.dx * self.W_w
         return Q
 
     def CalculateDischarge(self, t=None):
@@ -100,9 +103,11 @@ class StreamChannel(object):
         if Q < 0.0071: #Channel is going dry
             warn("The channel is going dry at %s.  The model will either skip these 'dry stream segments' or you can stop this model run and change input data.  Do you want to continue this model run?" % self)
             self.dw, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
-        else:
-            # That's it for discharge, let's recalculate our channel geometry now
-            self.CalcGeometry()
+            return
+
+        # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
+        self.CalcGeometry()
+        self.CalcHyporheic()
 
     def GetKnownDischarges(self):
         """Returns the known discharges necessary to calculate current discharge
@@ -193,16 +198,11 @@ class StreamChannel(object):
         return C1, C2, C3, C4
 
 
-    def SetBankfullMorphology(self, S, n, WD, Wbf, z):
+    def SetBankfullMorphology(self):
         """Calculate initial morphological characteristics in terms of W_bf, z and WD"""
-        if z >= WD/2:
+        if self.z >= self.WD/2:
             raise Warning("Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.z, self.WD))
-            z = 0.99 * (WD/2)
-        self.S = S
-        self.n = n
-        self.WD = WD
-        self.W_bf = Wbf
-        self.z = z
+            z = 0.99 * (self.WD/2)
 
         # Estimate depth of the trapazoid from the width/depth ratio
         self.d_ave = self.W_bf/self.WD
@@ -257,3 +257,19 @@ class StreamChannel(object):
         except:
             print "Failure to converge on a depth. Check minimum and maximum values defined in this method."
             raise
+
+    def CalcHyporheic(self):
+        """Calculate the hyporheic exchange value"""
+        # Taken directly from the VB code
+        #======================================================
+        #Calc hyporheic flow in cell Q(0,1)
+        #Calculate head at top (ho) and bottom (hL) of reach
+        if not self.Upstream:
+            ho = self.S * self.dx
+            hL = 0
+        else:
+            ho = self.Upstream.d_w + self.S * self.dx
+            hL = self.d_w
+        #Calculate Hyporheic Flows
+        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * dx))
+        self.Q_hyp = self.Q if self.Q_hyp > self.Q else self.Q_hyp

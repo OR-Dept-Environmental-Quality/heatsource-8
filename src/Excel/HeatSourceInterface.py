@@ -78,7 +78,7 @@ class HeatSourceInterface(DataSheet):
                       "Output - Evaporation","Output - Convection","Output - Conduction",
                       "Output - Total Heat","Output - Evaporation Rate", "Output - Daily Heat Flux")
 
-        self.SetupSheets1()
+#        self.SetupSheets1()
 
         # from VB: Apparently, only one day is simulated for the shadelator
         if Flag_HS != 2: Days = self.IniParams.SimPeriod
@@ -96,7 +96,7 @@ class HeatSourceInterface(DataSheet):
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
         # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
-        self.ScanMorphology()
+#        self.ScanMorphology()
         self.BuildStreamNodes()
         self.GetInflowData()
         self.GetContinuousData()
@@ -197,6 +197,19 @@ class HeatSourceInterface(DataSheet):
                     raise Exception("Invalid data: row %i, cell %s: '%s' ... Flow router terminated" %(theRow, self.excelize(theCol),val))
             self.PB("Scanning morphology data", theRow, self.Num_Q_Var+16)
 
+    def BuildStreamNodes2(self):
+        """Test method for a new, improved, low-fat way to build StreamNode instances"""
+        del self.Reach[:] # Make sure we empty any current list
+
+        long = self.IniParams.LongSample
+        dx = self.IniParams.Dx
+        length = self.IniParams.Length
+
+        # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
+        if (dx%long or dx<long): raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
+
+        multiple = dx/long #We have this many samples per distance step
+
     def BuildStreamNodes(self):
         """Create list of StreamNodes from the spreadsheet
 
@@ -208,6 +221,9 @@ class HeatSourceInterface(DataSheet):
         For instance, if longrate=50 and dx=200, then the Slope for the node will be
         the average of 4 longitudinal slopes."""
         #TODO: My god, no method should be this long, we need a redesign here!
+        # This is the worst kind of programming: Even the bastid who wrote it is clueless.
+        # Unfortunately, there's not much we can do about taking all these values from an
+        # Excel spreadsheet. Ugh- we need to dump Excel- that's what we need.
         del self.Reach[:] # Make sure we empty any current list
 
         long = self.IniParams.LongSample
@@ -221,25 +237,25 @@ class HeatSourceInterface(DataSheet):
 
         # Dictionary of sheet names, StreamNode attributes and corresponding columns within the sheet.
         # This is used in the later loop to fill the stream node with averaged data.
-        morph = {'Slope': 6,
-                'N': 7,
+        morph = {'S': 6,
+                'n': 7,
                 'WD': 9,
-                'Width_BF': 10,
-                'Width_B': 11,
-                'Depth_BF': 12,
-                'Z': 15,
-                'X_Weight': 16,
+                'W_bf': 10,
+                'W_b': 11,
+                'd_bf': 12,
+                'z': 15,
+                #'X_Weight': 16,
                 'Conductivity': 17, # This value needs to be divided by 1000
                 'ParticleSize': 18,
                 'Embeddedness': 19,
                 'FLIR_Time': 20,
                 'FLIR_Temp': 21,
-                'Q_Control': 22,
-                'D_Control': 23,
-                'T_Control': 24}
-        flow = {'Q_Accretion': 4,
-                'T_Accretion': 5,
-                'Q_Out': 6,}
+                'Q_cont': 22,
+                'd_cont': 23,
+                'T_cont': 24}
+        flow = {'Q_in': 4,
+                'T_in': 5,
+                'Q_out': 6,}
         ttools = {'Longitude': 5,
                   'Latitude': 6,
                   'Elevation': 7,
@@ -287,7 +303,7 @@ class HeatSourceInterface(DataSheet):
                 # We don't use a simple "if not val" because the last node would probably be
                 # zero, which is valid (stream mouth). Thus, we want to see if the value IS the
                 # class None
-                node.RiverKM = val if (val is not None) else node.RiverKM
+                node.km = val if (val is not None) else node.km
                 for page in pages:
                     # Row of all available data grabbed in a single 'get' call
                     # We get the 0th item because what's returned is actually a row of rows, but with only one.
@@ -323,6 +339,7 @@ class HeatSourceInterface(DataSheet):
                             val = data[col] # Get current value using the attribute's name string
                             if val is None:
                                 if test: # we are in the last run, or have a null value, so we average
+                                    print data
                                     setattr(node,attr,average(getattr(node,attr)))
                                 continue
                             # except when we have to catch some exceptions
@@ -344,12 +361,14 @@ class HeatSourceInterface(DataSheet):
                             if inst.message == "tuple index out of range":
                                 # If it's an attribute that we know about, then we can just keep the zero value
                                 # that's the default, or at least ignore this run because we have zero + zero.
-                                if attr in ['T_Control','D_Control','Q_Control']: pass
+                                if attr in ['T_cont','d_cont','Q_cont']: pass
                                 else:
                                     print attr, col, len(data)
                                     raise
-
-                        getattr(node,attr).append(val) # set the new value
+                        try:
+                            getattr(node,attr).append(val) # set the new value
+                        except AttributeError: # Value is still None, set to a list
+                            setattr(node,attr,[val])
                         if test: # we are in the last run, or have a null value, so we average
                             setattr(node,attr,average(getattr(node,attr)))
                     # We are going to build the VegZone and Zonator instances We have to do this for each cardinal
@@ -381,10 +400,21 @@ class HeatSourceInterface(DataSheet):
             # however many steps we've made. Note: this is not times 'multiple' because
             # we may be getting fewer nodes than that.
             try:
-                node.dx = long * (i+1)
-                node.BFMorph()
+                node.dx = long * (i+1) # Set the space-step
+                node.SetBankfullMorphology()
+                # Taken from the VB code in SubHydraulics- this doesn't have to run at every
+                # timestep, since the values don't change. Thus, we just set horizontal conductivity
+                # and porosity once here, and remove the other attributes.
+                # TODO: Research this mathematics further
+                Dummy1 = node.Conductivity * (1 - node.Embeddedness) #Ratio Conductivity of dominant sunstrate
+                Dummy2 = 0.00002 * node.Embeddedness  #Ratio Conductivity of sand - low range
+                node.K_h = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
+                Dummy1 = node.ParticleSize * (1 - node.Embeddedness) #Ratio Size of dominant substrate
+                Dummy2 = 0.062 * node.Embeddedness  #Ratio Conductivity of sand - low range
+                node.phi = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
+                del node.Conductivity, node.Embeddedness
             except: # Shit, something happened, WTF?
-                print node, node.Slope, node.Width_BF, node.Z, node.WD
+                print node, node.S, node.W_bf, node.z, node.WD
                 raise
 
             #############################################################
@@ -393,10 +423,10 @@ class HeatSourceInterface(DataSheet):
             # we'll spit these four things back to the spreadsheet for now, until we understand
             # better what the purpose is. Unfortunately, this only calculates for each node, which
             # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
-            self.SetValue((i + 16, 11),node.BottomWidth, sheet="Morphology Data")
-            self.SetValue((i + 16, 12),node.MaxDepth, sheet="Morphology Data")
-            self.SetValue((i + 16, 13),node.AveDepth, sheet="Morphology Data")
-            self.SetValue((i + 16, 14),node.BFXArea, sheet="Morphology Data")
+            self.SetValue((i + 16, 11),node.W_b, sheet="Morphology Data")
+            self.SetValue((i + 16, 12),node.d_bf, sheet="Morphology Data")
+            self.SetValue((i + 16, 13),node.d_ave, sheet="Morphology Data")
+            self.SetValue((i + 16, 14),node.A, sheet="Morphology Data")
             ##############################################################
             #Now that we have a stream node, we set the node's dx value, because
             # we have most nodes that are long-sample-distance times multiple,
