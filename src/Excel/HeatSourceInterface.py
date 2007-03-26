@@ -97,7 +97,7 @@ class HeatSourceInterface(DataSheet):
         # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
 #        self.ScanMorphology()
-        self.BuildStreamNodes2()
+        self.BuildStreamNodes()
         self.GetInflowData()
         self.GetContinuousData()
         map(lambda x:x.ViewToSky(),self.Reach)
@@ -197,7 +197,7 @@ class HeatSourceInterface(DataSheet):
                     raise Exception("Invalid data: row %i, cell %s: '%s' ... Flow router terminated" %(theRow, self.excelize(theCol),val))
             self.PB("Scanning morphology data", theRow, self.Num_Q_Var+16)
 
-    def BuildStreamNodes2(self):
+    def BuildStreamNodes(self):
         """Create list of StreamNodes from the spreadsheet
 
         In the original VB code, this was quite different. I will not explain what that
@@ -229,7 +229,6 @@ class HeatSourceInterface(DataSheet):
                 'W_b': 11,
                 'd_bf': 12,
                 'z': 15,
-                #'X_Weight': 16,
                 'Conductivity': 17, # This value needs to be divided by 1000
                 'ParticleSize': 18,
                 'Embeddedness': 19,
@@ -367,174 +366,7 @@ class HeatSourceInterface(DataSheet):
                     return reduce(operator.add,map(timeval,l))/smartlen(l)
             else: raise
         ########
-
         return imap(ave, *iterable)
-
-
-    def BuildStreamNodes(self):
-        #TODO: My god, no method should be this long, we need a redesign here!
-        # This is the worst kind of programming: Even the bastid who wrote it is clueless.
-        # Unfortunately, there's not much we can do about taking all these values from an
-        # Excel spreadsheet. Ugh- we need to dump Excel- that's what we need.
-        del self.Reach[:] # Make sure we empty any current list
-
-        long = self.IniParams.LongSample
-        dx = self.IniParams.Dx
-        length = self.IniParams.Length
-
-        # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
-        if (dx%long or dx<long): raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
-
-        multiple = dx/long #We have this many samples per distance step
-
-        # Dictionary of sheet names, StreamNode attributes and corresponding columns within the sheet.
-        # This is used in the later loop to fill the stream node with averaged data.
-        morph = {'S': 6,
-                'n': 7,
-                'WD': 9,
-                'W_bf': 10,
-                'W_b': 11,
-                'd_bf': 12,
-                'z': 15,
-                #'X_Weight': 16,
-                'Conductivity': 17, # This value needs to be divided by 1000
-                'ParticleSize': 18,
-                'Embeddedness': 19,
-                'FLIR_Time': 20,
-                'FLIR_Temp': 21,
-                'Q_cont': 22,
-                'd_cont': 23,
-                'T_cont': 24}
-        flow = {'Q_in': 4,
-                'T_in': 5,
-                'Q_out': 6,}
-        ttools = {'Longitude': 5,
-                  'Latitude': 6,
-                  'Elevation': 7,
-                  'Aspect': 9,
-                  'Topo_W': 10,
-                  'Topo_S': 11,
-                  'Topo_E': 12,
-                  'VHeight': 159,
-                  'VDensity': 160}
-        pages = {'Morphology Data': morph, 'TTools Data': ttools, 'Flow Data': flow}
-
-        # This process is quite gruelling. I think that this can probably be cleaned up by
-        # getting the entire data matrix in a single call, averaging every X group of values
-        # in every column, and dumping that data into the StreamNode. This would be significantly
-        # easier than this method. However, since UsedRange does not seem to work, we have to find
-        # a way of getting all of the data from a sheet in a non-stupid fashion. However, significant
-        # time will have to be spent figuring out how to turn the nature of the spreadsheet into
-        # a proper OOP framework.
-        # One idea for this is to subclass sheets from DataSheet and have a MorphologySheet,
-        # a FlowSheet, etc. Then, we could tie the StreamNode class directly to the DataSheet
-        # subclass and have this done internally.
-
-        row = 17 # Current row
-        # Take a list and divide its sum by either the length of the list, or 1 if it's of zero length
-        def average(lst):
-            iszero = lambda x: len(x) or 1
-            return sum(lst)/iszero(lst)
-        # this is a boolean that allows us to use the while statement to cycle until we want to fail
-        GotNodes = False
-        QuickExit = False
-
-        while not GotNodes: # Until we get to the end of the data
-            node = StreamNode()
-            # We want to get the data for a number of datapoints and average them for a node, so
-            # we go through and get the data for each row starting at 'row' and continuing 'multiple'
-            # times, then we divide by 'multiple'
-            for i in xrange(int(multiple)):
-                if GotNodes: break # If we set GotNodes to true in an inner loop, we don't necessarily break out of this one.
-                test = i == multiple-1 #Are we in the last pass?
-                # Set the river mile, we set this each time because we want the river mile
-                # to equal the last mile for the combined (averaged) data. In other words, each
-                # node accounts for its river mile, and all the upstream river miles until the
-                # next node.
-                val = self[row+i,4,'Morphology Data']
-                # We don't use a simple "if not val" because the last node would probably be
-                # zero, which is valid (stream mouth). Thus, we want to see if the value IS the
-                # class None
-                node.km = val if (val is not None) else node.km
-                for page in pages:
-                    # Row of all available data grabbed in a single 'get' call
-                    # We get the 0th item because what's returned is actually a row of rows, but with only one.
-                    try:
-                        data = self[row+i,:,page][0]
-                    except IndexError:
-                         # we have a null value, which means we may be at the end of our data.
-                         # e.g. if we have 3.15 km of stream with samples every 50 meters and
-                         # a dx of 100 meters, we'll have an extra segment of 50 meters, so
-                         # trying to grab the second part of that segment will be null.
-                         # In that case, we average immediately and scram. However, if we are at
-                         # the first pass in 'multiple' then we actually grabbed the last bit of
-                         # data during the last pass, meaning we have just built a node with
-                         # zero kilometers and no internal data. Thus, we have to figure out if
-                         # this is true, and if so, set a condition that allows us to delet the node.
-                        GotNodes = True # We're done, either way
-                        if not i: # we're at the first pass, i==0
-                            del node # Get rid of the node
-                            QuickExit = True # make a quick exit out of the loop
-                            break # then scram
-                        # Then we send the list to the ave lambda to average it, and set the attribute
-                        # to the resulting value
-                        setattr(node,attr,average(getattr(node,attr)))
-                        # Make sure we get the vegzones
-                        for j,k,zone in node: # use StreamNode.__iter__(), we can ignore the indexes, we just want the zone.
-                            for attr in ["Elevation","Overhang","VHeight","VDensity"]:
-                                setattr(zone, attr, average(getattr(zone,attr)))
-                        break
-                    # using [get|set]attr() allows us to do all of this with a single list or dictionary,
-                    # otherwise, we'd have to set each value independantly, which makes for long, inelegant methods.
-                    for attr, col in pages[page].items():
-                        try:
-                            val = data[col] # Get current value using the attribute's name string
-                            if val is None:
-                                if test: # we are in the last run, or have a null value, so we average
-                                    print data
-                                    setattr(node,attr,average(getattr(node,attr)))
-                                continue
-                            # except when we have to catch some exceptions
-                            #
-                            # This first exception catches the case when we are given a PyTime object, which occurs whenever
-                            # the interface encounters a date/time in the Excel interface. We cannot simply add the time objects
-                            # so we work around that in this case.
-                            if attr == "FLIR_Time":
-                                # And create a floating point number which is seconds since the epoch
-                                # Doing this, we can then add another time in seconds, then average them, and then
-                                # get the average of the time. I'm not entirely sure if it's useful, but it's done
-                                # in the original code, so I'll do it here
-                                val = time.mktime(time.strptime(val.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
-                        # In this instance, we have an out of range tuple, so that means that we are trying
-                        # to access data at the end of a row that doesn't actually exist. Since values of 'None'
-                        # at the end of a returned row or column are removed, we could have a row that's too short
-                        # to hold data for things like T_Control, which is at the far end of a row.
-                        except IndexError, inst:
-                            if inst.message == "tuple index out of range":
-                                # If it's an attribute that we know about, then we can just keep the zero value
-                                # that's the default, or at least ignore this run because we have zero + zero.
-                                if attr in ['T_cont','d_cont','Q_cont']: pass
-                                else:
-                                    print attr, col, len(data)
-                                    raise
-                        try:
-                            getattr(node,attr).append(val) # set the new value
-                        except AttributeError: # Value is still None, set to a list
-                            setattr(node,attr,[val])
-                        if test: # we are in the last run, or have a null value, so we average
-                            setattr(node,attr,average(getattr(node,attr)))
-
-            if QuickExit: break # We're done, scram
-            # Calculate the distance step, which is the longitudinal sample rate times
-            # however many steps we've made. Note: this is not times 'multiple' because
-            # we may be getting fewer nodes than that.
-
-            # but the last one may be shorter.
-            row += multiple
-            self.Reach.append(node)
-
-            # Here, we check if we get a cancel request from the progress bar. We set the maximum value of the progress
-            # bar to 1.5 times the number of variables just because... well... what the hell?
 
     def SetupSheets1(self):
         num = 0
