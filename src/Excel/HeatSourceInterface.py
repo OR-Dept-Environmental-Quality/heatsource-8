@@ -1,6 +1,6 @@
 from __future__ import division
-from numpy import arange
-import math, time
+from itertools import imap
+import math, time, operator
 from datetime import datetime, timedelta
 from DataSheet import DataSheet
 from StreamNode import StreamNode
@@ -97,7 +97,7 @@ class HeatSourceInterface(DataSheet):
         # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
 #        self.ScanMorphology()
-        self.BuildStreamNodes()
+        self.BuildStreamNodes2()
         self.GetInflowData()
         self.GetContinuousData()
         map(lambda x:x.ViewToSky(),self.Reach)
@@ -168,9 +168,9 @@ class HeatSourceInterface(DataSheet):
             hum_lst = TimeList()
             for II in xrange(self.Hours):
                 time = self.TimeUtil.MakeDatetime(time_col[II + 16][0])
-                node.Cont_Wind.append(DataPoint(wind_col[II + 16][0],time=time))
-                node.Cont_Humidity.append(DataPoint(humidity_col[II + 16][0],time=time))
-                node.Cont_Air_Temp.append(DataPoint(air_col[II + 16][0], time=time))
+                node.Wind.append(DataPoint(wind_col[II + 16][0],time=time))
+                node.Humidity.append(DataPoint(humidity_col[II + 16][0],time=time))
+                node.T_air.append(DataPoint(air_col[II + 16][0], time=time))
             node.Wind = wind_lst
             node.T_air = air_lst
             node.Humidity = hum_lst
@@ -198,19 +198,6 @@ class HeatSourceInterface(DataSheet):
             self.PB("Scanning morphology data", theRow, self.Num_Q_Var+16)
 
     def BuildStreamNodes2(self):
-        """Test method for a new, improved, low-fat way to build StreamNode instances"""
-        del self.Reach[:] # Make sure we empty any current list
-
-        long = self.IniParams.LongSample
-        dx = self.IniParams.Dx
-        length = self.IniParams.Length
-
-        # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
-        if (dx%long or dx<long): raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
-
-        multiple = dx/long #We have this many samples per distance step
-
-    def BuildStreamNodes(self):
         """Create list of StreamNodes from the spreadsheet
 
         In the original VB code, this was quite different. I will not explain what that
@@ -220,6 +207,171 @@ class HeatSourceInterface(DataSheet):
         node are the average values of the longitudinal samples that fall within that dx.
         For instance, if longrate=50 and dx=200, then the Slope for the node will be
         the average of 4 longitudinal slopes."""
+
+        ####################
+        # Some convenience variables
+        # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
+        if (self.IniParams.Dx%self.IniParams.LongSample
+            or self.IniParams.Dx<self.IniParams.LongSample):
+            raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
+        long = self.IniParams.LongSample
+        dx = self.IniParams.Dx
+        length = self.IniParams.Length
+        multiple = int(dx/long) #We have this many samples per distance step
+        nodes = int(self.Num_Q_Var/multiple)
+        row = 17 # Current row
+        ####################
+        # And convenience dictionaries
+        morph = {'S': 6,
+                'n': 7,
+                'WD': 9,
+                'W_bf': 10,
+                'W_b': 11,
+                'd_bf': 12,
+                'z': 15,
+                #'X_Weight': 16,
+                'Conductivity': 17, # This value needs to be divided by 1000
+                'ParticleSize': 18,
+                'Embeddedness': 19,
+                'FLIR_Time': 20,
+                'FLIR_Temp': 21,
+                'Q_cont': 22,
+                'd_cont': 23,
+                'T_cont': 24}
+        flow = {'Q_in': 4,
+                'T_in': 5,
+                'Q_out': 6,}
+        ttools = {'Longitude': 5,
+                  'Latitude': 6,
+                  'Elevation': 7,
+                  'Aspect': 9,
+                  'Topo_W': 10,
+                  'Topo_S': 11,
+                  'Topo_E': 12,
+                  'VHeight': 159,
+                  'VDensity': 160}
+        pages = {'Morphology Data': morph, 'TTools Data': ttools, 'Flow Data': flow}
+
+        # Using this method, we can cycle through all of the nodes in self.Reach, which should coorespond
+        # to the number of rows of data. If it doesn't, then the way we set Num_Q_Var should be changed.
+        for h in xrange(nodes):
+            # This is the node
+            node = StreamNode()
+            endrow = row+multiple-1 # Ending row for a get call
+            for page in pages:
+                # Get data as a tuple of tuples of len(multiple)
+                data = self[row:endrow,:,page]
+                if page == 'Morphology Data':
+                    node.km = data[multiple-1][4] # Get kilometer, last row, 4th cell
+                data = [i for i in self.smartaverage(data)] # Average all the values smartly
+                # Now we iterate through the list of averages, and assign the values to the appropriate
+                # attributes in the stream node
+                for attr,col in pages[page].iteritems():
+                    try:
+                        setattr(node, attr, data[col])
+                    except IndexError, inst:
+                        if inst.message == "list index out of range":
+                            # If it's an attribute that we know about, then we can just keep the zero value
+                            # that's the default, or at least ignore this run because we have zero + zero.
+                            if attr in ['T_cont','d_cont','Q_cont']: pass
+                            else:
+                                print attr, col, len(data)
+                                raise
+                # We are going to build the VegZone and Zonator instances We have to do this for each cardinal
+                # direction and for 5 zones/direction. They are built in the StreamNode constructor and all
+                # values are set to zero by default, so we can just add values here and feel confident the
+                # addition will not fail.
+                if page == 'TTools Data':
+                    for j,k,zone in node: # j is the cardinal direction, k is the zone number
+                        if k == 0: # If we're in the 0th zone
+                            zone.Elevation = data[7]
+                            zone.Overhang = data[j + 151] or 0
+                        else:
+                            ecol = data[(j * 4) + 42 + (k-1)]
+                            hcol = data[(j * 8) + 71 + ((k-1) * 2)]
+                            dcol = data[(j * 8) + 70 + ((k-1) * 2)]
+                            zone.Elevation = ecol
+                            zone.VHeight = hcol
+                            zone.VDensity = dcol
+                            zone.SlopeHeight = zone.Elevation - node.Zone[j][0].Elevation
+
+            ##############################################################
+            #Now that we have a stream node, we set the node's dx value, because
+            # we have most nodes that are long-sample-distance times multiple,
+            try:
+                node.dx = long * (multiple) # Set the space-step
+                node.SetBankfullMorphology()
+                # Taken from the VB code in SubHydraulics- this doesn't have to run at every
+                # timestep, since the values don't change. Thus, we just set horizontal conductivity
+                # and porosity once here, and remove the other attributes.
+                # TODO: Research this mathematics further
+                Dummy1 = node.Conductivity * (1 - node.Embeddedness) #Ratio Conductivity of dominant sunstrate
+                Dummy2 = 0.00002 * node.Embeddedness  #Ratio Conductivity of sand - low range
+                node.K_h = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
+                Dummy1 = node.ParticleSize * (1 - node.Embeddedness) #Ratio Size of dominant substrate
+                Dummy2 = 0.062 * node.Embeddedness  #Ratio Conductivity of sand - low range
+                node.phi = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
+                del node.Conductivity, node.Embeddedness
+            except: # Shit, something happened, WTF?
+                print node, node.S, node.W_bf, node.z, node.WD
+                raise
+            #############################################################
+            #The original VB code has this method BFMorph, which calculates some things and
+            # spits them back to the spreadsheet. We want to keep everything in the node, but
+            # we'll spit these four things back to the spreadsheet for now, until we understand
+            # better what the purpose is. Unfortunately, this only calculates for each node, which
+            # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
+            self.SetValue((row, 11),node.W_b, sheet="Morphology Data")
+            self.SetValue((row, 12),node.d_bf, sheet="Morphology Data")
+            self.SetValue((row, 13),node.d_ave, sheet="Morphology Data")
+            self.SetValue((row, 14),node.A, sheet="Morphology Data")
+
+            self.Reach.append(node) #append and sort
+            row += multiple
+            if not self.PB("Building Stream Nodes", row, self.Num_Q_Var*1.5)[0]:
+                raise Exception("Building streamnodes cancelled, model stopped")
+
+    def smartaverage(self, iterable):
+        """Average values in an iterable of iterables, returning a tuple of those averages.
+
+        This method takes a tuple of tuples and averages the values in each index of the tuple,
+        returning a tuple of those averages. This method has to be somewhat smart about the
+        length of the iterables, and the values that the datasheet contains.
+        """
+        # Unfortunately, using imap won't work directly because it will only map to the length
+        # of the shortest string. Thus, we sort of create our own, non-vectorized imap functionality.
+        # It's not as efficient, but we only use this in BuildStreamNodes, which is only run once.
+        max = 0
+        # Figure out the length of the longest iterable
+        for it in iterable:
+            max = len(it) if len(it) > max else max
+        # Make sure all iterables are of equal length
+        for it in iterable:
+            while len(it) < max:
+                it += None, # Add a None value, kind of a stupid method, but it'll work for now.
+        #########
+        smartlen = lambda x: len(x) or 1 # Return length of sequence or 1 for averages
+        def ave(*it): # Smart average function
+            l = []
+            for elem in it:
+                if elem is not None: l.append(elem)
+            try:
+                return reduce(operator.add,l)/smartlen(l) # Fast average of a list
+            except TypeError, err:
+                if err.message == "reduce() of empty sequence with no initial value": # Tried to average all None values
+                    return None
+                elif err.message == "bad operand type": # This error occurs when we have a date.
+                    # lambda to return a floating point number representing a date
+                    timeval = lambda x: time.mktime(time.strptime(x.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
+                    # Return the fast average, but map the list to the floating point number lambda above
+                    return reduce(operator.add,map(timeval,l))/smartlen(l)
+            else: raise
+        ########
+
+        return imap(ave, *iterable)
+
+
+    def BuildStreamNodes(self):
         #TODO: My god, no method should be this long, we need a redesign here!
         # This is the worst kind of programming: Even the bastid who wrote it is clueless.
         # Unfortunately, there's not much we can do about taking all these values from an
@@ -371,73 +523,18 @@ class HeatSourceInterface(DataSheet):
                             setattr(node,attr,[val])
                         if test: # we are in the last run, or have a null value, so we average
                             setattr(node,attr,average(getattr(node,attr)))
-                    # We are going to build the VegZone and Zonator instances We have to do this for each cardinal
-                    # direction and for 5 zones/direction. They are built in the StreamNode constructor and all
-                    # values are set to zero by default, so we can just add values here and feel confident the
-                    # addition will not fail.
-                    if page == 'TTools Data':
-                        for j,k,zone in node: # j is the cardinal direction, k is the zone number
-                            if k == 0: # If we're in the 0th zone
-                                zone.Elevation.append(data[7])
-                                try:
-                                    zone.Overhang.append(data[j + 151])
-                                except TypeError: # Overhang column is blank, meaning there's no overhang
-                                    pass
-                            else:
-                                ecol = data[(j * 4) + 42 + (k-1)]
-                                hcol = data[(j * 8) + 71 + ((k-1) * 2)]
-                                dcol = data[(j * 8) + 70 + ((k-1) * 2)]
-                                zone.Elevation.append(ecol)
-                                zone.VHeight.append(hcol)
-                                zone.VDensity.append(dcol)
-                            if test:
-                                for attr in ["Elevation","Overhang","VHeight","VDensity"]:
-                                    setattr(zone, attr, average(getattr(zone,attr)))
-                                zone.SlopeHeight = zone.Elevation - node.Zone[j][0].Elevation
 
             if QuickExit: break # We're done, scram
             # Calculate the distance step, which is the longitudinal sample rate times
             # however many steps we've made. Note: this is not times 'multiple' because
             # we may be getting fewer nodes than that.
-            try:
-                node.dx = long * (i+1) # Set the space-step
-                node.SetBankfullMorphology()
-                # Taken from the VB code in SubHydraulics- this doesn't have to run at every
-                # timestep, since the values don't change. Thus, we just set horizontal conductivity
-                # and porosity once here, and remove the other attributes.
-                # TODO: Research this mathematics further
-                Dummy1 = node.Conductivity * (1 - node.Embeddedness) #Ratio Conductivity of dominant sunstrate
-                Dummy2 = 0.00002 * node.Embeddedness  #Ratio Conductivity of sand - low range
-                node.K_h = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
-                Dummy1 = node.ParticleSize * (1 - node.Embeddedness) #Ratio Size of dominant substrate
-                Dummy2 = 0.062 * node.Embeddedness  #Ratio Conductivity of sand - low range
-                node.phi = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
-                del node.Conductivity, node.Embeddedness
-            except: # Shit, something happened, WTF?
-                print node, node.S, node.W_bf, node.z, node.WD
-                raise
 
-            #############################################################
-            #The original VB code has this method BFMorph, which calculates some things and
-            # spits them back to the spreadsheet. We want to keep everything in the node, but
-            # we'll spit these four things back to the spreadsheet for now, until we understand
-            # better what the purpose is. Unfortunately, this only calculates for each node, which
-            # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
-            self.SetValue((i + 16, 11),node.W_b, sheet="Morphology Data")
-            self.SetValue((i + 16, 12),node.d_bf, sheet="Morphology Data")
-            self.SetValue((i + 16, 13),node.d_ave, sheet="Morphology Data")
-            self.SetValue((i + 16, 14),node.A, sheet="Morphology Data")
-            ##############################################################
-            #Now that we have a stream node, we set the node's dx value, because
-            # we have most nodes that are long-sample-distance times multiple,
             # but the last one may be shorter.
             row += multiple
             self.Reach.append(node)
 
             # Here, we check if we get a cancel request from the progress bar. We set the maximum value of the progress
             # bar to 1.5 times the number of variables just because... well... what the hell?
-            if not self.PB("Building Stream Nodes", row, self.Num_Q_Var*1.5)[0]:
-                raise Exception("Building streamnodes cancelled, model stopped")
 
     def SetupSheets1(self):
         num = 0

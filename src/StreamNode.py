@@ -27,8 +27,10 @@ class StreamNode(StreamChannel):
         self.BC = BoundCond.getInstance() # Class to hold various boundary conditions
         # Set all the attributes to bare lists, or set from the constructor
         for attr in self.__slots__:
-            x = kwargs[attr] if attr in kwargs.keys() else []
+            x = kwargs[attr] if attr in kwargs.keys() else None
             setattr(self,attr,x)
+        for attr in ["Wind","Humidity","T_air"]:#,"FLIR"]:
+            setattr(self,attr,TimeList())
 
         # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
         # with values for the sampled zones in each directions. We build a blank Zonator
