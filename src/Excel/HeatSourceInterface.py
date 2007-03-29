@@ -96,13 +96,14 @@ class HeatSourceInterface(DataSheet):
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
         # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
-        self.ScanMorphology()
+# TODO: Uncomment after debugging
+#        self.ScanMorphology()
         self.BuildStreamNodes()
         self.GetInflowData()
         self.GetContinuousData()
         map(lambda x:x.Initialize(),self.Reach)
-        # TODO: Uncomment this after debugging
-        #self.SetupSheets2()
+# TODO: Uncomment this after debugging
+#        self.SetupSheets2()
 
         del self.PB
 
@@ -320,10 +321,12 @@ class HeatSourceInterface(DataSheet):
             # we'll spit these four things back to the spreadsheet for now, until we understand
             # better what the purpose is. Unfortunately, this only calculates for each node, which
             # is a multiple of the rows. So we'll have to figure out whether that's acceptable.
-            self.SetValue((row, 11),node.W_b, sheet="Morphology Data")
-            self.SetValue((row, 12),node.d_bf, sheet="Morphology Data")
-            self.SetValue((row, 13),node.d_ave, sheet="Morphology Data")
-            self.SetValue((row, 14),node.A, sheet="Morphology Data")
+#######
+# TODO: Uncomment after debugging
+#            self.SetValue((row, 11),node.W_b, sheet="Morphology Data")
+#            self.SetValue((row, 12),node.d_bf, sheet="Morphology Data")
+#            self.SetValue((row, 13),node.d_ave, sheet="Morphology Data")
+#            self.SetValue((row, 14),node.A, sheet="Morphology Data")
 
             self.Reach.append(node) #append and sort
             row += multiple

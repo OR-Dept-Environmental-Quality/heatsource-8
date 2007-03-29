@@ -1,7 +1,6 @@
 from __future__ import division
 import wx
 
-
 class ProgressBar(wx.ProgressDialog):
     """Simple progress dialog taking a message and a maximum count.
 

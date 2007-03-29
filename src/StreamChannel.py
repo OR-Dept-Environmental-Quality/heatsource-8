@@ -107,7 +107,7 @@ class StreamChannel(object):
         self.Q = Q
 
         if Q < 0.0071: #Channel is going dry
-            warn("The channel is going dry at %s.  The model will either skip these 'dry stream segments' or you can stop this model run and change input data.  Do you want to continue this model run?" % self)
+            warn("The channel is going dry at %s." % self)
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
             return
 
@@ -176,7 +176,11 @@ class StreamChannel(object):
         # Taken from the VB source.
         if not self.W_w:
             pass
-        A = self.Q / (2 * self.W_w * self.S)
+        try:
+            A = self.Q / (2 * self.W_w * self.S)
+        except ZeroDivisionError, err:
+            print err.args, err.message, err.__class__.__name__
+            raise
         B = (5/3) * self.U * self.dx
         X = 0.5 * (1 - A / B)
         if X > 0.5: X = 0.5
