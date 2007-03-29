@@ -96,12 +96,11 @@ class HeatSourceInterface(DataSheet):
         # Now we start through the steps that were in the first subroutines in the VB code's theModel subroutine
         # We might need to clean up this syntax and logical progression
         self.GetBoundaryConditions()
-#        self.ScanMorphology()
+        self.ScanMorphology()
         self.BuildStreamNodes()
         self.GetInflowData()
         self.GetContinuousData()
-        map(lambda x:x.ViewToSky(),self.Reach)
-        map(lambda x:x.CalcStreamGeom(),self.Reach)
+        map(lambda x:x.Initialize(),self.Reach)
         # TODO: Uncomment this after debugging
         #self.SetupSheets2()
 
@@ -299,6 +298,7 @@ class HeatSourceInterface(DataSheet):
             # we have most nodes that are long-sample-distance times multiple,
             try:
                 node.dx = long * (multiple) # Set the space-step
+                node.dt = self.IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
                 node.SetBankfullMorphology()
                 # Taken from the VB code in SubHydraulics- this doesn't have to run at every
                 # timestep, since the values don't change. Thus, we just set horizontal conductivity

@@ -1,6 +1,8 @@
 from __future__ import division
+import math
 from warnings import warn
 from itertools import imap
+from Utils.Maths import NewtonRaphson
 
 class StreamChannel(object):
     """Class that describes the geometry of a stream channel
@@ -13,10 +15,11 @@ class StreamChannel(object):
     kinds of channels, or some of this can be pushed down to
     a base class.
     """
+    def __init__(self):
     # Protect the allowable attributes, so we cannot later add an attribute.
     # This is useful to avoid programming errors where we might set self.Slope
     # at some point, and access self.S at another point.
-    __slots__ = ["S",        # Slope
+        slots = ["S",        # Slope
                  "n",        # Manning's n
                  "W_bf",     # Bankfull width (surface)
                  "z",        # z factor: Ration of run to rise of the side of a trapazoidal channel
@@ -49,19 +52,19 @@ class StreamChannel(object):
                  "phi",      # Porosity of the bed
                  "K_h"      # Horizontal bed conductivity
                  ]
-    def __init__(self):
-        # Set all attributes to None, so we can do testing without raising an AttributeError
-        for attr in self.__slots__:
-            setattr(self, attr, None)
+        for attr in slots:
+            setattr(self,attr,None)
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
 
     def GetInputs(self, t=None):
         """Returns a value for inputs-outputs to the channel at the time=t"""
         Q = 0
-        Q += Q_in # Input volume
-        Q -= Q_out # Output volume
-        Q += Q_tribs[t,-1] # Tributary volume
+        Q += self.Q_in or 0 # Input volume
+        Q -= self.Q_out or 0 # Output volume
+        try:
+            Q += self.Q_tribs[t,-1]# Tributary volume
+        except TypeError: pass
         if self.E: # Evaporation volume
             Q -= self.E * self.dx * self.W_w
         return Q
@@ -88,21 +91,24 @@ class StreamChannel(object):
 
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
-            Q = Q_bc[t,-1] # Get the value at this time, or the closest previous time
+            Q = self.Q_bc[t,-1] # Get the value at this time, or the closest previous time
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
-            Q_in = GetInputs(t) # Add up our inputs to this segment
+            Q_in = self.GetInputs(t) # Add up our inputs to this segment
             Q = self.prev_km.Q + Q_in
         else: raise Exception("WTF?")
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
-        self.Q_prev = self.Q
+        try:
+            self.Q_prev = self.Q
+        except AttributeError: # If there's no Q, then we are here for the first time. Set to Boundary Condition
+            self.Q_prev = self.Q_bc[t,-1]
         self.Q = Q
 
         if Q < 0.0071: #Channel is going dry
             warn("The channel is going dry at %s.  The model will either skip these 'dry stream segments' or you can stop this model run and change input data.  Do you want to continue this model run?" % self)
-            self.dw, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
+            self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
             return
 
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
@@ -155,19 +161,21 @@ class StreamChannel(object):
             dw = self.d_cont
         else:
             if not self.S: raise Exception("Must have a control depth with zero slope")
-            dw = GetWettedDepth(Q_est)
+            dw = self.GetWettedDepth(Q_est)
 
-        self.dw = dw
+        self.d_w = dw
         self.A = dw + (self.W_b + self.z*dw)
         self.P_w = self.W_b + 2 * dw * math.sqrt(1+self.z**2)
         self.R_h = self.A/self.P_w
         self.W_w = self.W_b + 2 * self.z * dw
-        self.U = Q_est / A
+        self.U = Q_est / self.A
 
-    def GetMuskigum(self, Q=None):
+    def GetMuskingum(self, Q=None):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
         # Taken from the VB source.
+        if not self.W_w:
+            pass
         A = self.Q / (2 * self.W_w * self.S)
         B = (5/3) * self.U * self.dx
         X = 0.5 * (1 - A / B)
@@ -194,7 +202,7 @@ class StreamChannel(object):
         # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
         C4 = (self.GetInputs()*dt)/D
         test = C1 + C2 + C3
-        if test != 1: warn("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self))
+        if 1-test > 0.015: warn("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self))
         return C1, C2, C3, C4
 
 
@@ -243,8 +251,8 @@ class StreamChannel(object):
 
         # Here is the derivative of the equation in sections.
         first = lambda x: (5 * (x**(2/3)) * (x*z+W)**(5/3)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(2/3)))
-        second = lambda x: (5 * (x**(5/3)) * z * ((x*z+W)**(2/3))) / (3*((2*x*sqrt((z**2)+1)+W)**(2/3)))
-        third = lambda x: (4 * (x**(5/3)) * (x*z+W)**(5/3) * sqrt(z^2+1)) / (3*((2*x*sqrt((z**2)+1)+W)**(5/3)))
+        second = lambda x: (5 * (x**(5/3)) * z * ((x*z+W)**(2/3))) / (3*((2*x*math.sqrt((z**2)+1)+W)**(2/3)))
+        third = lambda x: (4 * (x**(5/3)) * (x*z+W)**(5/3) * math.sqrt(z**2+1)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(5/3)))
 
         Fdd = lambda x: first(x) + second(x) - third(x)
 
@@ -253,7 +261,7 @@ class StreamChannel(object):
         # 20 meters deep. We CAN put these minimum and maximum values in the IniParams class just to make things
         # easier to change, but until we know we need to, they will be left here.
         try:
-            return NewtonRaphson(Fd, Fdd, 0, 20) # Assume minimum (0) and maximum (20) meters in depth
+            return NewtonRaphson(Fd, Fdd, 0, 50) # Assume minimum (0) and maximum (20) meters in depth
         except:
             print "Failure to converge on a depth. Check minimum and maximum values defined in this method."
             raise
@@ -264,12 +272,16 @@ class StreamChannel(object):
         #======================================================
         #Calc hyporheic flow in cell Q(0,1)
         #Calculate head at top (ho) and bottom (hL) of reach
-        if not self.Upstream:
+        if not self.prev_km:
             ho = self.S * self.dx
             hL = 0
         else:
-            ho = self.Upstream.d_w + self.S * self.dx
+            try:
+                ho = self.prev_km.d_w + self.S * self.dx
+            except:
+                print self.S, self.prev_km.d_w
+                raise
             hL = self.d_w
         #Calculate Hyporheic Flows
-        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * dx))
+        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * self.dx))
         self.Q_hyp = self.Q if self.Q_hyp > self.Q else self.Q_hyp

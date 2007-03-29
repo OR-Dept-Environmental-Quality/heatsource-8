@@ -19,18 +19,21 @@ class StreamNode(StreamChannel):
                  "T_cont","T_sed","T_in", # Temperature attrs
                  "VHeight","VDensity",  #Vegetation params
                  "Wind","Humidity","T_air", # Continuous data
-                 "IniParams","Zone","BC" # Initialization parameters, Zonator and boundary conditions
+                 "IniParams","Zone","BC", # Initialization parameters, Zonator and boundary conditions
+                 "View_To_Sky"
                  ]
     def __init__(self, **kwargs):
         StreamChannel.__init__(self)
-        self.IniParams = IniParams.getInstance()
-        self.BC = BoundCond.getInstance() # Class to hold various boundary conditions
         # Set all the attributes to bare lists, or set from the constructor
         for attr in self.__slots__:
             x = kwargs[attr] if attr in kwargs.keys() else None
             setattr(self,attr,x)
         for attr in ["Wind","Humidity","T_air"]:#,"FLIR"]:
             setattr(self,attr,TimeList())
+        self.IniParams = IniParams.getInstance()
+        self.BC = BoundCond.getInstance() # Class to hold various boundary conditions
+        # Set discharge boundary conditions for the StreamChannel
+        self.Q_bc = self.BC.Q
 
         # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
         # with values for the sampled zones in each directions. We build a blank Zonator
@@ -86,6 +89,11 @@ class StreamNode(StreamChannel):
             for j in xrange(5):
                 yield i,j,self.Zone[i][j]
 
+    def Initialize(self):
+        """Methods necessary to set initial conditions of the node"""
+        self.ViewToSky()
+        self.SetBankfullMorphology()
+
     def ViewToSky(self):
         #TODO: This method needs to be tested against the values obtained by the VB code
         #======================================================
@@ -115,7 +123,7 @@ class StreamNode(StreamChannel):
         dt = self.IniParams.dt
         dx = self.dx
         # Iterate down the stream channel, calculating the discharges
-        self.CalculateDischarge()
+        self.CalculateDischarge(time)
 
         ################################################################
         ### This section seems unused in the original code. It calculates a stratification
@@ -141,19 +149,19 @@ class StreamNode(StreamChannel):
         # to fiddle with the spreadsheet. Perhaps we can write a report to a text file or
         # something. I'm very hesitant to connect this too tightly with the interface.
         Flag_StoptheModel = False
-        if self.Width > self.Width_BF and not self.IniParams.Flag_ChannelWidth:
+        if self.W_w > self.W_bf and not self.IniParams.ChannelWidth:
 
             I = self.km - dx / 1000
             II = self.km
-            msg = "The wetted width is exceeding the BFW at river KM %0.3f to %0.3f.  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" %(round(I, 3), round(II, 3), round(self.AreaX[1], 2))
-            dlg = wx.MessageDialog(self, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
+            msg = "The wetted width is exceeding the bankfull width at %s.  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.__class__.__name__
+            dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
             if dlg.ShowModal() == wx.ID_OK:
                 # Put this in a public place so we don't ask again.
                 self.IniParams.Flag_ChannelWidth = True
                 Flag_StoptheModel = False
             else:    #Stop Model Run and Change Input Data
                 Flag_StoptheModel = True
-                self.IniParams.Flag_ChannelWidth = True
+                self.IniParams.ChannelWidth = True
             dlg.Destroy()
 #        if Flag_StoptheModel:
 #            I = 0

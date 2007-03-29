@@ -1,6 +1,6 @@
 """Various mathematical routines and classes"""
 
-def NewtonRaphson(f, df, a, b, tol=1.0e-9, maxiter=30):
+def NewtonRaphson(f, df, a, b, tol=1.0e-5, maxiter=30):
     """Calculate the root of f(x) using the Newton-Raphson method.
 
     This method is taken from "Numerical Methods in Engineering with Python",
@@ -9,10 +9,12 @@ def NewtonRaphson(f, df, a, b, tol=1.0e-9, maxiter=30):
     be calculated using the secant method and an appropriate dx value.
     """
     fa = f(a)
-    if not fa: return a
+    if fa == 0.0: return a
     fb = f(b)
-    if not fb: return b
-    if fa*fb: raise Exception("Root not in (%0.3f,%0.3f)" % (a,b))
+    if fb == 0.0: return b
+    if fa*fb > 0.0:
+        print fa, fb
+        raise Exception("Root not in (%0.3f,%0.3f)" % (a,b))
     x = 0.5*(a+b)
     for i in xrange(maxiter):
         fx = f(x)
@@ -35,5 +37,6 @@ def NewtonRaphson(f, df, a, b, tol=1.0e-9, maxiter=30):
         # Check for convergence
         if abs(dx) < tol * max(abs(b), 1.0): return x
     # If we get past the loop, then we've exceeded our maximum number of iterations
+    print x, abs(dx), tol + max(abs(b), 1.0)
     raise Exception("No convergences when calculating NewtonRaphson, is there a code problem?")
 
