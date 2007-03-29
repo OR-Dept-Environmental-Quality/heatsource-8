@@ -11,13 +11,6 @@ def GetRelative(name, levels):
         dir = path.split(dir[0])
     return path.join(dir[0], name)
 
-
-########################################
-# Import the graphical user interface library, and start it up so that
-# we can spit out a progress bar
-import wx
-app = wx.App()
-app.MainLoop()
 #######################################
 # Turn of Metta's warnings and programming comments
 simplefilter('ignore', UserWarning)
