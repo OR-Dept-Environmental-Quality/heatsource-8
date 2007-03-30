@@ -6,7 +6,6 @@ from DataSheet import DataSheet
 from StreamNode import StreamNode
 
 from Utils.TimeUtil import TimeUtil
-from Utils.ProgressBar import ProgressBar
 from Utils.VegZone import VegZone
 from Utils.Zonator import Zonator
 from Utils.IniParams import IniParams
@@ -22,22 +21,21 @@ from Utils.TimeStepper import TimeStepper
 
 class HeatSourceInterface(DataSheet):
     """Defines a datasheet specific to the Current (version 7, 2006) HeatSource Excel interface"""
-    def __init__(self, filename=None, show=None, Flag_HS=1):
+    def __init__(self, filename=None, show=None, Flag_HS=1, gauge=None):
         if not filename:
             raise Warning("Need a model filename!")
         DataSheet.__init__(self, filename)
-        self.__initialize(Flag_HS) # Put all constructor stuff in a method for Psyco optimation
+        self.__initialize(Flag_HS, gauge) # Put all constructor stuff in a method for Psyco optimation
 
     def __del__(self):
         self.Close() # Close the file and quit Excel process
 
-    def __initialize(self, Flag_HS):
+    def __initialize(self, Flag_HS, gauge):
         self.Reach = PlaceList(attr='km', orderdn=True)
         self.IniParams = IP = IniParams.getInstance()
         self.BC = BC = BoundCond.getInstance()
         # Build a quick progress bar
-        self.PB = ProgressBar(1000)
-        self.PB("Initializing Excel interface")
+        self.PB = gauge
 
         #######################################################
         # Grab the initialization parameters from the Excel file.
@@ -62,11 +60,6 @@ class HeatSourceInterface(DataSheet):
         # Create a time manipulator for making time objects
         self.TimeUtil = TimeUtil()
 
-        # Create a TimeStepper iterator
-        dt = timedelta(minutes=IP.dt)
-        start = self.TimeUtil.MakeDatetime(IP.Date)
-        stop = start + timedelta(days=IP.SimPeriod)
-        self.Timer = TimeStepper(start, dt, stop)
         ##########################################################
 
         # Page names- maybe a useless tuple, we'll see
@@ -330,8 +323,7 @@ class HeatSourceInterface(DataSheet):
 
             self.Reach.append(node) #append and sort
             row += multiple
-            if not self.PB("Building Stream Nodes", row, self.Num_Q_Var*1.5)[0]:
-                raise Exception("Building streamnodes cancelled, model stopped")
+            self.PB("Building Stream Nodes", row, self.Num_Q_Var*1.5)
 
     def smartaverage(self, iterable):
         """Average values in an iterable of iterables, returning a tuple of those averages.
