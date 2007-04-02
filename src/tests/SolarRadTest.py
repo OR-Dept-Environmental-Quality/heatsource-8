@@ -1,8 +1,8 @@
 from unittest import TestCase
 from Excel.HeatSourceInterface import HeatSourceInterface
-from Utils.Time import TimeUtil
-from SolarRad import SolarRad
-from PyTZ import timezone,utc
+from Time.TimeUtil import TimeUtil
+from Solar.SolarRad import TheSun
+from pytz import timezone,utc
 import datetime
 
 class TestDataSheet(TestCase):
@@ -12,7 +12,7 @@ class TestDataSheet(TestCase):
         self.date1 = datetime.datetime(2007, 2, 12, 9, 35, 15,tzinfo=pst)
         lat = 45 + (31/60)
         lon = -1*(122 + (39/60))
-        self.solar = SolarRad(lat,lon)
+        self.solar = TheSun(lat,lon)
     def tearDown(self): pass
     def testPrintSolarVars(self):
         self.solar.ResetSolarVars(self.date1)

@@ -4,7 +4,7 @@ import time
 
 from Time.TimeUtil import TimeUtil
 from Excel.HeatSourceInterface import HeatSourceInterface
-from Utils.SolarRad import SolarRad
+from Solar.SolarRad import TheSun
 from Time.TimeStepper import TimeStepper
 from Containers.IniParams import IniParams
 from Containers.BoundCond import BoundCond
@@ -20,7 +20,7 @@ class MainModel(object):
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
         self.IniParams = IniParams.getInstance()
         self.Bounds = BoundCond.getInstance()
-        self.SolarRad = SolarRad.getInstance()
+        self.TheSun = TheSun.getInstance()
         #######################################################
         ## Time class objects
         # Create a time manipulator for making time objects
