@@ -138,19 +138,19 @@ class HeatSourceInterface(DataSheet):
             # GetByKm() currently looks downstream
             node = self.Reach[self.GetValue((I + 17, 11),"Flow Data"),1]
             # Get entire flow and temp columns in one call each
-            flow_col = self[:, 13 + I * 2,"Flow Data"]
-            temp_col = self[:, 14 + I * 2,"Flow Data"]
-            time_col = self[:, 12, "Flow Data"]
+            flow_col = self[:, 14 + I * 2,"Flow Data"]
+            temp_col = self[:, 15 + I * 2,"Flow Data"]
+            time_col = self[:, 13, "Flow Data"]
             tribs = TimeList()
-            for II in xrange(Hours):
+            for II in xrange(self.Hours):
                 time = self.TimeUtil.MakeDatetime(time_col[II+16][0])
                 flow = flow_col[II + 16][0]
                 temp = temp_col[II + 16][0]
-                tribs.append(DataPoint(flow, time=time))
-                val = temp * flow if self.Flag_HS else temp
-                node.T_In.append(DataPoint(val, time=time))
+                node.Q_tribs.append(DataPoint(flow, time=time))
+                #TODO: check when this is validS
+                val = temp * flow# if self.Flag_HS else temp
+                node.T_tribs.append(DataPoint(val, time=time))
             # Set the node's tributary list to the inflow list
-            node.Q_tribs = tribs
             self.PB("Getting inflow data", I, self.IniParams.InflowSites)
 
     def GetContinuousData(self):
@@ -270,7 +270,7 @@ class HeatSourceInterface(DataSheet):
                         if inst.message == "list index out of range":
                             # If it's an attribute that we know about, then we can just keep the zero value
                             # that's the default, or at least ignore this run because we have zero + zero.
-                            if attr in ['T_cont','d_cont','Q_cont']: pass
+                            if attr in ['T_cont','d_cont','Q_cont', 'T_in', 'Q_in', 'Q_out']: pass
                             else:
                                 print attr, col, len(data)
                                 raise
