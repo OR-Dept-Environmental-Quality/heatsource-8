@@ -12,7 +12,7 @@ from Containers.IniParams import IniParams
 from Containers.BoundCond import BoundCond
 from Containers.AttrList import PlaceList, TimeList
 from Containers.DataPoint import DataPoint
-from Time.TimeStepper import TimeStepper
+from Time.Chronos import Chronos
 
 #Flag_HS values:
 #    0: Flow Router
@@ -93,7 +93,7 @@ class HeatSourceInterface(DataSheet):
 # TODO: Uncomment after debugging
 #        self.ScanMorphology()
         self.BuildStreamNodes()
-        self.GetInflowData()
+#        self.GetInflowData()
         self.GetContinuousData()
         n = 1
         for i in self.Reach:
@@ -159,13 +159,14 @@ class HeatSourceInterface(DataSheet):
         """Get accumulation data from the "Flow Data" page"""
         data,timelist = self.GetDataBlock("Flow Data")
 
+        t1 = time.time()
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
         for site in xrange(self.IniParams.InflowSites):
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
-            node = self.Reach[self.GetValue((I + 17, 11),"Flow Data"),1]
+            node = self.Reach[self.GetValue((site + 17, 11),"Flow Data"),1]
             for hour in xrange(self.Hours):
                 # Now we make a DataPoint object with the flow and temp, where flow is in the
                 # column 0+sitenum*2 and temp is in the column 1+sitenum*2 where sitenum is the
@@ -176,6 +177,7 @@ class HeatSourceInterface(DataSheet):
                 node.Q_tribs.append(DataPoint(data[hour][site*2], time=timelist[hour]))
                 node.T_tribs.append(DataPoint(data[hour][1+site*2], time=timelist[hour]))
             self.PB("Reading Inflow data", site, self.IniParams.InflowSites)
+        print "Total time (inflow data): " + `time.time() - t1` + " secs"
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
@@ -187,7 +189,14 @@ class HeatSourceInterface(DataSheet):
                 node.Wind.append(DataPoint(data[hour][site*4],time=timelist[hour]))
                 node.Humidity.append(DataPoint(data[hour][1+site*4],time=timelist[hour]))
                 node.T_air.append(DataPoint(data[hour][2+site*4], time=timelist[hour]))
-                node.T_stream.append(DataPoint(data[hour][3+site*4], time=timelist[hour]))
+                try:
+                    node.T_stream.append(DataPoint(data[hour][3+site*4], time=timelist[hour]))
+                except TypeError, inst:
+                    # Often, Stream Temp will be blank. Let's make sure that we catch that case.
+                    # We set the result to a 999 instead of zero to state that it's unknown
+                    if inst.message == "float() argument must be a string or a number":
+                        node.T_stream.append(DataPoint(999, time=timelist[hour]))
+                    else: raise
             self.PB("Reading continuous data", site, self.IniParams.ContSites)
 
     def ScanMorphology(self):

@@ -2,35 +2,29 @@ from __future__ import division
 import math
 from datetime import datetime, timedelta
 from Time.TimeUtil import TimeUtil
+from Time.Chronos import Chronos
 from Utils.SingletonMixin import Singleton
 
-# TODO: Remove all members of TheSun that are not needed.
-# There are likely a lot of calculations made only to be used in a later calculation. Maintaining
-# all of these numbers as members will add a (small) amount to the size of the object, thus adding to
-# memory space and load times. We should trim this down by making temporary calculations temporary so that
-# the memory buffers are cleared when they are not needed.
-
-class TheSun(Singleton):
+class Helios(Singleton):
+    """The God personification of The Sun"""
     def __init__(self):
         self.DST = None # Holder for a time object
         self.UTC = None # datetime object is Coordinated Universal Time (Greenwich Mean Time in the ol' days)
         self.JD = None # Julian Date
         self.JDC = None # Julian Century
         self.TimeUtil = TimeUtil()
-    def TestDtime(self, dtime):
-        if not isinstance(dtime, datetime):
-            raise Exception("%s must be used with a Python datetime.datetime instance, not %s"% \
-                            (self.__class__.__name__, dtime.__class__.__name__))
-    def SetTime(self,dtime):
+        self.Chronos = Chronos.getInstance() # The God of Time
+
+    def SetTime(self):
         """Create julian date and julian century as defined in HeatSource manual"""
-        self.TestDtime(dtime)
-        self.JD,self.JDC = self.TimeUtil.GetJD(dtime) # Then create julian date and century in UTC
+        self.TestDtime(self.Chronos.TheTime)
+        self.JD,self.JDC = self.TimeUtil.GetJD(self.Chronos.TheTime) # Then create julian date and century in UTC
         if not self.JD or not self.JDC:
             raise Exception("No Julian date calculated")
 
-    def ResetSolarVars(self, dtime):
+    def ResetSolarVars(self):
         """Reset solar variables for time=dtime which is a datetime object"""
-        self.SetTime(dtime)
+        self.SetTime()
         #======================================================
         #Obliquity of the eliptic
         #   MeanObliquity: Average obliquity (degrees)
@@ -88,9 +82,9 @@ class TheSun(Singleton):
         Dummy5 = math.sin(2 * self.GeoMeanAnomalySun * math.pi / 180)
         self.Et = 4 * (Dummy * Dummy1 - 2 * self.Eccentricity * Dummy2 + 4 * self.Eccentricity * Dummy * Dummy2 * Dummy3 - 0.5 * (Dummy ** 2) * Dummy4 - 1.25 * (self.Eccentricity ** 2) * Dummy5) * (180/math.pi)
 
-    def CalcSolarPosition(self, dtime, lat, lon):
+    def CalcSolarPosition(self, lat, lon):
         """Calculates relative position of sun"""
-        self.ResetSolarVars(dtime)
+        self.ResetSolarVars()
         #####################################
         ## Numerical methods are copied from Heat Source VB code except where noted
 

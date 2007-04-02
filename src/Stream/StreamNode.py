@@ -9,7 +9,8 @@ from Containers.BoundCond import BoundCond
 from Containers.AttrList import TimeList
 from Utils.Maths import NewtonRaphson
 from StreamChannel import StreamChannel
-from Solar.SolarRad import TheSun
+from Solar.Helios import Helios
+from Time.Chronos import Chronos
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
@@ -22,7 +23,7 @@ class StreamNode(StreamChannel):
                  "Wind","Humidity","T_air","T_stream" # Continuous data
                  "IniParams","Zone","BC", # Initialization parameters, Zonator and boundary conditions
                  "Flux",
-                 "TheSun" # Singleton class for Solar Insolation
+                 "Helios" # Singleton class for Solar Insolation
                  ]
     def __init__(self, **kwargs):
         StreamChannel.__init__(self)
@@ -42,7 +43,8 @@ class StreamNode(StreamChannel):
         self.Topo = {"E": None,
                      "S": None,
                      "W": None}
-        self.TheSun = TheSun.getInstance()
+        self.Chronos = Chronos.getInstance()
+        self.Helios = Helios.getInstance()
         # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
         # with values for the sampled zones in each directions. We build a blank Zonator
         # here so that the HeatSourceInterface.BuildStreamNode() method can add values without
@@ -80,12 +82,12 @@ class StreamNode(StreamChannel):
         self.ViewToSky()
         self.SetBankfullMorphology()
 
-    def CalcHydraulics(self, time):
+    def CalcHydraulics(self):
         # Convenience variables
         dt = self.IniParams.dt
         dx = self.dx
         # Iterate down the stream channel, calculating the discharges
-        self.CalculateDischarge(time)
+        self.CalculateDischarge()
 
         ################################################################
         ### This section seems unused in the original code. It calculates a stratification
@@ -157,13 +159,13 @@ class StreamNode(StreamChannel):
             VTS_Total = VTS_Total + LC_Angle_Max
         self.View_To_Sky = (1 - VTS_Total / (7 * 90))
 
-    def CalcSolarPosition(self, time):
+    def CalcSolarPosition(self):
         #Like the others, taken from VB code unless otherwise noted
         #======================================================
         # Get the sun's altitude and azimuth:
-        Altitude, Azimuth = self.TheSun.CalcSolarPosition(time, self.Latitude, self.Longitude)
-        # TheSun calculates the julian date, so we lazily snag that calculation.
-        JD = self.TheSun.JD
+        Altitude, Azimuth = self.Helios.CalcSolarPosition(time, self.Latitude, self.Longitude)
+        # Helios calculates the julian date, so we lazily snag that calculation.
+        JD = self.Helios.JD
         # If it's night, we get out quick.
         if Altitude <= 0: #Nighttime
             Altitude = 0
@@ -231,9 +233,9 @@ class StreamNode(StreamChannel):
         #       5 - Entering Stream
         #       6 - Received by Water Column
         #       7 - Received by Bed
-        self.CalcFlux0(time,JD)
+        self.CalcFlux0()
 
-    def CalcFlux0(self, time, JD):
+    def CalcFlux0(self):
         #======================================================
         # 0 - Edge of atmosphere
         # TODO: Original VB code's JulianDay calculation:

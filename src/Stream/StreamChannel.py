@@ -50,21 +50,24 @@ class StreamChannel(object):
                  "E",        # Evaporation rate (currently unused)
                  "dt",        # This is the timestep (for kinematic wave movement, etc.)
                  "phi",      # Porosity of the bed
-                 "K_h"      # Horizontal bed conductivity
+                 "K_h",      # Horizontal bed conductivity
+                 "Chronos"    # The God of Time
                  ]
         for attr in slots:
             setattr(self,attr,None)
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
-
-    def GetInputs(self, t=None):
+    def GetInputs(self):
         """Returns a value for inputs-outputs to the channel at the time=t"""
+        t = self.Chronos.TheTime
         Q = 0
         Q += self.Q_in or 0 # Input volume
         Q -= self.Q_out or 0 # Output volume
         try:
             Q += self.Q_tribs[t,-1]# Tributary volume
-        except TypeError: pass
+        except IndexError, inst:
+            if inst.message[:35] == 'No value possible for attribute t: ': pass #No value likely means an empty list (no tributaries)
+            else: raise
         if self.E: # Evaporation volume
             Q -= self.E * self.dx * self.W_w
         return Q
@@ -84,6 +87,7 @@ class StreamChannel(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
+        t = self.Chronos.TheTime
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             # Get the tuples for C and Q values, multiply the each C by the cooresponding Q, then sum it up
@@ -95,7 +99,7 @@ class StreamChannel(object):
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
-            Q_in = self.GetInputs(t) # Add up our inputs to this segment
+            Q_in = self.GetInputs() # Add up our inputs to this segment
             Q = self.prev_km.Q + Q_in
         else: raise Exception("WTF?")
 

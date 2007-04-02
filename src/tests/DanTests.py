@@ -22,7 +22,7 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # make it fail, will be a fully live instance
 
 #HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls" gauge=ProgressBar())
-HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
+HS = HeatSourceInterface("C:\\Temp\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
 
 ############################################
 
@@ -31,7 +31,7 @@ HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=Pro
 
 # Filenames are easier to change as a variable, remember to escape the
 # backslashes
-filename = "D:\\dan\\heatsource tests\\boundary.out"
+filename = "c:\\Temp\\boundary.out"
 f = open(filename, 'w') # Open the file writable
 # Note that the open() function returns a class instance that is actually a file object.
 # This is another example of the power of classes and Object-Orientation. If we did this

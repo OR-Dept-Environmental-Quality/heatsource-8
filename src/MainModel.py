@@ -4,8 +4,8 @@ import time
 
 from Time.TimeUtil import TimeUtil
 from Excel.HeatSourceInterface import HeatSourceInterface
-from Solar.SolarRad import TheSun
-from Time.TimeStepper import TimeStepper
+from Solar.Helios import Helios
+from Time.Chronos import Chronos
 from Containers.IniParams import IniParams
 from Containers.BoundCond import BoundCond
 
@@ -20,27 +20,28 @@ class MainModel(object):
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
         self.IniParams = IniParams.getInstance()
         self.Bounds = BoundCond.getInstance()
-        self.TheSun = TheSun.getInstance()
+        self.Helios = Helios.getInstance()
         #######################################################
         ## Time class objects
         # Create a time manipulator for making time objects
         self.TimeUtil = TimeUtil()
 
         ##########################################################
-        # Create a TimeStepper iterator
+        # Create a Chronos iterator that controls all model time
         dt = timedelta(minutes=self.IniParams.dt)
         start = self.TimeUtil.MakeDatetime(self.IniParams.Date)
         stop = start + timedelta(days=self.IniParams.SimPeriod)
-        self.Timer = TimeStepper(start, dt, stop)
+        self.Chronos = Chronos.getInstance()
+        # Other classes hold references to the instance, but only we should Start() it.
+        self.Chronos.Start(start, dt, stop)
         ##########################################################
     def Run(self):
-        max = len(self.Timer)
+        max = len(self.Chronos)
         n = 0
-        for t in self.Timer:
+        for t in self.Chronos:
             try:
-#                self.CalcSolarPosition(t)
                 map(lambda x:x.ViewToSky(),self.Reach)
-                map(lambda x:x.CalcHydraulics(t),self.Reach)
+                map(lambda x:x.CalcHydraulics(),self.Reach)
             except:
                 raise
                 return False
