@@ -7,16 +7,7 @@ from warnings import simplefilter
 import wx
 app = wx.App()
 app.MainLoop()
-
-
-def GetRelative(name, levels):
-    """Return a path to a file 'name' that is 'levels' directory 
-    levels above the current directory in the tree"""
-    dir = path.split(os.getcwd())
-    for i in xrange(levels):
-        dir = path.split(dir[0])
-    return path.join(dir[0], name)
-
+from ProgressBar import ProgressBar
 
 #######################################
 # Turn of Metta's warnings and programming comments
@@ -30,8 +21,8 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
 
-HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls")
-#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls")
+#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls" gauge=ProgressBar())
+HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
 
 ############################################
 
