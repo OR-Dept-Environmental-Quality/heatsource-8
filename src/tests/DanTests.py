@@ -21,8 +21,9 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
 
-#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls" gauge=ProgressBar())
+#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
 HS = HeatSourceInterface("C:\\Temp\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
+
 
 ############################################
 
@@ -102,6 +103,16 @@ for val in BC.Q:
     f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[aaa], BC.C[aaa]))
     aaa = aaa + 1
 
+for node in HS.Reach:
+    print node, node.Humidity
+    if node.Humidity: 
+        print "Yes"
+        for i in node.Humidity:
+            print i.t, i, node.Humidity[i.t, 0]
+    
+
+
+#    print HS.Reach[i.km,1]
 
 #for cond in BC:
 #    for val in cond:
