@@ -132,7 +132,14 @@ class HeatSourceInterface(DataSheet):
         """Get accumulation data from the "Flow Data" page"""
         #====================================================
         # Account for inflow volumes
+        # First, make a list of all the times that we have, each time turned into a datetime instance
+        time_col = self[:, 13, "Flow Data"]
+        timelist = []
+        for II in xrange(self.Hours):
+            timelist.append(self.TimeUtil.MakeDatetime(time_col[II+16][0]))
+
         for I in xrange(self.IniParams.InflowSites):
+            print time.time()
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
@@ -140,35 +147,36 @@ class HeatSourceInterface(DataSheet):
             # Get entire flow and temp columns in one call each
             flow_col = self[:, 14 + I * 2,"Flow Data"]
             temp_col = self[:, 15 + I * 2,"Flow Data"]
-            time_col = self[:, 13, "Flow Data"]
             tribs = TimeList()
             for II in xrange(self.Hours):
-                time = self.TimeUtil.MakeDatetime(time_col[II+16][0])
                 flow = flow_col[II + 16][0]
                 temp = temp_col[II + 16][0]
-                node.Q_tribs.append(DataPoint(flow, time=time))
+                node.Q_tribs.append(DataPoint(flow, time=timelist[II]))
                 #TODO: check when this is validS
                 val = temp * flow# if self.Flag_HS else temp
-                node.T_tribs.append(DataPoint(val, time=time))
+                node.T_tribs.append(DataPoint(val, time=timelist[II]))
             # Set the node's tributary list to the inflow list
             self.PB("Getting inflow data", I, self.IniParams.InflowSites)
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
+        time_col = self[:,6,"Continuous Data"]
+        timelist = []
+        for II in xrange(self.Hours):
+            timelist.append(self.TimeUtil.MakeDatetime(time_col[II + 16][0]))
+
         for I in xrange(self.IniParams.ContSites):
             node = self.Reach[self.GetValue((I + 17, 4),"Continuous Data"),1] # Index by kilometer
             wind_col = self[:,11 + (I * 4),"Continuous Data"]
             humidity_col = self[:,12 + (I * 4),"Continuous Data"]
             air_col = self[:,13 + (I * 4),"Continuous Data"]
-            time_col = self[:,6,"Continuous Data"]
             wind_lst = TimeList()
             air_lst = TimeList()
             hum_lst = TimeList()
             for II in xrange(self.Hours):
-                time = self.TimeUtil.MakeDatetime(time_col[II + 16][0])
-                node.Wind.append(DataPoint(wind_col[II + 16][0],time=time))
-                node.Humidity.append(DataPoint(humidity_col[II + 16][0],time=time))
-                node.T_air.append(DataPoint(air_col[II + 16][0], time=time))
+                node.Wind.append(DataPoint(wind_col[II + 16][0],time=timelist[II]))
+                node.Humidity.append(DataPoint(humidity_col[II + 16][0],time=timelist[II]))
+                node.T_air.append(DataPoint(air_col[II + 16][0], time=timelist[II]))
             node.Wind = wind_lst
             node.T_air = air_lst
             node.Humidity = hum_lst
