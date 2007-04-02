@@ -3,16 +3,16 @@ from itertools import imap
 import math, time, operator
 from datetime import datetime, timedelta
 from DataSheet import DataSheet
-from StreamNode import StreamNode
+from Stream.StreamNode import StreamNode
 
-from Utils.TimeUtil import TimeUtil
-from Utils.VegZone import VegZone
-from Utils.Zonator import Zonator
-from Utils.IniParams import IniParams
-from Utils.BoundCond import BoundCond
-from Utils.AttrList import PlaceList, TimeList
-from Utils.DataPoint import DataPoint
-from Utils.TimeStepper import TimeStepper
+from Time.TimeUtil import TimeUtil
+from Containers.VegZone import VegZone
+from Containers.Zonator import Zonator
+from Containers.IniParams import IniParams
+from Containers.BoundCond import BoundCond
+from Containers.AttrList import PlaceList, TimeList
+from Containers.DataPoint import DataPoint
+from Time.TimeStepper import TimeStepper
 
 #Flag_HS values:
 #    0: Flow Router
@@ -83,6 +83,7 @@ class HeatSourceInterface(DataSheet):
         # and incrementing a counter if the value was not blank. With the
         # new DataSheet's __getitem__ functionality, we can merely access
         # the sheet once, and return the length of that tuple
+        self.PB("Calculating the number of datapoints")
         row = self[:,5][16:] # no row definition, 5th column- strip off the first 16 lines
         self.Num_Q_Var = len(row)
 
@@ -94,7 +95,11 @@ class HeatSourceInterface(DataSheet):
         self.BuildStreamNodes()
         self.GetInflowData()
         self.GetContinuousData()
-        map(lambda x:x.Initialize(),self.Reach)
+        n = 1
+        for i in self.Reach:
+            self.PB("Initializing StreamNodes",n,len(self.Reach))
+            i.Initialize()
+            n+=1
 # TODO: Uncomment this after debugging
 #        self.SetupSheets2()
 
@@ -274,7 +279,7 @@ class HeatSourceInterface(DataSheet):
                 # values are set to zero by default, so we can just add values here and feel confident the
                 # addition will not fail.
                 if page == 'TTools Data':
-                    for j,k,zone in node: # j is the cardinal direction, k is the zone number
+                    for j,k,zone in node.GetZones(): # j is the cardinal direction, k is the zone number
                         if k == 0: # If we're in the 0th zone
                             zone.Elevation = data[7]
                             zone.Overhang = data[j + 151] or 0

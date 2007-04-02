@@ -99,7 +99,7 @@ class HSFrame(sc.SizedFrame):
 
         # Add a button for starting, stopping the model
         self.LED.SetFont(font)
-        self.StartStop = buttons.GenButton(BottomPane, -1, 'Start Model')
+        self.StartStop = buttons.GenButton(BottomPane, -1, 'Big Red Button')
         self.Bind(wx.EVT_BUTTON, self.OnStartStop, self.StartStop)
         self.StartStop.SetFont(wx.Font(18, wx.SWISS, wx.NORMAL, wx.BOLD, False))
         self.StartStop.SetBezelWidth(5)
@@ -120,6 +120,12 @@ class HSFrame(sc.SizedFrame):
         self.Log("HeatSource System started")
         self.FileName = None
 
+        ################################
+        ## debugging conveniences
+        self.FileName = "C:\\eclipse\\HeatSource\\Toketee_CCC.xls"
+        self.OnLoadFile(True)
+        self.OnStartStop(True)
+
     def Switch(self):
         """Routines necessary for switching the GUI on or off"""
         if not self.IsRunning: # Switching the model on
@@ -137,9 +143,11 @@ class HSFrame(sc.SizedFrame):
     def OnStartStop(self,evt):
         if self.Switch(): #Switch model on (GUI and timers)
             self.Model.Run()
+            self.Switch()
         else:
             self.Model.Stop()
             del self.Model
+            self.Switch()
     def OnLoadFile(self,evt):
         if not self.FileName: return
         self.StartStop.Enable(True)
@@ -172,6 +180,7 @@ class HSFrame(sc.SizedFrame):
             self.LastLog = message
         if i and max:
             self.Percent.SetLabel("%i%%"%int((i/max)*100))
+            self.Gauge.Pulse()
 class HSApp(wx.App):
     def OnInit(self):
         self.frame = HSFrame()
