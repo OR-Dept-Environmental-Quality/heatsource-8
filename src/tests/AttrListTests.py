@@ -1,8 +1,8 @@
 from __future__ import division
 import random
 from unittest import TestCase
-from Utils.DataPoint import DataPoint
-from Utils.AttrList import AttrList, TimeList, PlaceList
+from Containers.DataPoint import DataPoint
+from Containers.AttrList import AttrList, TimeList, PlaceList
 
 class TestAttrList(TestCase):
     def setUp(self):
@@ -21,6 +21,7 @@ class TestAttrList(TestCase):
     def test_TimeList(self):
         for i in xrange(1,len(self.TL[:-1])):
             self.assertTrue(self.TL[i].t >= self.TL[i-1].t)
+        
 
         for i in xrange(1,len(self.PL[:-1])):
             self.assertTrue(self.PL[i].x >= self.PL[i-1].x)
@@ -108,5 +109,4 @@ class TestAttrList(TestCase):
         self.assertEqual(map(lambda x: x.x,PL[15:93, -1]), pattr_ordered[1:-2])
         self.assertEqual(PL[15:93, 1], pval_ordered[2:-2])
         self.assertEqual(map(lambda x: x.x, PL[15:93, 1]), pattr_ordered[2:-2])
-
 

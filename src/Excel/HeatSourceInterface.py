@@ -159,7 +159,6 @@ class HeatSourceInterface(DataSheet):
         """Get accumulation data from the "Flow Data" page"""
         data,timelist = self.GetDataBlock("Flow Data")
 
-        t1 = time.time()
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
         for site in xrange(self.IniParams.InflowSites):
@@ -177,7 +176,6 @@ class HeatSourceInterface(DataSheet):
                 node.Q_tribs.append(DataPoint(data[hour][site*2], time=timelist[hour]))
                 node.T_tribs.append(DataPoint(data[hour][1+site*2], time=timelist[hour]))
             self.PB("Reading Inflow data", site, self.IniParams.InflowSites)
-        print "Total time (inflow data): " + `time.time() - t1` + " secs"
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""

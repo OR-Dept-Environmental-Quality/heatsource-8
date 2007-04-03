@@ -63,11 +63,8 @@ class StreamChannel(object):
         Q = 0
         Q += self.Q_in or 0 # Input volume
         Q -= self.Q_out or 0 # Output volume
-        try:
+        if len(self.Q_tribs):
             Q += self.Q_tribs[t,-1]# Tributary volume
-        except IndexError, inst:
-            if inst.message[:35] == 'No value possible for attribute t: ': pass #No value likely means an empty list (no tributaries)
-            else: raise
         if self.E: # Evaporation volume
             Q -= self.E * self.dx * self.W_w
         return Q
@@ -177,14 +174,15 @@ class StreamChannel(object):
     def GetMuskingum(self, Q=None):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
-        # Taken from the VB source.
+        print self, self.Chronos.TheTime, self.Q, self.W_w, self.S
         if not self.W_w:
             pass
         try:
             A = self.Q / (2 * self.W_w * self.S)
         except ZeroDivisionError, err:
-            print err.args, err.message, err.__class__.__name__
             raise
+
+        # Taken from the VB source.
         B = (5/3) * self.U * self.dx
         X = 0.5 * (1 - A / B)
         if X > 0.5: X = 0.5

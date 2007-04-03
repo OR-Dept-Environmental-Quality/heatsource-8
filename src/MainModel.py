@@ -40,7 +40,7 @@ class MainModel(object):
         n = 0
         for t in self.Chronos:
             try:
-                map(lambda x:x.ViewToSky(),self.Reach)
+#                map(lambda x:x.ViewToSky(),self.Reach)
                 map(lambda x:x.CalcHydraulics(),self.Reach)
             except:
                 raise

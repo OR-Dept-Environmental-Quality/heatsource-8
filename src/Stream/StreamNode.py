@@ -84,7 +84,7 @@ class StreamNode(StreamChannel):
 
     def CalcHydraulics(self):
         # Convenience variables
-        dt = self.IniParams.dt
+        dt = self.dt
         dx = self.dx
         # Iterate down the stream channel, calculating the discharges
         self.CalculateDischarge()
@@ -117,7 +117,7 @@ class StreamNode(StreamChannel):
 
             I = self.km - dx / 1000
             II = self.km
-            msg = "The wetted width is exceeding the bankfull width at %s.  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.__class__.__name__
+            msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
             dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
             if dlg.ShowModal() == wx.ID_OK:
                 # Put this in a public place so we don't ask again.
@@ -163,7 +163,7 @@ class StreamNode(StreamChannel):
         #Like the others, taken from VB code unless otherwise noted
         #======================================================
         # Get the sun's altitude and azimuth:
-        Altitude, Azimuth = self.Helios.CalcSolarPosition(time, self.Latitude, self.Longitude)
+        Altitude, Azimuth = self.Helios.CalcSolarPosition(self.Latitude, self.Longitude)
         # Helios calculates the julian date, so we lazily snag that calculation.
         JD = self.Helios.JD
         # If it's night, we get out quick.
@@ -241,7 +241,7 @@ class StreamNode(StreamChannel):
         # TODO: Original VB code's JulianDay calculation:
         # JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-
+        self.Chronos.TheTime
         Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - JD + Hour_DST / 24))
         Solar_Constant = 1367 #W/m2
         self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(Altitude * math.pi / 180) #Global Direct Solar Radiation

@@ -193,7 +193,6 @@ class AttrList(list):
                 ind = -1 if look == -1 else 0
                 return list(ifilter(test,self))[ind]
             except IndexError:
-                print map(lambda x:x.t,self)
                 raise IndexError("No value possible for attribute %s: %s." %(self.attr, index))
 
 
