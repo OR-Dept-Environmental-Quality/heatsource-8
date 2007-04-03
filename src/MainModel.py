@@ -41,7 +41,17 @@ class MainModel(object):
         for t in self.Chronos:
             try:
 #                map(lambda x:x.ViewToSky(),self.Reach)
-                map(lambda x:x.CalcHydraulics(),self.Reach)
+                for node in self.Reach:
+                    for k in node.__slots__:
+                        print k,
+                        try: print getattr(node,k)
+                        except: print "None"
+                    for k in node.slots:
+                        print k,
+                        try: print getattr(node,k)
+                        except: print "None"
+                    import sys
+                    sys.exit()
             except:
                 raise
                 return False
