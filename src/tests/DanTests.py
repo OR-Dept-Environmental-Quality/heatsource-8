@@ -13,8 +13,8 @@ from ProgressBar import ProgressBar
 # Turn of Metta's warnings and programming comments
 simplefilter('ignore', UserWarning)
 
-datadir = "C:\\Temp\\"
-outputdir = "C:\\Temp\\"
+datadir = "D:\\dan\\heatsource tests\\"
+outputdir = "D:\\dan\\heatsource tests\\"
 
 ###########################################
 # Import the HeatSourceInterface class and create an instance with
@@ -24,8 +24,8 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
 
-HS = HeatSourceInterface(datadir+"HS7_Jackson_CCC.xls", gauge=ProgressBar())
-#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
+#HS = HeatSourceInterface(datadir+"HS7_Jackson_CCC.xls", gauge=ProgressBar())
+HS = HeatSourceInterface(datadir+"Toketee_CCC.xls", gauge=ProgressBar())
 
 
 ############################################
@@ -117,6 +117,7 @@ for val in BC.Q:
 g.write("node.Wind.t,")
 cont_node_list = []
 for node in HS.Reach:
+    print node, node.Topo, node.Topo_W, node.Topo_S, node.Topo_S
     if node.Humidity:
         cont_node_list.append(node)
         g.write("%s,%s,%s,%s," % (node, node, node, node))
@@ -140,16 +141,18 @@ for i in node1.Wind:
 nodes_out.write("Node\t")
 for k in HS.Reach[0].__slots__:
     nodes_out.write("%s\t" % k)
-for k in HS.Reach[0].slots:
+for k in HS.Reach[0].slots:  #if you get an error here make sure StreamChannel.py has "self.slots at line 22 and 56
     nodes_out.write("%s\t" % k)
 
 nodes_out.write("\n")
 
+#If you get "none" for node.Embeddedness its because it gets cleaned in HeatSourceInterface after calculation of porosity
 for node in HS.Reach:
     nodes_out.write("%s\t" % node)
     for k in node.__slots__:
         try: nodes_out.write("%s\t" % getattr(node, k))
         except: nodes_out.write("None\t")
+        if k == "phi": print node, getattr(node, k)
     for k in node.slots:
         try: nodes_out.write("%s\t" % getattr(node, k))
         except: nodes_out.write("None\t")
