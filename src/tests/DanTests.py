@@ -21,8 +21,8 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
 
-#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
-HS = HeatSourceInterface("C:\\Temp\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
+HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
+#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
 
 
 ############################################
@@ -32,8 +32,10 @@ HS = HeatSourceInterface("C:\\Temp\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
 
 # Filenames are easier to change as a variable, remember to escape the
 # backslashes
-filename = "c:\\Temp\\boundary.out"
+filename = "D:\\dan\\heatsource tests\\boundary.out"
 f = open(filename, 'w') # Open the file writable
+filename2 = "D:\\dan\\heatsource tests\\continuous.out"
+g = open(filename2, 'w') # Open the file writable
 # Note that the open() function returns a class instance that is actually a file object.
 # This is another example of the power of classes and Object-Orientation. If we did this
 # the old way, we would have to operate on a single file at a time, at a very low level.
@@ -103,13 +105,27 @@ for val in BC.Q:
     f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[aaa], BC.C[aaa]))
     aaa = aaa + 1
 
+g.write("node.Wind.t,")
+cont_node_list = []
 for node in HS.Reach:
-    print node, node.Humidity
-    if node.Humidity: 
-        print "Yes"
-        for i in node.Humidity:
-            print i.t, i, node.Humidity[i.t, 0]
-    
+    if node.Humidity:
+        cont_node_list.append(node)
+        g.write("%s,%s,%s,%s," % (node, node, node, node))
+g.write("\nnode.Wint.t,")
+for node in cont_node_list:
+    g.write("Wind, Humidity, T_air, T_stream,")
+g.write("\n")
+print cont_node_list
+
+node1 = cont_node_list[0]
+for i in node1.Wind:
+    #print node, node.Humidity
+    #if node.Humidity:
+#    for i in node.Humidity:
+    g.write("%s," % i.t.isoformat(' ')[:-6])
+    for node in cont_node_list:
+        g.write("%s,%s,%s,%s," % (node.Wind[i.t, 0], node.Humidity[i.t, 0], node.T_air[i.t, 0], node.T_stream[i.t, 0]))
+    g.write("\n")
 
 
 #    print HS.Reach[i.km,1]
@@ -134,3 +150,4 @@ for node in HS.Reach:
 
 
 f.close() # CLOSE THE FILE!!
+g.close()
