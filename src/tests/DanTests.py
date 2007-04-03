@@ -21,8 +21,8 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
 
-HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
-#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
+#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
+HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
 
 
 ############################################
@@ -36,6 +36,12 @@ filename = "D:\\dan\\heatsource tests\\boundary.out"
 f = open(filename, 'w') # Open the file writable
 filename2 = "D:\\dan\\heatsource tests\\continuous.out"
 g = open(filename2, 'w') # Open the file writable
+filename3 = "D:\\dan\\heatsource tests\\tributaries.out"
+h = open(filename3, 'w') # Open the file writable
+filename4 = "D:\\dan\\heatsource tests\\nodes.out"
+nodes_out = open(filename4, 'w') # Open the file writable
+
+
 # Note that the open() function returns a class instance that is actually a file object.
 # This is another example of the power of classes and Object-Orientation. If we did this
 # the old way, we would have to operate on a single file at a time, at a very low level.
@@ -127,6 +133,44 @@ for i in node1.Wind:
         g.write("%s,%s,%s,%s," % (node.Wind[i.t, 0], node.Humidity[i.t, 0], node.T_air[i.t, 0], node.T_stream[i.t, 0]))
     g.write("\n")
 
+#print headers for node file
+nodes_out.write("Node\t")
+for k in HS.Reach[0].__slots__:
+    nodes_out.write("%s\t" % k)
+for k in HS.Reach[0].slots:
+    nodes_out.write("%s\t" % k)
+
+nodes_out.write("\n") 
+
+for node in HS.Reach:
+    nodes_out.write("%s\t" % node)
+    for k in node.__slots__:
+        try: nodes_out.write("%s\t" % getattr(node, k))
+        except: nodes_out.write("None\t")
+    for k in node.slots:
+        try: nodes_out.write("%s\t" % getattr(node, k))
+        except: nodes_out.write("None\t")
+
+#    import sys
+#    sys.exit()
+    nodes_out.write("\n") 
+
+
+# Started for tributary inputs but need to wait until operational!
+#trib_node_list = []
+#for node in HS.Reach:
+#    print node, node.Q_tribs
+#    if node.Q_tribs:
+#        trib_node_list.append(node)
+#
+#print trib_node_list
+
+#node1 = trib_node_list[0]
+#for i in node1.Q_tribs:
+#    h.write("%s," % i.t.isoformat(' ')[:-6])
+#    for node in cont_node_list:
+#        h.write("%s,%s," % (node.Q_tribs[i.t, 0], node.T_tribs[i.t, 0]))
+#    h.write("\n")
 
 #    print HS.Reach[i.km,1]
 
@@ -151,3 +195,5 @@ for i in node1.Wind:
 
 f.close() # CLOSE THE FILE!!
 g.close()
+h.close()
+nodes_out.close()
