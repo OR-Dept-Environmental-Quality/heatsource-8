@@ -13,6 +13,9 @@ from ProgressBar import ProgressBar
 # Turn of Metta's warnings and programming comments
 simplefilter('ignore', UserWarning)
 
+datadir = "C:\\Temp\\"
+outputdir = "C:\\Temp\\"
+
 ###########################################
 # Import the HeatSourceInterface class and create an instance with
 # the Umpqua Toketee file
@@ -21,8 +24,8 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
 
-#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls", gauge=ProgressBar())
-HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
+HS = HeatSourceInterface(datadir+"HS7_Jackson_CCC.xls", gauge=ProgressBar())
+#HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=ProgressBar())
 
 
 ############################################
@@ -32,13 +35,13 @@ HS = HeatSourceInterface("D:\\dan\\heatsource tests\\Toketee_CCC.xls", gauge=Pro
 
 # Filenames are easier to change as a variable, remember to escape the
 # backslashes
-filename = "D:\\dan\\heatsource tests\\boundary.out"
+filename = outputdir+"boundary.out"
 f = open(filename, 'w') # Open the file writable
-filename2 = "D:\\dan\\heatsource tests\\continuous.out"
+filename2 = outputdir+"continuous.out"
 g = open(filename2, 'w') # Open the file writable
-filename3 = "D:\\dan\\heatsource tests\\tributaries.out"
+filename3 = outputdir+"tributaries.out"
 h = open(filename3, 'w') # Open the file writable
-filename4 = "D:\\dan\\heatsource tests\\nodes.out"
+filename4 = outputdir+"nodes.out"
 nodes_out = open(filename4, 'w') # Open the file writable
 
 
@@ -140,7 +143,7 @@ for k in HS.Reach[0].__slots__:
 for k in HS.Reach[0].slots:
     nodes_out.write("%s\t" % k)
 
-nodes_out.write("\n") 
+nodes_out.write("\n")
 
 for node in HS.Reach:
     nodes_out.write("%s\t" % node)
@@ -153,7 +156,7 @@ for node in HS.Reach:
 
 #    import sys
 #    sys.exit()
-    nodes_out.write("\n") 
+    nodes_out.write("\n")
 
 
 # Started for tributary inputs but need to wait until operational!
@@ -197,3 +200,4 @@ f.close() # CLOSE THE FILE!!
 g.close()
 h.close()
 nodes_out.close()
+del HS
