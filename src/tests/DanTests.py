@@ -1,5 +1,6 @@
 """Test module to spit out and check HeatSource information"""
 from warnings import simplefilter
+import sys
 
 ########################################
 # Import the graphical user interface library, and start it up so that
@@ -13,8 +14,10 @@ from ProgressBar import ProgressBar
 # Turn of Metta's warnings and programming comments
 simplefilter('ignore', UserWarning)
 
-datadir = "D:\\dan\\heatsource tests\\"
-outputdir = "D:\\dan\\heatsource tests\\"
+#datadir = "D:\\dan\\heatsource tests\\"
+#outputdir = "D:\\dan\\heatsource tests\\"
+datadir = "c:\\Temp\\"
+outputdir = datadir
 
 ###########################################
 # Import the HeatSourceInterface class and create an instance with
@@ -26,7 +29,6 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 
 #HS = HeatSourceInterface(datadir+"HS7_Jackson_CCC.xls", gauge=ProgressBar())
 HS = HeatSourceInterface(datadir+"Toketee_CCC.xls", gauge=ProgressBar())
-
 
 ############################################
 
@@ -69,8 +71,6 @@ nodes_out = open(filename4, 'w') # Open the file writable
 # method. This way, you can do the following
 ##################
 # Print out some boundary condition information from the Discharge conditions
-BC = HS.BC # Get the boundary conditions class
-#print BC.Q[0:5] # print first 5 elements of the boundary conditions
 
 # temporary function that prints the attribute of a value, use as attr(object)-> object.t
 #attr = lambda x: x.t
@@ -107,9 +107,31 @@ BC = HS.BC # Get the boundary conditions class
 # over each internal list (Discharge, temperature, cloudiness) in turn.
 #line = "" # Clear the line
 
+################################################################################
+##
+"""
+Dan,
+    To make your life easier, StreamNode now has a GetAttributes() method.
+    See the docstring, then try something similiar to the following:
+"""
+help(HS.Reach[0].GetAttributes) #Print the GetAttributes() method docstring for a StreamNode class
+help(HS.Reach[0].GetZoneAttributes) # Print the GetZoneAttributes() method docstring
+ignoreList = ["Q_bc", "T_bc", "C_bc", "Wind"]  #You can ignore attributes if you want
+for k,v in HS.Reach[0].GetAttributes(zone=False).iteritems():
+    if k in ignoreList: continue
+    print "%s: %s" %(k, `v`)
+sys.exit()
+""""""
+#################################################################################
 f.write("BC.Q.t, BC.Q, BC.T, BC.C\n")
 aaa = 0
 #Could I use map here?  Could I get rid of count?
+"""Dan,
+    Not really with map, but you can more easily use the following:
+
+for i in xrange(len(BC.Q)):     # iterate through the NUMBER of values in BC.Q
+    f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[i], BC.C[i]))
+"""
 for val in BC.Q:
     f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[aaa], BC.C[aaa]))
     aaa = aaa + 1

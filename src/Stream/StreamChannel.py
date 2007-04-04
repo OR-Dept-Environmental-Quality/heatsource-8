@@ -19,7 +19,7 @@ class StreamChannel(object):
     # Protect the allowable attributes, so we cannot later add an attribute.
     # This is useful to avoid programming errors where we might set self.Slope
     # at some point, and access self.S at another point.
-        slots = ["S",        # Slope
+        self.slots = ["S",        # Slope
                  "n",        # Manning's n
                  "W_bf",     # Bankfull width (surface)
                  "z",        # z factor: Ration of run to rise of the side of a trapazoidal channel
@@ -51,9 +51,10 @@ class StreamChannel(object):
                  "dt",        # This is the timestep (for kinematic wave movement, etc.)
                  "phi",      # Porosity of the bed
                  "K_h",      # Horizontal bed conductivity
-                 "Chronos"    # The God of Time
+                 "Chronos",    # The God of Time
+                 "Log"       # Global logging class
                  ]
-        for attr in slots:
+        for attr in self.slots:
             setattr(self,attr,None)
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
@@ -108,13 +109,13 @@ class StreamChannel(object):
         self.Q = Q
 
         if Q < 0.0071: #Channel is going dry
-            warn("The channel is going dry at %s." % self)
+            self.Log.write("The channel is going dry at %s, model time: %s." % (self, self.Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
             return
 
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
         self.CalcGeometry()
-        self.CalcHyporheic()
+#        self.CalcHyporheic()
 
     def GetKnownDischarges(self):
         """Returns the known discharges necessary to calculate current discharge
@@ -174,7 +175,6 @@ class StreamChannel(object):
     def GetMuskingum(self, Q=None):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
-        print self, self.Chronos.TheTime, self.Q, self.W_w, self.S
         if not self.W_w:
             pass
         try:

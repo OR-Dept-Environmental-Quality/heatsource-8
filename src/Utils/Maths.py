@@ -37,6 +37,6 @@ def NewtonRaphson(f, df, a, b, tol=1.0e-5, maxiter=30):
         # Check for convergence
         if abs(dx) < tol * max(abs(b), 1.0): return x
     # If we get past the loop, then we've exceeded our maximum number of iterations
-    print x, abs(dx), tol + max(abs(b), 1.0)
+    #print x, abs(dx), tol + max(abs(b), 1.0)
     raise Exception("No convergences when calculating NewtonRaphson, is there a code problem?")
 

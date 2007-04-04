@@ -42,21 +42,12 @@ class MainModel(object):
             try:
 #                map(lambda x:x.ViewToSky(),self.Reach)
                 for node in self.Reach:
-                    for k in node.__slots__:
-                        print k,
-                        try: print getattr(node,k)
-                        except: print "None"
-                    for k in node.slots:
-                        print k,
-                        try: print getattr(node,k)
-                        except: print "None"
-                    import sys
-                    sys.exit()
+                    node.CalcHydraulics()
             except:
                 raise
                 return False
             n+=1
-            self.Log("Running...",n,max)
+#            self.Log("Running...",n,max)
         return True
     def Stop(self):
         pass

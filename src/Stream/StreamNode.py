@@ -5,23 +5,24 @@ from scipy.optimize.minpack import newton
 from Containers.IniParams import IniParams
 from Containers.VegZone import VegZone
 from Containers.Zonator import Zonator
-from Containers.BoundCond import BoundCond
 from Containers.AttrList import TimeList
 from Utils.Maths import NewtonRaphson
 from StreamChannel import StreamChannel
 from Solar.Helios import Helios
 from Time.Chronos import Chronos
+from Utils.Logger import Logger
+
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
     # Define members in __slots__ to ensure that later member names cannot be added accidentally
-    __slots__ = ["Embeddedness","Conductivity","ParticleSize","Porosity",  # From Morphology Data sheet
+    __slots__ = ["Embeddedness","Conductivity","ParticleSize",  # From Morphology Data sheet
                  "Topo","Latitude","Longitude","Elevation", # Geographic params
                  "FLIR_Temp","FLIR_Time", # FLIR data
                  "T_cont","T_sed","T_in","T_tribs", # Temperature attrs
                  "VHeight","VDensity",  #Vegetation params
-                 "Wind","Humidity","T_air","T_stream" # Continuous data
-                 "IniParams","Zone","BC", # Initialization parameters, Zonator and boundary conditions
+                 "Wind","Humidity","T_air","T_stream", # Continuous data
+                 "IniParams","Zone","T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
                  "Flux",
                  "Helios" # Singleton class for Solar Insolation
                  ]
@@ -34,9 +35,6 @@ class StreamNode(StreamChannel):
         for attr in ["Wind","Humidity","T_air","T_tribs","Q_tribs","T_stream"]:
             setattr(self,attr,TimeList())
         self.IniParams = IniParams.getInstance()
-        self.BC = BoundCond.getInstance() # Class to hold various boundary conditions
-        # Set discharge boundary conditions for the StreamChannel
-        self.Q_bc = self.BC.Q
         self.Flux = {"Direct": [0]*8,
                      "Diffuse": [0]*8,
                      "Solar": [0]*8}
@@ -45,6 +43,7 @@ class StreamNode(StreamChannel):
                      "W": None}
         self.Chronos = Chronos.getInstance()
         self.Helios = Helios.getInstance()
+        self.Log = Logger.getInstance()
         # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
         # with values for the sampled zones in each directions. We build a blank Zonator
         # here so that the HeatSourceInterface.BuildStreamNode() method can add values without
@@ -77,6 +76,58 @@ class StreamNode(StreamChannel):
         return self.km <= cmp
     def GetZones(self):
         return self.Zone
+    def GetAttributes(self,zone=False):
+        """Return a dictionary of all class attribute names and values
+
+        This class returns a dictionary with keys that are the attribute name
+        and values that are the current value for that attribute. All attributes
+        in __slots__ and in self.slots (which hold the values for the StreamChannel)
+        are included, including an optional breakdown of the values in the Zonator instance.
+
+        If the argument zone is boolean True, then the values of the Zonator instance
+        are given as well. The values in the Zonator are given differently named keys,
+        in the form of X_Y_ATTR where X is the cardinal direction, clockwise from 0=NE to
+        6=NW; Y is the zone number (0-4) and ATTR is the attribute name
+        (e.g. VDensity). This dictionary can then be iterated over in a single
+        call for printing. Internal dictionaries and lists are returned as objects
+        and should be dealt with as such. (e.g. boundary conditions and such should
+        be iterated over externally).
+        """
+        # Make a dictionary to return
+        attrDict = {}
+        ignoreList = ["Zone","Chronos","Helios","IniParams","Log"]
+        # First we get all the attributes of __slots__
+        for k in self.__slots__:
+            if k in ignoreList: continue # Ignore the Zonator, clock, etc.
+            try:
+                attrDict[k] = getattr(self, k)
+            except AttributeError:
+                attrDict[k] = None
+        # now iterate over the contents of the stream channel
+        for k in self.slots:
+            if k in ignoreList: continue
+            try:
+                attrDict[k] = getattr(self, k)
+            except AttributeError:
+                attrDict[k] = None
+        if zone:
+            for k,v in self.GetZoneAttributes().iteritems():
+                attrDict[k] = v
+        return attrDict
+    def GetZoneAttributes(self):
+        """Return a dictionary of key/value pairs for the internal Zonator instance.
+
+        See GetAttributes() for details of the key format"""
+        attrDict = {}
+        # Expand the Zonator portion into the dictionary
+        for i,j,zone in self.Zone:
+            for attr in zone.__slots__:
+                k = "%i_%i_%s" %(i,j,attr)
+                try:
+                    attrDict[k] = getattr(zone, k)
+                except AttributeError:
+                    attrDict[k] = None
+        return attrDict
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
         self.ViewToSky()
@@ -89,6 +140,18 @@ class StreamNode(StreamChannel):
         # Iterate down the stream channel, calculating the discharges
         self.CalculateDischarge()
 
+        if self.W_w > self.W_bf:
+            self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
+            if not self.IniParams.ChannelWidth:
+                msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
+                dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
+                if dlg.ShowModal() == wx.ID_YES:
+                    # Put this in a public place so we don't ask again.
+                    self.IniParams.ChannelWidth = True
+                else:    #Stop Model Run and Change Input Data
+                    import sys
+                    sys.exit(1)
+                dlg.Destroy()
         ################################################################
         ### This section seems unused in the original code. It calculates a stratification
         # tendency factor. We can implement it (possibly in StreamChannel) if we need to
@@ -112,29 +175,7 @@ class StreamNode(StreamChannel):
         # spreadsheet is. Thus, something must be propigated backward to the parent class
         # to fiddle with the spreadsheet. Perhaps we can write a report to a text file or
         # something. I'm very hesitant to connect this too tightly with the interface.
-        Flag_StoptheModel = False
-        if self.W_w > self.W_bf and not self.IniParams.ChannelWidth:
 
-            I = self.km - dx / 1000
-            II = self.km
-            msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
-            dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
-            if dlg.ShowModal() == wx.ID_OK:
-                # Put this in a public place so we don't ask again.
-                self.IniParams.Flag_ChannelWidth = True
-                Flag_StoptheModel = False
-            else:    #Stop Model Run and Change Input Data
-                Flag_StoptheModel = True
-                self.IniParams.ChannelWidth = True
-            dlg.Destroy()
-#        if Flag_StoptheModel:
-#            I = 0
-#            while self[(17 + I, 5),"Morphology Data"] < self.km
-#                I += 1
-#            Dummy = self[17, 5) - Sheet1.Cells(18, 5)
-#            For II = I - CInt(dx / (Dummy * 1000)) To I
-#                If II >= 0 Then Sheet1.Cells(17 + II, 26) = Round(AreaX(Node, 1) + 0.1, 2)
-#            Next II
     def ViewToSky(self):
         #TODO: This method needs to be tested against the values obtained by the VB code
         #======================================================

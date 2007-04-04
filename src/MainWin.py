@@ -6,8 +6,9 @@ import  wx.lib.buttons  as  buttons
 import  wx.gizmos   as  gizmos
 
 from MainModel import MainModel
+from Utils.Logger import Logger
 
-class Logger(wx.TextCtrl):
+class wxLogger(wx.TextCtrl):
     def __init__(self, parent, id):
         wx.TextCtrl.__init__(self, parent, id, size=(500,100), style=wx.TE_MULTILINE|wx.TE_AUTO_SCROLL|wx.TE_BESTWRAP|wx.TE_MULTILINE)
     def write(self, msg):
@@ -42,8 +43,13 @@ class HSFrame(sc.SizedFrame):
         self.Bind(wx.EVT_BUTTON, self.OnLoadFile, loadbtn)
 
         # row 1
-        self.ErrLog = Logger(pane, -1)
-        self.ErrLog.SetSizerProps(expand=True, proportion=1)
+        # Set up a stdout/stderr logger
+        self.ErrLog = Logger.getInstance()
+        # Then create a wxTextCtrl to write to
+        ErrLog = wxLogger(pane, -1)
+        ErrLog.SetSizerProps(expand=True, proportion=1)
+#        self.ErrLog.SetFile(ErrLog)  # Set the logger to the wxTextCtrl
+        self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
 
         # row 2
         MiddlePane = sc.SizedPanel(pane, -1)
@@ -175,10 +181,7 @@ class HSFrame(sc.SizedFrame):
             self.LED.SetLabel(st)
             self.Gauge.Pulse()
     def Log(self,message,i=None, max=None):
-        if message != self.LastLog:
-            t = time.strftime("%m/%d/%y %H:%M:%S",time.localtime(time.time()))
-            self.ErrLog.WriteText("%s-> %s\n"% (t,message))
-            self.LastLog = message
+        self.ErrLog.write(message)
         if i and max:
             self.Percent.SetLabel("%i%%"%int((i/max)*100))
             self.Gauge.Pulse()
@@ -190,5 +193,5 @@ class HSApp(wx.App):
 
 if __name__ == "__main__":
     app = HSApp(False)
-#    sys.stderr = app.frame.ErrLog
+    sys.stderr = Logger.getInstance()
     app.MainLoop()
