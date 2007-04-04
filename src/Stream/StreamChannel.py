@@ -115,6 +115,20 @@ class StreamChannel(object):
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
         self.CalcGeometry()
         self.CalcHyporheic()
+    def CalcHydroStability(self):
+        """Ensure stability of the timestep using the technique from pg 82 of the HS manual
+        
+        This is only used if we are not using Muskingum routing, at least in the original code."""
+        pass
+#        Maxdt = 1e6
+#        for node in reach:
+#            Dummy = node.dx / (node.Velocity[0] + math.sqrt(9.861 * node.Depth[0]))
+#            if Dummy < Maxdt: Maxdt = Dummy
+#            Dummy = (node.Rh ** (4 / 3)) / (9.861 * node.Velocity[0] * (node.N ** 2))
+#            if Dummy < Maxdt: Maxdt = Dummy
+#        if Maxdt < iniparams.dt: dt = Maxdt
+#        else: dt = iniparams.dt
+#        return dt
 
     def GetKnownDischarges(self):
         """Returns the known discharges necessary to calculate current discharge

@@ -2,14 +2,14 @@ from __future__ import division
 import math,wx
 from warnings import warn
 from scipy.optimize.minpack import newton
-from Containers.IniParams import IniParams
+from Dieties.IniParams import IniParams
 from Containers.VegZone import VegZone
 from Containers.Zonator import Zonator
 from Containers.AttrList import TimeList
 from Utils.Maths import NewtonRaphson
 from StreamChannel import StreamChannel
-from Solar.Helios import Helios
-from Time.Chronos import Chronos
+from Dieties.Helios import Helios
+from Dieties.Chronos import Chronos
 from Utils.Logger import Logger
 
 
@@ -283,7 +283,7 @@ class StreamNode(StreamChannel):
         # JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
         self.Chronos.TheTime
-        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - JD + Hour_DST / 24))
+        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - self.Helios.JD + self.Chronos.TheTime.hour / 24))
         Solar_Constant = 1367 #W/m2
         self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(Altitude * math.pi / 180) #Global Direct Solar Radiation
         self.Flux["Diffuse"][0] = 0

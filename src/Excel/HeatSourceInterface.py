@@ -5,13 +5,12 @@ from datetime import datetime, timedelta
 from DataSheet import DataSheet
 from Stream.StreamNode import StreamNode
 
-from Time.TimeUtil import TimeUtil
 from Containers.VegZone import VegZone
 from Containers.Zonator import Zonator
-from Containers.IniParams import IniParams
+from Dieties.IniParams import IniParams
 from Containers.AttrList import PlaceList, TimeList
 from Containers.DataPoint import DataPoint
-from Time.Chronos import Chronos
+from Dieties.Chronos import Chronos
 
 #Flag_HS values:
 #    0: Flow Router
@@ -32,6 +31,7 @@ class HeatSourceInterface(DataSheet):
     def __initialize(self, gauge):
         self.Reach = PlaceList(attr='km', orderdn=True)
         self.IniParams = IP = IniParams.getInstance()
+        self.Chronos = Chronos.getInstance()
         # Build a quick progress bar
         self.PB = gauge
 
@@ -56,13 +56,6 @@ class HeatSourceInterface(DataSheet):
         IP.TimeZone = self.GetValue("I12")
         IP.SimPeriod = self.GetValue("I13")
         ######################################################
-
-        #######################################################
-        ## Time class objects
-        # Create a time manipulator for making time objects
-        self.TimeUtil = TimeUtil()
-
-        ##########################################################
 
         # Page names- maybe a useless tuple, we'll see
         self.pages = ("TTools Data", "Land Cover Codes", "Morphology Data", "Flow Data",
@@ -117,7 +110,7 @@ class HeatSourceInterface(DataSheet):
         temp_col = self[:,col+1,"Continuous Data"]
         cloud_col = self[:,col+2,"Continuous Data"]
         for I in xrange(self.Hours):
-            time = self.TimeUtil.MakeDatetime(time_col[16+I][0])
+            time = self.Chronos.MakeDatetime(time_col[16+I][0])
             # Get the flow boundary condition
             val = flow_col[row + I][0] # We get the 0th index because each column is actually a 1-length row
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
@@ -143,7 +136,7 @@ class HeatSourceInterface(DataSheet):
         time_col = self[:,cols[type][2],type]
         timelist = []
         for II in xrange(self.Hours):
-            timelist.append(self.TimeUtil.MakeDatetime(time_col[II + 16][0]))
+            timelist.append(self.Chronos.MakeDatetime(time_col[II + 16][0]))
 
         # Find the bounds of the data block
         c1 = self.excelize(cols[type][0]) # Turn the starting row into an Excel letter
@@ -356,6 +349,7 @@ class HeatSourceInterface(DataSheet):
             node.dx = self.IniParams.dx # Set the space-step
             node.dt = self.IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
             node.SetBankfullMorphology()
+            node.ViewToSky()
             # Taken from the VB code in SubHydraulics- this doesn't have to run at every
             # timestep, since the values don't change. Thus, we just set horizontal conductivity
             # and porosity once here, and remove the other attributes.

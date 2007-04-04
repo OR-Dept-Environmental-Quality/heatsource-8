@@ -1,8 +1,7 @@
 from __future__ import division
 import math
 from datetime import datetime, timedelta
-from Time.TimeUtil import TimeUtil
-from Time.Chronos import Chronos
+from Dieties.Chronos import Chronos
 from Utils.SingletonMixin import Singleton
 
 class Helios(Singleton):
@@ -12,19 +11,11 @@ class Helios(Singleton):
         self.UTC = None # datetime object is Coordinated Universal Time (Greenwich Mean Time in the ol' days)
         self.JD = None # Julian Date
         self.JDC = None # Julian Century
-        self.TimeUtil = TimeUtil()
         self.Chronos = Chronos.getInstance() # The God of Time
-
-    def SetTime(self):
-        """Create julian date and julian century as defined in HeatSource manual"""
-        self.TestDtime(self.Chronos.TheTime)
-        self.JD,self.JDC = self.TimeUtil.GetJD(self.Chronos.TheTime) # Then create julian date and century in UTC
-        if not self.JD or not self.JDC:
-            raise Exception("No Julian date calculated")
 
     def ResetSolarVars(self):
         """Reset solar variables for time=dtime which is a datetime object"""
-        self.SetTime()
+        self.JD, self.JDC = self.Chronos.JD, self.Chronos.JDC
         #======================================================
         #Obliquity of the eliptic
         #   MeanObliquity: Average obliquity (degrees)
@@ -88,23 +79,25 @@ class Helios(Singleton):
         #####################################
         ## Numerical methods are copied from Heat Source VB code except where noted
 
+        # Get the time (in DST) from Chronos
+        dst = self.Chronos.TheTime
         #########################################################
         # We need to get the DST hour, minute, second and offset from the python class
-        H = self.DST.hour*60
-        M = self.DST.minute
-        S = self.DST.second/60
-        tz = self.t.GetTZOffset(self.DST)*60
-
+        H = dst.hour*60
+        M = dst.minute
+        S = dst.second/60
+        tz = self.Chronos.TZOffset(dst)*60
+        print H,M,S,type(tz)
         #======================================================
         #Solar Time (minutes)
-        SolarTime = hour + minute + second + (self.Et - 4 * (-1*long) + tz)
+        SolarTime = H + M + S + (self.Et - 4 * (-1*lon) + tz)
         while SolarTime > 1440: # TODO: What is our goal here?
             SolarTime -= 1440  # this loop should likely be cleaned up
         HourAngle = SolarTime / 4 - 180
         if HourAngle < -180: HourAngle += 360
         #======================================================
         #Uncorrected Solar Zenith (degrees)
-        Dummy = math.sin(lat * math.pi / 180) * math.sin(self.Declination * math.pi / 180) + math.cos(lat * math.pi / 180) * math.cos(Declination * math.pi / 180) * math.cos(HourAngle * math.pi / 180)
+        Dummy = math.sin(lat * math.pi / 180) * math.sin(self.Declination * math.pi / 180) + math.cos(lat * math.pi / 180) * math.cos(self.Declination * math.pi / 180) * math.cos(HourAngle * math.pi / 180)
         if Dummy > 1: Dummy = 1
         elif Dummy < -1: Dummy = -1
         Dummy1 = math.acos(Dummy)

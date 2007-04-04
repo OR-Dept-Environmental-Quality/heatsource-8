@@ -1,12 +1,11 @@
 from __future__ import division
 from datetime import datetime, timedelta
-import time
+import time, sys
 
-from Time.TimeUtil import TimeUtil
 from Excel.HeatSourceInterface import HeatSourceInterface
-from Solar.Helios import Helios
-from Time.Chronos import Chronos
-from Containers.IniParams import IniParams
+from Dieties.Helios import Helios
+from Dieties.Chronos import Chronos
+from Dieties.IniParams import IniParams
 
 class MainModel(object):
     def __init__(self, filename,log):
@@ -19,15 +18,11 @@ class MainModel(object):
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
         self.IniParams = IniParams.getInstance()
         self.Helios = Helios.getInstance()
-        #######################################################
-        ## Time class objects
-        # Create a time manipulator for making time objects
-        self.TimeUtil = TimeUtil()
-
+        self.Chronos = Chronos.getInstance()
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(minutes=self.IniParams.dt)
-        start = self.TimeUtil.MakeDatetime(self.IniParams.Date)
+        start = self.Chronos.MakeDatetime(self.IniParams.Date)
         stop = start + timedelta(days=self.IniParams.SimPeriod)
         self.Chronos = Chronos.getInstance()
         # Other classes hold references to the instance, but only we should Start() it.
@@ -38,9 +33,10 @@ class MainModel(object):
         n = 0
         for t in self.Chronos:
             try:
-#                map(lambda x:x.ViewToSky(),self.Reach)
                 for node in self.Reach:
                     node.CalcHydraulics()
+                    node.CalcSolarPosition()
+                    sys.exit()
             except:
                 raise
                 return False

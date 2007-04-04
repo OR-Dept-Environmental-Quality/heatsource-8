@@ -128,9 +128,9 @@ class HSFrame(sc.SizedFrame):
 
         ################################
         ## debugging conveniences
-#        self.FileName = "C:\\eclipse\\HeatSource\\Toketee_CCC.xls"
-#        self.OnLoadFile(True)
-#        self.OnStartStop(True)
+        self.FileName = "C:\\eclipse\\HeatSource\\Toketee_CCC.xls"
+        self.OnLoadFile(True)
+        self.OnStartStop(True)
 
     def Switch(self):
         """Routines necessary for switching the GUI on or off"""

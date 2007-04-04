@@ -1,7 +1,7 @@
 from unittest import TestCase
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Time.TimeUtil import TimeUtil
-from Solar.Helios import Helios
+from Dieties.Helios import Helios
 from pytz import timezone,utc
 import datetime
 

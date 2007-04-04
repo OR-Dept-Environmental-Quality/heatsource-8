@@ -1,6 +1,6 @@
 from __future__ import division
 from unittest import TestCase
-from Time.Chronos import Chronos
+from Dieties.Chronos import Chronos
 from datetime import datetime, timedelta
 
 class TestChronos(TestCase):
