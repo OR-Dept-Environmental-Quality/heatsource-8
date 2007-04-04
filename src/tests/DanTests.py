@@ -127,10 +127,31 @@ print "------------------------------"
 for k,v in HS.Reach[0].Q_bc.Items():
     print k,v
 print "------------------------------"
+
+##############
+# Here's a quick and dirty way to print everything with headers:
+
+# Make a function that takes care of our try/except block, so we don't have to write that all the time!
+def GetValue(obj,attr):
+    """Return obj.attr if it exists, or None if it raises an error"""
+    try: return getattr(obj,attr)
+    except AttributeError: return None
+
+ignoreList += ["prev_km","next_km","Humidity","km"] # append to the ignoreList, we print km first, so ignore it here
+header = None
+for node in HS.Reach:
+    if not header:
+        header = node.GetAttributes().keys() # Get the attribute names (ignoring Zonator)
+        for name in header: print name + ",", # No newline
+        print ""
+    print `node.km` + ",",  # Print the string interpreted value, then a comma, but don't print a newline
+    for name in header:
+        print `GetValue(node,name)` + ",", # again, a comma, then no newline
+    print "" # Then print an empty string, which adds a newline to the end of this StreamNode's row
 sys.exit()
 #################################################################################
 ### Further code invalid because there is no BoundCond class. Boundary conditions
-### are now in T_bc, Q_bc and C_bc
+### are now in T_bc, Q_bc and C_bc (Sorry!!)
 
 f.write("BC.Q.t, BC.Q, BC.T, BC.C\n")
 aaa = 0

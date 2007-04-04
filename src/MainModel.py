@@ -7,7 +7,6 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 from Solar.Helios import Helios
 from Time.Chronos import Chronos
 from Containers.IniParams import IniParams
-from Containers.BoundCond import BoundCond
 
 class MainModel(object):
     def __init__(self, filename,log):
@@ -19,7 +18,6 @@ class MainModel(object):
         self.Reach = self.HS.Reach
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
         self.IniParams = IniParams.getInstance()
-        self.Bounds = BoundCond.getInstance()
         self.Helios = Helios.getInstance()
         #######################################################
         ## Time class objects
@@ -47,7 +45,7 @@ class MainModel(object):
                 raise
                 return False
             n+=1
-#            self.Log("Running...",n,max)
+            self.Log("Running...",n,max)
         return True
     def Stop(self):
         pass

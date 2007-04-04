@@ -46,7 +46,7 @@ class HeatSourceInterface(DataSheet):
         IP.Name = self.GetValue("I2")
         IP.Date = self.GetValue("I3")
         IP.dt = self.GetValue("I4")
-        IP.Dx = self.GetValue("I5")
+        IP.dx = self.GetValue("I5")
         IP.Length = self.GetValue("I6")
         IP.LongSample = self.GetValue("I7")
         IP.TransSample = self.GetValue("I8")
@@ -236,16 +236,15 @@ class HeatSourceInterface(DataSheet):
         ####################
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
-        if (self.IniParams.Dx%self.IniParams.LongSample
-            or self.IniParams.Dx<self.IniParams.LongSample):
+        self.IniParams.dx = 250
+        if (self.IniParams.dx%self.IniParams.LongSample
+            or self.IniParams.dx<self.IniParams.LongSample):
             raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
         long = self.IniParams.LongSample
-        dx = self.IniParams.Dx
+        dx = self.IniParams.dx
         length = self.IniParams.Length
         multiple = int(dx/long) #We have this many samples per distance step
         datapoints = self.Num_Q_Var-1 # We subtract one because the first datapoint is a boundary node.
-        nodes = int(datapoints/multiple)
-        extra = datapoints%multiple # Are there leftover datapoints at the bottom?
         row = 18 # Current row (Skipping the boundary node row)
 
         # The first node is a boundary node. Because the discharge, etc. are not calculated, but given
@@ -255,17 +254,21 @@ class HeatSourceInterface(DataSheet):
         # Place the boundary conditions in this first streamnode
         for cond in ["Q_bc","T_bc","C_bc"]:
             setattr(self.Reach[0],cond,getattr(self,cond))
+        # We also need to reset the dx of the first node, since it's of a shorter length:
+        self.Reach[0].dx = self.IniParams.LongSample # Set it to the length of the sample rate
         # Now, the meat. Most of the nodes will be developed as some multiple of the longitudinal
         # sample rate. Here, we figure out what that multiple is and append stream nodes for all
         # of the samples.
         for i in range(0, datapoints, multiple):
             self.Reach.append(self.GetNode(row+i,multiple))
             self.PB("Building Stream Nodes", i, datapoints)
-        # Having built most of the StreamNodes that are perfect multiples, we have to figure out if there
-        # are extra nodes at the mouth of the stream. These extra nodes will be shorter than the normal stream
-        # node by n*dx, where n is
-        if extra: # If so, we have to calculate how many extra datapoints there are
-            pass
+        row += i+multiple
+
+        #The last node may not have enough datapoints to be of length multiple*long, so
+        # we reset the multiple and if there's a remainder, we reset the last nodes dx
+        multiple = datapoints%multiple
+        if multiple: # If so, we have to calculate how many extra datapoints there are
+            self.Reach[-1].dx = long*multiple
 
 
     def GetNode(self, row, multiple):

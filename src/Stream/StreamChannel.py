@@ -112,10 +112,9 @@ class StreamChannel(object):
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, self.Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
             return
-
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
         self.CalcGeometry()
-#        self.CalcHyporheic()
+        self.CalcHyporheic()
 
     def GetKnownDischarges(self):
         """Returns the known discharges necessary to calculate current discharge
