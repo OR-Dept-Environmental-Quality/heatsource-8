@@ -215,6 +215,14 @@ class AttrList(list):
                 if not i: return l # if that index is zero, then we've grabbed the list from the start, so return.
                 l.insert(0, self[i-1]) # otherwise, insert this object at the beginning
                 return l # then return the list.
+    def Items(self):
+        """iterator for the items (as key/value pairs) in self"""
+        # Working outside to in, this method returns an iterator
+        # that iterates over a list of tuples formed of all values in
+        # self, the tuples are of the form (attr, val) where attr
+        # is the value of the indexing attribute, and val is the
+        # actual value of the datapoint.
+        return iter([(getattr(v,self.attr),v) for v in self])
 
 class TimeList(AttrList):
     """list class that can be indexed by slice or by time

@@ -116,10 +116,17 @@ Dan,
 """
 help(HS.Reach[0].GetAttributes) #Print the GetAttributes() method docstring for a StreamNode class
 help(HS.Reach[0].GetZoneAttributes) # Print the GetZoneAttributes() method docstring
-ignoreList = ["Q_bc", "T_bc", "C_bc", "Wind"]  #You can ignore attributes if you want
+ignoreList = ["Q_bc","T_bc", "C_bc", "Wind"]  #You can ignore attributes if you want
+print "------------------------------"
 for k,v in HS.Reach[0].GetAttributes(zone=False).iteritems():
     if k in ignoreList: continue
     print "%s: %s" %(k, `v`)
+print "------------------------------"
+# Attribute lists now have an Items() method, which returns an iterator over the
+# attribute value and the actual value.
+for k,v in HS.Reach[0].Q_bc.Items():
+    print k,v
+print "------------------------------"
 sys.exit()
 #################################################################################
 ### Further code invalid because there is no BoundCond class. Boundary conditions
