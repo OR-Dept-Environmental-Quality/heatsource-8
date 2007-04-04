@@ -121,15 +121,17 @@ for k,v in HS.Reach[0].GetAttributes(zone=False).iteritems():
     if k in ignoreList: continue
     print "%s: %s" %(k, `v`)
 sys.exit()
-""""""
 #################################################################################
+### Further code invalid because there is no BoundCond class. Boundary conditions
+### are now in T_bc, Q_bc and C_bc
+
 f.write("BC.Q.t, BC.Q, BC.T, BC.C\n")
 aaa = 0
 #Could I use map here?  Could I get rid of count?
 """Dan,
     Not really with map, but you can more easily use the following:
 
-for i in xrange(len(BC.Q)):     # iterate through the NUMBER of values in BC.Q
+for i in xrange(len(BC.Q)):     # iterate over a RANGE that is the LENGTH of BC.Q
     f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[i], BC.C[i]))
 """
 for val in BC.Q:
