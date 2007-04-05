@@ -20,7 +20,7 @@ class StreamNode(StreamChannel):
                  "Topo","Latitude","Longitude","Elevation", # Geographic params
                  "FLIR_Temp","FLIR_Time", # FLIR data
                  "T_cont","T_sed","T_in","T_tribs", # Temperature attrs
-                 "VHeight","VDensity",  #Vegetation params
+                 "VHeight","VDensity","Overhang",  #Vegetation params
                  "Wind","Humidity","T_air","T_stream", # Continuous data
                  "IniParams","Zone","T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
                  "Flux",
@@ -188,7 +188,7 @@ class StreamNode(StreamChannel):
                     OH = self.Zone[D][Z].Overhang
                 else:
                     OH = 0
-                Dummy1 = self.Zone[D][Z].VHeight + self.Zone[D][Z].SlopeHeight
+                Dummy1 = self.Zone[D][Z].VHeight + (self.Zone[D][Z].Elevation - self.Elevation)
                 Dummy2 = self.IniParams.TransSample * (Z - 0.5) - OH
                 if Dummy2 <= 0:
                     Dummy2 = 0.0001

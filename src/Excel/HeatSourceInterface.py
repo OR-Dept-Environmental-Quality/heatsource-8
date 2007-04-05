@@ -1,5 +1,5 @@
 from __future__ import division
-from itertools import imap
+from itertools import imap, dropwhile
 import math, time, operator
 from datetime import datetime, timedelta
 from DataSheet import DataSheet
@@ -229,7 +229,6 @@ class HeatSourceInterface(DataSheet):
         ####################
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
-        self.IniParams.dx = 250
         if (self.IniParams.dx%self.IniParams.LongSample
             or self.IniParams.dx<self.IniParams.LongSample):
             raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
@@ -295,7 +294,6 @@ class HeatSourceInterface(DataSheet):
                   'VHeight': 159,
                   'VDensity': 160}
         pages = {'Morphology Data': morph, 'TTools Data': ttools, 'Flow Data': flow}
-
         # This is the node
         node = StreamNode()
         # Figuring out the ending row takes some logic. If h=0, this is the first node, which should be a
@@ -304,8 +302,8 @@ class HeatSourceInterface(DataSheet):
         for page in pages:
             # Get data as a tuple of tuples of len(multiple)
             data = self[row:endrow,:,page]
-            if page == 'Morphology Data':
-                node.km = data[-1][4] # Get kilometer, last row, 4th cell
+            if page == 'Morphology Data': node.km = data[-1][4] # Get kilometer, last row, 4th cell
+            if page == 'TTools Data': self.GetZoneData(node, data) # get the zone data before averaging!
             data = [i for i in self.smartaverage(data)] # Average all the values smartly
             # Now we iterate through the list of averages, and assign the values to the appropriate
             # attributes in the stream node
@@ -320,25 +318,46 @@ class HeatSourceInterface(DataSheet):
                         else:
                             print attr, col, len(data)
                             raise
-            # We are going to build the VegZone and Zonator instances We have to do this for each cardinal
-            # direction and for 5 zones/direction. They are built in the StreamNode constructor and all
-            # values are set to zero by default, so we can just add values here and feel confident the
-            # addition will not fail.
-            if page == 'TTools Data':
-                for j,k,zone in node.GetZones(): # j is the cardinal direction, k is the zone number
-                    if k == 0: # If we're in the 0th zone
-                        zone.Elevation = data[7]
-                        zone.Overhang = data[j + 151] or 0
-                    else:
-                        ecol = data[(j * 4) + 42 + (k-1)]
-                        hcol = data[(j * 8) + 71 + ((k-1) * 2)]
-                        dcol = data[(j * 8) + 70 + ((k-1) * 2)]
-                        zone.Elevation = ecol
-                        zone.VHeight = hcol
-                        zone.VDensity = dcol
-                        zone.SlopeHeight = zone.Elevation - node.Zone[j][0].Elevation
         self.InitializeNode(row, node)
         return node
+    def GetZoneData(self, node, data):
+        raise Exception("Zones are broken. Know this. You can comment this exception to run normally")
+        pass
+
+#        # Land cover codes
+#        LC = self.GetLandCoverCodes()
+#        # LC attrs
+#        attrs = ["VHeight","VDensity","Overhang"]
+#        # Get the emergent vegetation
+#        d = LC[data[13]] # Dictionary of the emergent veg code
+#        for attr in attrs:
+#            setattr(node, attr, d[attr])
+#        for j,k,zone in node.GetZones(): # j is the cardinal direction, k is the zone number
+#            zone.Elevation = data[(j * 4) + 42 + (k-1)]
+#            hcol = data[(j * 4) + 14 + k]
+#            dcol = data[(j * 4) + 14 + k]
+#            zone.VHeight = hcol
+#            zone.VDensity = dcol
+
+    def GetLandCoverCodes(self):
+        """Return the codes from the Land Cover Codes worksheet as a dictionary of dictionaries"""
+        # returns a tuple, but we want a list because we have to reverse it
+        data = [[j for j in i] for i in self.GetValue("E17:H500","Land Cover Codes")]
+        # remove the null values.
+        for k in xrange(len(data)):
+            row = data[k]
+            row.reverse()
+            row = [i for i in dropwhile(lambda x:x==None,row)]
+            row.reverse()
+            data[k] = row
+        data.reverse()
+        data = [i for i in dropwhile(lambda x:len(x) == 0,data)]
+        data.reverse()
+        # now, make a dictionary of dictionaries to put stuff in
+        d = {}
+        for row in data:
+            d[row[0]] = {'VHeight': row[1], 'VDensity': row[2], 'Overhang': row[3]}
+        return d
 
     def InitializeNode(self, row, node):
         """Perform some initialization of the StreamNode, and write some values to spreadsheet"""

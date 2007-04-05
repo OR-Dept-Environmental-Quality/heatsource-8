@@ -44,7 +44,7 @@ class Zonator(EightFoldPath):
         """Iterator that cycles through the zonator
 
         This method returns a tuple (i,j,zone) where i is the cardinal direction of the
-        Zonator instance (0-6) and j is the zone number (0-4). zone is the actual zone
+        Zonator instance (0-6) and j is the zone number (0-3). zone is the actual zone
         instance so that the following syntax can be used:
 
         >>> SN = StreamNode()
@@ -54,11 +54,10 @@ class Zonator(EightFoldPath):
         0 1 VZ:(0, 0, 0, 0, 0)
         0 2 VZ:(0, 0, 0, 0, 0)
         0 3 VZ:(0, 0, 0, 0, 0)
-        0 4 VZ:(0, 0, 0, 0, 0)
         1 0 VZ:(0, 0, 0, 0, 0)
         1 1 VZ:(0, 0, 0, 0, 0)
         ...
         """
         for i in xrange(7):
-            for j in xrange(5):
+            for j in xrange(4):
                 yield i,j,self[i][j]

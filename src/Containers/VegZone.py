@@ -26,7 +26,7 @@ class VegZone(object):
     [23, 43, 4]
     >>>
     """
-    __slots__ = ['Elevation','VHeight','VDensity','Overhang','SlopeHeight']
+    __slots__ = ['Elevation','VHeight','VDensity','Overhang']
     def __init__(self, *args, **kwargs):
         # We only deal with the first 3 attributes on a normal basis.
         max = len(self.__slots__)
