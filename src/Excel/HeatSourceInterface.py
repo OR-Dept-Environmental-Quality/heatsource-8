@@ -245,7 +245,7 @@ class HeatSourceInterface(DataSheet):
         # sample, or row 17 of the Excel spreadsheet.
         self.Reach.append(self.GetNode(17,1)) #append the boundary condition node, row 17
         # Place the boundary conditions in this first streamnode
-        for cond in ["Q_bc","T_bc","C_bc"]:
+        for cond in ["Q_bc","T_bc"]:
             setattr(self.Reach[0],cond,getattr(self,cond))
         # We also need to reset the dx of the first node, since it's of a shorter length:
         self.Reach[0].dx = self.IniParams.LongSample # Set it to the length of the sample rate
@@ -348,6 +348,8 @@ class HeatSourceInterface(DataSheet):
         try:
             node.dx = self.IniParams.dx # Set the space-step
             node.dt = self.IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
+            # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
+            node.C_bc = self.C_bc
             node.SetBankfullMorphology()
             node.ViewToSky()
             # Taken from the VB code in SubHydraulics- this doesn't have to run at every

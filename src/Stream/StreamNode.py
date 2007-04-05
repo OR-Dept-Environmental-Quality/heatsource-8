@@ -206,7 +206,7 @@ class StreamNode(StreamChannel):
         # Get the sun's altitude and azimuth:
         Altitude, Azimuth = self.Helios.CalcSolarPosition(self.Latitude, self.Longitude)
         # Helios calculates the julian date, so we lazily snag that calculation.
-        JD = self.Helios.JD
+        JD = self.Chronos.JD
         # If it's night, we get out quick.
         if Altitude <= 0: #Nighttime
             Altitude = 0
@@ -274,40 +274,40 @@ class StreamNode(StreamChannel):
         #       5 - Entering Stream
         #       6 - Received by Water Column
         #       7 - Received by Bed
-        self.CalcFlux0()
+        self.CalcFlux0(Altitude)
+        self.CalcFlux1(Altitude)
 
-    def CalcFlux0(self):
+    def CalcFlux0(self, Altitude):
         #======================================================
         # 0 - Edge of atmosphere
         # TODO: Original VB code's JulianDay calculation:
         # JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-        self.Chronos.TheTime
         Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - self.Helios.JD + self.Chronos.TheTime.hour / 24))
         Solar_Constant = 1367 #W/m2
-        self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(Altitude * math.pi / 180) #Global Direct Solar Radiation
+        self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(math.radians(Altitude)) #Global Direct Solar Radiation
         self.Flux["Diffuse"][0] = 0
-#    def CalcFlux1(self):
-#        #======================================================
-#        # 1 - Above Topography
-#        Dummy1 = 35 / math.sqrt(1224 * math.sin(Altitude * math.pi / 180) + 1)
-#        Air_Mass = Dummy1 * math.exp(-0.0001184 * zonator[0][1].Elevation)
-#        Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (JulianDay + 10)) + 0.8
-#        #Calculate Diffuse Fraction
-#        self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.Cloudiness[time,-1] ** 2)
-#        if self.Flux["Direct"][0] == 0:
-#            Clearness_Index = 1
-#        else:
-#            Clearness_Index = self.Flux["Direct"][1] / self.Flux["Direct"][0]
-#        Dummy = self.Flux["Direct"][1]
-#        Dummy1 = 0.938 + 1.071 * Clearness_Index
-#        Dummy2 = 5.14 * (Clearness_Index ** 2)
-#        Dummy3 = 2.98 * (Clearness_Index ** 3)
-#        Dummy4 = math.sin(2 * math.pi * (JulianDay - 40) / 365)
-#        Dummy5 = (0.009 - 0.078 * Clearness_Index)
-#        Diffuse_Fraction = Dummy1 - Dummy2 + Dummy3 - Dummy4 * Dummy5
-#        self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
-#        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.Cloudiness[time,-1] ** 2)
+    def CalcFlux1(self, Altitude):
+        #======================================================
+        # 1 - Above Topography
+        Dummy1 = 35 / math.sqrt(1224 * math.sin(math.radians(Altitude)) + 1)
+        Air_Mass = Dummy1 * math.exp(-0.0001184 * self.Zone[0][1].Elevation)
+        Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (self.Chronos.JD + 10)) + 0.8
+        #Calculate Diffuse Fraction
+        self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time,-1] ** 2)
+        if self.Flux["Direct"][0] == 0:
+            Clearness_Index = 1
+        else:
+            Clearness_Index = self.Flux["Direct"][1] / self.Flux["Direct"][0]
+        Dummy = self.Flux["Direct"][1]
+        Dummy1 = 0.938 + 1.071 * Clearness_Index
+        Dummy2 = 5.14 * (Clearness_Index ** 2)
+        Dummy3 = 2.98 * (Clearness_Index ** 3)
+        Dummy4 = math.sin(2 * math.pi * (self.Chronos.JD - 40) / 365)
+        Dummy5 = (0.009 - 0.078 * Clearness_Index)
+        Diffuse_Fraction = Dummy1 - Dummy2 + Dummy3 - Dummy4 * Dummy5
+        self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
+        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.Cloudiness[time,-1] ** 2)
 #    def CalcFlux2(self):
 #        #======================================================
 #        #2 - Above Land Cover
