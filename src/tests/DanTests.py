@@ -14,10 +14,10 @@ from ProgressBar import ProgressBar
 # Turn of Metta's warnings and programming comments
 simplefilter('ignore', UserWarning)
 
-#datadir = "D:\\dan\\heatsource tests\\"
-#outputdir = "D:\\dan\\heatsource tests\\"
-datadir = "c:\\Temp\\"
-outputdir = datadir
+datadir = "D:\\dan\\heatsource tests\\"
+outputdir = "D:\\dan\\heatsource tests\\"
+#datadir = "c:\\Temp\\"
+#outputdir = datadir
 
 ###########################################
 # Import the HeatSourceInterface class and create an instance with
@@ -45,6 +45,8 @@ filename3 = outputdir+"tributaries.out"
 h = open(filename3, 'w') # Open the file writable
 filename4 = outputdir+"nodes.out"
 nodes_out = open(filename4, 'w') # Open the file writable
+filename5 = outputdir+"nodes2.out"
+nodes_out2 = open(filename5, 'w') # Open the file writable
 
 
 # Note that the open() function returns a class instance that is actually a file object.
@@ -116,7 +118,8 @@ Dan,
 """
 help(HS.Reach[0].GetAttributes) #Print the GetAttributes() method docstring for a StreamNode class
 help(HS.Reach[0].GetZoneAttributes) # Print the GetZoneAttributes() method docstring
-ignoreList = ["Q_bc","T_bc", "C_bc", "Wind"]  #You can ignore attributes if you want
+#ignoreList = ["Q_bc","T_bc", "C_bc", "Wind"]  #You can ignore attributes if you want
+ignoreList = []
 print "------------------------------"
 for k,v in HS.Reach[0].GetAttributes(zone=False).iteritems():
     if k in ignoreList: continue
@@ -137,34 +140,48 @@ def GetValue(obj,attr):
     try: return getattr(obj,attr)
     except AttributeError: return None
 
-ignoreList += ["prev_km","next_km","Humidity","km"] # append to the ignoreList, we print km first, so ignore it here
+#ignoreList += ["prev_km","next_km","Humidity","km"] # append to the ignoreList, we print km first, so ignore it here
+#header = None
+#for node in HS.Reach:
+#    if not header:
+#        header = node.GetAttributes().keys() # Get the attribute names (ignoring Zonator)
+#        for name in header: print name + ",", # No newline
+#        print ""
+#    print `node.km` + ",",  # Print the string interpreted value, then a comma, but don't print a newline
+#    for name in header:
+#        print `GetValue(node,name)` + ",", # again, a comma, then no newline
+#    print "" # Then print an empty string, which adds a newline to the end of this StreamNode's row
+
 header = None
+nodes_out2.write("node.km\t")
 for node in HS.Reach:
     if not header:
-        header = node.GetAttributes().keys() # Get the attribute names (ignoring Zonator)
-        for name in header: print name + ",", # No newline
-        print ""
-    print `node.km` + ",",  # Print the string interpreted value, then a comma, but don't print a newline
+        header = node.GetAttributes(zone=False).keys() # Get the attribute names (ignoring Zonator)
+        for name in header: nodes_out2.write(name + "\t") # No newline
+        nodes_out2.write("\n")
+    nodes_out2.write(`node.km` + "\t")  # Print the string interpreted value, then a tab
     for name in header:
-        print `GetValue(node,name)` + ",", # again, a comma, then no newline
-    print "" # Then print an empty string, which adds a newline to the end of this StreamNode's row
-sys.exit()
+        nodes_out2.write(`GetValue(node,name)` + "\t") 
+    nodes_out2.write("\n") # Then print an empty string, which adds a newline to the end of this StreamNode's row
+#sys.exit()
+
+
 #################################################################################
 ### Further code invalid because there is no BoundCond class. Boundary conditions
 ### are now in T_bc, Q_bc and C_bc (Sorry!!)
 
-f.write("BC.Q.t, BC.Q, BC.T, BC.C\n")
-aaa = 0
-#Could I use map here?  Could I get rid of count?
-"""Dan,
-    Not really with map, but you can more easily use the following:
-
-for i in xrange(len(BC.Q)):     # iterate over a RANGE that is the LENGTH of BC.Q
-    f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[i], BC.C[i]))
-"""
-for val in BC.Q:
-    f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[aaa], BC.C[aaa]))
-    aaa = aaa + 1
+#f.write("BC.Q.t, BC.Q, BC.T, BC.C\n")
+#aaa = 0
+##Could I use map here?  Could I get rid of count?
+#"""Dan,
+#    Not really with map, but you can more easily use the following:
+#
+#for i in xrange(len(BC.Q)):     # iterate over a RANGE that is the LENGTH of BC.Q
+#    f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[i], BC.C[i]))
+#"""
+#for val in BC.Q:
+#    f.write("%s,%s,%s,%s\n" % (val.t.isoformat(' ')[:-6], val, BC.T[aaa], BC.C[aaa]))
+#    aaa = aaa + 1
 
 g.write("node.Wind.t,")
 cont_node_list = []
@@ -255,4 +272,5 @@ f.close() # CLOSE THE FILE!!
 g.close()
 h.close()
 nodes_out.close()
+nodes_out2.close()
 del HS
