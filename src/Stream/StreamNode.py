@@ -15,23 +15,24 @@ from Utils.Logger import Logger
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
-    # Define members in __slots__ to ensure that later member names cannot be added accidentally
-    __slots__ = ["Embeddedness","Conductivity","ParticleSize",  # From Morphology Data sheet
-                 "Topo","Latitude","Longitude","Elevation", # Geographic params
-                 "FLIR_Temp","FLIR_Time", # FLIR data
-                 "T_cont","T_sed","T_in","T_tribs", # Temperature attrs
-                 "VHeight","VDensity","Overhang",  #Vegetation params
-                 "Wind","Humidity","T_air","T_stream", # Continuous data
-                 "IniParams","Zone","T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
-                 "Flux",
-                 "Helios" # Singleton class for Solar Insolation
-                 ]
     def __init__(self, **kwargs):
         StreamChannel.__init__(self)
+        # Define members in __slots__ to ensure that later member names cannot be added accidentally
+        s = ["Embeddedness","Conductivity","ParticleSize",  # From Morphology Data sheet
+                     "Topo","Latitude","Longitude","Elevation", # Geographic params
+                     "FLIR_Temp","FLIR_Time", # FLIR data
+                     "T_cont","T_sed","T_in","T_tribs", # Temperature attrs
+                     "VHeight","VDensity","Overhang",  #Vegetation params
+                     "Wind","Humidity","T_air","T_stream", # Continuous data
+                     "IniParams","Zone","T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
+                     "Flux",
+                     "Helios" # Singleton class for Solar Insolation
+                     ]
         # Set all the attributes to bare lists, or set from the constructor
-        for attr in self.__slots__:
+        for attr in s:
             x = kwargs[attr] if attr in kwargs.keys() else None
             setattr(self,attr,x)
+        self.slots += s
         for attr in ["Wind","Humidity","T_air","T_tribs","Q_tribs","T_stream"]:
             setattr(self,attr,TimeList())
         self.IniParams = IniParams.getInstance()
@@ -44,17 +45,23 @@ class StreamNode(StreamChannel):
         self.Chronos = Chronos.getInstance()
         self.Helios = Helios.getInstance()
         self.Log = Logger.getInstance()
-        # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
-        # with values for the sampled zones in each directions. We build a blank Zonator
-        # here so that the HeatSourceInterface.BuildStreamNode() method can add values without
-        # needing to build anything
-        dir = [] # List to save the seven directions
-        for Direction in xrange(7):
-            z = () #Tuple to store the zones 0-4
-            for Zone in xrange(5):
-                z += VegZone(),
-            dir.append(z) # append to the proper direction
-        self.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
+
+        # Make Overhang a dictionary (one value for each direction starting at NE (or SW if in southern hemisphere))
+        self.Overhang = {}
+        for i in xrange(7):
+            self.Overhang[i] = 0  # Overhang is zero unless otherwise set
+
+#        # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
+#        # with values for the sampled zones in each directions. We build a blank Zonator
+#        # here so that the HeatSourceInterface.BuildStreamNode() method can add values without
+#        # needing to build anything
+#        dir = [] # List to save the seven directions
+#        for Direction in xrange(7):
+#            z = () #Tuple to store the zones 0-4
+#            for Zone in xrange(5):
+#                z += VegZone(),
+#            dir.append(z) # append to the proper direction
+#        self.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
 
     def __eq__(self, other):
         cmp = other.km if isinstance(other,StreamNode) else other
@@ -97,15 +104,8 @@ class StreamNode(StreamChannel):
         attrDict = {}
         ignoreList = ["Zone","Chronos","Helios","IniParams","Log"]
         # First we get all the attributes of __slots__
-        for k in self.__slots__:
-            if k in ignoreList: continue # Ignore the Zonator, clock, etc.
-            try:
-                attrDict[k] = getattr(self, k)
-            except AttributeError:
-                attrDict[k] = None
-        # now iterate over the contents of the stream channel
         for k in self.slots:
-            if k in ignoreList: continue
+            if k in ignoreList: continue # Ignore the Zonator, clock, etc.
             try:
                 attrDict[k] = getattr(self, k)
             except AttributeError:
@@ -123,10 +123,7 @@ class StreamNode(StreamChannel):
         for i,j,zone in self.Zone:
             for attr in zone.__slots__:
                 k = "%i_%i_%s" %(i,j,attr)
-                try:
-                    attrDict[k] = getattr(zone, k)
-                except AttributeError:
-                    attrDict[k] = None
+                attrDict[k] = getattr(zone, attr)
         return attrDict
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
@@ -181,26 +178,25 @@ class StreamNode(StreamChannel):
         #======================================================
         #Calculate View to Sky
         VTS_Total = 0
-        for D in xrange(7): # Direction
-            LC_Angle_Max = 0
-            for Z in xrange(1,5): # Zone
-                if Z == 1:
-                    OH = self.Zone[D][Z].Overhang
-                else:
-                    OH = 0
-                Dummy1 = self.Zone[D][Z].VHeight + (self.Zone[D][Z].Elevation - self.Elevation)
-                Dummy2 = self.IniParams.TransSample * (Z - 0.5) - OH
-                if Dummy2 <= 0:
-                    Dummy2 = 0.0001
-                LC_Angle = (180 / math.pi) * math.atan(Dummy1 / Dummy2) * self.Zone[D][Z].VDensity
-                if Z == 1:
-                    LC_Angle_Max = LC_Angle
-                if LC_Angle_Max < LC_Angle:
-                    LC_Angle_Max = LC_Angle
-            VTS_Total = VTS_Total + LC_Angle_Max
+        for D,Z,zone in self.Zone:
+            if Z == 0:
+                LC_Angle_Max = 0 #Set new value for each zone
+                OH = self.Overhang[D]
+            else:
+                OH = 0
+            Dummy1 = self.Zone[D][Z].VHeight + (self.Zone[D][Z].Elevation - self.Elevation)
+            Dummy2 = self.IniParams.TransSample * (Z - 0.5) - OH
+            if Dummy2 <= 0:
+                Dummy2 = 0.0001
+            LC_Angle = (180 / math.pi) * math.atan(Dummy1 / Dummy2) * self.Zone[D][Z].VDensity
+            if Z == 1:
+                LC_Angle_Max = LC_Angle
+            if LC_Angle_Max < LC_Angle:
+                LC_Angle_Max = LC_Angle
+            if Z == 3: VTS_Total = VTS_Total + LC_Angle_Max # Add angle at end of each zone calculation
         self.View_To_Sky = (1 - VTS_Total / (7 * 90))
 
-    def CalcSolarPosition(self):
+    def CalcSolarFlux(self):
         #Like the others, taken from VB code unless otherwise noted
         #======================================================
         # Get the sun's altitude and azimuth:

@@ -50,14 +50,14 @@ class Zonator(EightFoldPath):
         >>> SN = StreamNode()
         >>> for i,j,zone in SN:
         >>>     print i, j, zone
-        0 0 VZ:(0, 0, 0, 0, 0)
-        0 1 VZ:(0, 0, 0, 0, 0)
-        0 2 VZ:(0, 0, 0, 0, 0)
-        0 3 VZ:(0, 0, 0, 0, 0)
-        1 0 VZ:(0, 0, 0, 0, 0)
-        1 1 VZ:(0, 0, 0, 0, 0)
+        0 0 VZ:(...)
+        0 1 VZ:(...)
+        0 2 VZ:(...)
+        0 3 VZ:(...)
+        1 0 VZ:(...)
+        1 1 VZ:(...)
         ...
         """
-        for i in xrange(7):
-            for j in xrange(4):
+        for i in xrange(len(self)):
+            for j in xrange(len(self[0])):
                 yield i,j,self[i][j]

@@ -20,40 +20,40 @@ class StreamChannel(object):
     # This is useful to avoid programming errors where we might set self.Slope
     # at some point, and access self.S at another point.
         self.slots = ["S",        # Slope
-                 "n",        # Manning's n
-                 "W_bf",     # Bankfull width (surface)
-                 "z",        # z factor: Ration of run to rise of the side of a trapazoidal channel
-                 "d_bf",     # Bankfull Depth, See below or HeatSource manual
-                 "d_ave",    # Average bankfull depth, calculated as W_bf/WD
-                 "d_w",      # Wetted depth. Calculated in GetWettedDepth()
-                 "d_cont",   # Control depth
-                 "W_b",      # Bottom width, calculated as W_bf - (2 * d_bf * z)
-                 "W_w",      # Wetted width, calculated as W_b + 2*z*d_w
-                 "A",        # Cross-sectional Area, calculated d_w * (W_b + z * d_w)
-                 "P_w",      # Wetted Perimeter, calculated as W_b + 2 * d_w * sqrt(1 + z**2)
-                 "R_h",      # Hydraulic Radius, calculated as A_x/P_w
-                 "WD",       # Width/Depth ratio, constant
-                 "dx",       # Length of this stream reach.
-                 "U",        # Velocity from Manning's relationship
-                 "Q",        # Discharge, from Manning's relationship
-                 "Q_prev",   # Discharge at previous timestep, previous space step is taken from another node
-                 "Q_cont",   # Control discharge
-                 "V",        # Total volume, based on current flow
-                 "Q_tribs",  # Inputs from tribs. This is a TimeList class object
-                 "Q_in",     # Inputs from "accretion" in cubic meters per second
-                 "Q_out",    # Withdrawls from the stream, in cubic meters per second
-                 "Q_hyp",    # Hyporheic flow
-                 "km",       # River kilometer, from mouth
-                 "next_km",  # Reference to next (downstream) river channel instance (Set externally)
-                 "prev_km",  # Reference to prevous (Upstream) river channel instance (also set externally)
-                 "Q_bc",      # Boundary conditions, in a TimeList class, for discharge.
-                 "E",        # Evaporation rate (currently unused)
-                 "dt",        # This is the timestep (for kinematic wave movement, etc.)
-                 "phi",      # Porosity of the bed
-                 "K_h",      # Horizontal bed conductivity
-                 "Chronos",    # The God of Time
-                 "Log"       # Global logging class
-                 ]
+                    "n",        # Manning's n
+                    "W_bf",     # Bankfull width (surface)
+                    "z", # z factor: Ration of run to rise of the side of a trapazoidal channel
+                    "d_bf", # Bankfull Depth, See below or HeatSource manual
+                    "d_ave", # Average bankfull depth, calculated as W_bf/WD
+                    "d_w", # Wetted depth. Calculated in GetWettedDepth()
+                    "d_cont", # Control depth
+                    "W_b", # Bottom width, calculated as W_bf - (2 * d_bf * z)
+                    "W_w", # Wetted width, calculated as W_b + 2*z*d_w
+                    "A", # Cross-sectional Area, calculated d_w * (W_b + z * d_w)
+                    "P_w", # Wetted Perimeter, calculated as W_b + 2 * d_w * sqrt(1 + z**2)
+                    "R_h", # Hydraulic Radius, calculated as A_x/P_w
+                    "WD", # Width/Depth ratio, constant
+                    "dx", # Length of this stream reach.
+                    "U", # Velocity from Manning's relationship
+                    "Q", # Discharge, from Manning's relationship
+                    "Q_prev", # Discharge at previous timestep, previous space step is taken from another node
+                    "Q_cont", # Control discharge
+                    "V", # Total volume, based on current flow
+                    "Q_tribs", # Inputs from tribs. This is a TimeList class object
+                    "Q_in", # Inputs from "accretion" in cubic meters per second
+                    "Q_out", # Withdrawls from the stream, in cubic meters per second
+                    "Q_hyp", # Hyporheic flow
+                    "km", # River kilometer, from mouth
+                    "next_km", # Reference to next (downstream) river channel instance (Set externally)
+                    "prev_km", # Reference to prevous (Upstream) river channel instance (also set externally)
+                    "Q_bc", # Boundary conditions, in a TimeList class, for discharge.
+                    "E", # Evaporation rate (currently unused)
+                    "dt", # This is the timestep (for kinematic wave movement, etc.)
+                    "phi", # Porosity of the bed
+                    "K_h", # Horizontal bed conductivity
+                    "Chronos", # The God of Time
+                    "Log"  # Global logging class
+                    ]
         for attr in self.slots:
             setattr(self,attr,None)
     def __repr__(self):

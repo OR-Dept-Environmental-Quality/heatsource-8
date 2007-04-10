@@ -276,23 +276,19 @@ class HeatSourceInterface(DataSheet):
                 'Conductivity': 17, # This value needs to be divided by 1000
                 'ParticleSize': 18,
                 'Embeddedness': 19,
-                'FLIR_Time': 20,
-                'FLIR_Temp': 21,
                 'Q_cont': 22,
                 'd_cont': 23,
                 'T_cont': 24}
         flow = {'Q_in': 4,
                 'T_in': 5,
-                'Q_out': 6,}
+                'Q_out': 6}
         ttools = {'Longitude': 5,
                   'Latitude': 6,
                   'Elevation': 7,
                   'Aspect': 9,
                   'Topo_W': 10,
                   'Topo_S': 11,
-                  'Topo_E': 12,
-                  'VHeight': 159,
-                  'VDensity': 160}
+                  'Topo_E': 12}
         pages = {'Morphology Data': morph, 'TTools Data': ttools, 'Flow Data': flow}
         # This is the node
         node = StreamNode()
@@ -300,11 +296,16 @@ class HeatSourceInterface(DataSheet):
         # boundary node developed from the first (headwater) datapoint
         endrow = row+multiple-1
         for page in pages:
-            # Get data as a tuple of tuples of len(multiple)
-            data = self[row:endrow,:,page]
-            if page == 'Morphology Data': node.km = data[-1][4] # Get kilometer, last row, 4th cell
-            if page == 'TTools Data': self.GetZoneData(node, data) # get the zone data before averaging!
-            data = [i for i in self.smartaverage(data)] # Average all the values smartly
+            # Get data as a tuple of tuples of len(multiple) and turn it into a list of lists
+            data = [[i for i in j] for j in self[row:endrow,:,page]]
+            if page == 'Morphology Data':
+                node.km = data[-1][4] # Get kilometer, last row, 4th cell
+                for i in xrange(len(data)):
+                    data[i][20] = 0.0 # Remove the FLIR time so it doesn't cause an error
+            # get the zone data before averaging! This is because we would average over the zone code
+            # rendering it meaningless
+            if page == 'TTools Data': self.GetZoneData(node, data)
+            data = [i for i in self.AverageIterables(data)] # Average all the values smartly
             # Now we iterate through the list of averages, and assign the values to the appropriate
             # attributes in the stream node
             for attr,col in pages[page].iteritems():
@@ -316,32 +317,77 @@ class HeatSourceInterface(DataSheet):
                         # that's the default, or at least ignore this run because we have zero + zero.
                         if attr in ['T_cont','d_cont','Q_cont', 'T_in', 'Q_in', 'Q_out']: pass
                         else:
-                            print attr, col, len(data)
+                            print attr, col, len(data), row
                             raise
+                    else: raise
         self.InitializeNode(row, node)
         return node
     def GetZoneData(self, node, data):
-        raise Exception("Zones are broken. Know this. You can comment this exception to run normally")
-        pass
+        """Build a Zonator instance, with VegZone values
 
-#        # Land cover codes
-#        LC = self.GetLandCoverCodes()
-#        # LC attrs
-#        attrs = ["VHeight","VDensity","Overhang"]
-#        # Get the emergent vegetation
-#        d = LC[data[13]] # Dictionary of the emergent veg code
-#        for attr in attrs:
-#            setattr(node, attr, d[attr])
-#        for j,k,zone in node.GetZones(): # j is the cardinal direction, k is the zone number
-#            zone.Elevation = data[(j * 4) + 42 + (k-1)]
-#            hcol = data[(j * 4) + 14 + k]
-#            dcol = data[(j * 4) + 14 + k]
-#            zone.VHeight = hcol
-#            zone.VDensity = dcol
+        This method builds a Zonator instance from a tuple of data rows.
+        The values placed in the VegZone instances are averaged over the
+        number of rows returned. This is a bit of a grueling process because
+        we have to get the height, density and overhang values for
+        each zone in each direction, then we have to Average those over the
+        distance step.
+        """
+        # Land cover codes
+        LC = self.GetLandCoverCodes()
+        # LC attrs
+        attrs = ["VHeight","VDensity"]
+        ########################################
+        # We build a Zonator instance with lists for all values. This way, we can append
+        # values to the list, then average over the values. The Zonator instance, has 7
+        # directions, each of which holds 4 VegZone instances
+        # with values for the sampled zones in each directions.
+        dir = [] # List to save the seven directions
+        for Direction in xrange(7):
+            z = () #Tuple to store the zones 0-3
+            for Zone in xrange(4):
+                z += VegZone([],[],[]), #Build the VegZone with lists as values
+            dir.append(z) # append to the proper direction
+        node.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
+        # The values for VHeight and VDensity for emergent vegetation lie in the StreamNode
+        node.VDensity = []
+        node.VHeight = []
+        # Overhang is also in the streamnode, as a separate variable which is a dictionary
+        # indexed by direction
+        ########################################
+
+        # Now, we add values to the lists as many times as we have rows.
+        for i in xrange(len(data)):
+            ## Emergent vegetation
+            emerg = LC[data[i][13]] # Dictionary of the emergent veg code
+            node.VDensity.append(emerg["VDensity"])
+            node.VHeight.append(emerg["VHeight"])
+
+            for j,k,zone in node.GetZones():
+                # Get the dictionary from the LC code from the ith row at the [14+(j*4)+k]th column
+                zdict = LC[data[i][14+(j*4)+k]]
+                if k == 0: #If we're at the first zone of a given direction, set the StreamNode's Overhang for that direction
+                    try: node.Overhang[j].append(zdict["Overhang"])
+                    except AttributeError:
+                        node.Overhang[j] = [zdict["Overhang"]]
+                zone.VHeight.append(zdict["VHeight"])
+                zone.VDensity.append(zdict["VDensity"])
+                zone.Elevation.append(data[i][41+(j*4)+k])
+
+        # Theoretically, we now have lists for all of the values, so we need to average over the lists
+        # We use our self.smartaverage() method, so that we take care of any values of None
+        # First we average the StreamNode attributes
+        node.VHeight, node.VDensity = self.SmartAverage(node.VHeight), self.SmartAverage(node.VDensity)
+        for i in xrange(7): node.Overhang[i] = self.SmartAverage(node.Overhang[i])
+
+        # Then we iterate over the zones
+        for i,j,zone in node.GetZones():
+            zone.VDensity = self.SmartAverage(zone.VDensity)
+            zone.VHeight = self.SmartAverage(zone.VHeight)
+            zone.Elevation = self.SmartAverage(zone.Elevation)
 
     def GetLandCoverCodes(self):
         """Return the codes from the Land Cover Codes worksheet as a dictionary of dictionaries"""
-        # returns a tuple, but we want a list because we have to reverse it
+        # GetValue() returns a tuple, but we want a list because we have to reverse it
         data = [[j for j in i] for i in self.GetValue("E17:H500","Land Cover Codes")]
         # remove the null values.
         for k in xrange(len(data)):
@@ -398,7 +444,7 @@ class HeatSourceInterface(DataSheet):
 #            self.SetValue((row, 13),node.d_ave, sheet="Morphology Data")
 #            self.SetValue((row, 14),node.A, sheet="Morphology Data")
 
-    def smartaverage(self, iterable):
+    def AverageIterables(self, iterable):
         """Average values in an iterable of iterables, returning a tuple of those averages.
 
         This method takes a tuple of tuples and averages the values in each index of the tuple,
@@ -416,25 +462,23 @@ class HeatSourceInterface(DataSheet):
         for it in iterable:
             while len(it) < max:
                 it += None, # Add a None value, kind of a stupid method, but it'll work for now.
-        #########
+        if len(iterable) == 1:
+            return iterable[0]
+        else:
+            return [i for i in map(self.SmartAverage, zip(*iterable))]
+
+    def SmartAverage(self, iterable):
+        """Average values over an iterable, ignorning None or returning None if there's no length"""
         smartlen = lambda x: len(x) or 1 # Return length of sequence or 1 for averages
-        def ave(*it): # Smart average function
-            l = []
-            for elem in it:
-                if elem is not None: l.append(elem)
-            try:
-                return reduce(operator.add,l)/smartlen(l) # Fast average of a list
-            except TypeError, err:
-                if err.message == "reduce() of empty sequence with no initial value": # Tried to average all None values
-                    return None
-                elif err.message == "bad operand type": # This error occurs when we have a date.
-                    # lambda to return a floating point number representing a date
-                    timeval = lambda x: time.mktime(time.strptime(x.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
-                    # Return the fast average, but map the list to the floating point number lambda above
-                    return reduce(operator.add,map(timeval,l))/smartlen(l)
-            else: raise
-        ########
-        return imap(ave, *iterable)
+        l = []
+        for elem in iterable:
+            if elem is not None: l.append(elem)
+        try:
+            return reduce(operator.add,l)/smartlen(l) # Fast average of a list
+        except TypeError, err:
+            if err.message == "reduce() of empty sequence with no initial value": # Tried to average all None values
+                return None
+        else: raise
 
     def SetupSheets1(self):
         num = 0

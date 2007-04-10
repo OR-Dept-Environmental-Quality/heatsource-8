@@ -35,7 +35,7 @@ class MainModel(object):
             try:
                 for node in self.Reach:
                     node.CalcHydraulics()
-                    node.CalcSolarPosition()
+                    node.CalcSolarFlux()
                     sys.exit()
             except:
                 raise
