@@ -411,6 +411,13 @@ class HeatSourceInterface(DataSheet):
         #Now that we have a stream node, we set the node's dx value, because
         # we have most nodes that are long-sample-distance times multiple,
         try:
+            # To make our life easier when building the node we created Topo_W,
+            # Topo_S, and Topo_E, however,
+            # these are better in a dictionary, so we fix that here.
+            node.Topo = {"E":node.Topo_E,
+                         "W":node.Topo_W,
+                         "S":node.Topo_S}
+            del node.Topo_E, node.Topo_W, node.Topo_S # Delete the unnecessary attributes
             node.dx = self.IniParams.dx # Set the space-step
             node.dt = self.IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
             # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node

@@ -46,7 +46,6 @@ class Chronos(Singleton):
         while self.__current <= self.__stop:
             yield self.__current
             self.__current += self.__dt
-            self.__jd, self.__jdc = self.GetJD(self.__current)
     def __len__(self):
         return len([i for i in self])
     def GetStart(self): return self.__start
@@ -80,9 +79,9 @@ class Chronos(Singleton):
         if self.__current: return self.__current
         else: return 0
     def SetCurrent(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
-    def GetJD(self): return self.__jd
+    def GetJD(self): return self.FracJD()
     def SetJD(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
-    def GetJDC(self): return self.__jdc
+    def GetJDC(self): return self.FracJDC()
     def SetJDC(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
     start = property(GetStart, SetStart)
     dt = property(GetDT, SetDT)
@@ -95,7 +94,7 @@ class Chronos(Singleton):
         t = t or self.__current
         if not t.tzinfo == pytz.utc:
             t = self.GetUTC(t)
-        y,m,d,H,M,S,dst = self.makeTuple(t)
+        y,m,d,H,M,S,tz = self.makeTuple(t)
         dec_day = d + (H + (M + S/60)/60)/24
         if m < 3:
             m += 12;
@@ -106,7 +105,7 @@ class Chronos(Singleton):
             a = math.floor(y/100);
             julian_day += (2 - a + math.floor(a/4));
 
-        self.__jd = round(julian_day,5) #Python numerics return to about 10 places, Naval Observatory goes to 5
+        return round(julian_day,5) #Python numerics return to about 10 places, Naval Observatory goes to 5
     def FracJDC(self, t=None):
         """Takes a datetime object in UTC and returns the calculated julian century"""
         t = t or self.__current
@@ -117,7 +116,7 @@ class Chronos(Singleton):
         """Returns a tuple of julian date and julian century"""
         t = t or self.__current
         jdc = self.FracJDC(t) # Calcs both JD and JDC, but only returns JDC
-        return self.__jd,jdc
+        return self.JD,self.JDC
 
     def TZOffset(self, t=None):
         """Takes a datetime object and returns the signed integer offset from UTC"""
@@ -145,5 +144,5 @@ class Chronos(Singleton):
             else:
                 print t
                 raise AttributeError(detail)
-        dst = pytz.timezone(tz) # Make a local timezone object
-        return y,m,d,H,M,S,dst
+        tz = pytz.timezone(tz) # Make a local timezone object
+        return y,m,d,H,M,S,tz

@@ -32,16 +32,15 @@ class MainModel(object):
         max = len(self.Chronos)
         n = 0
         for t in self.Chronos:
+            self.Log("Running...",n,max)
             try:
                 for node in self.Reach:
                     node.CalcHydraulics()
                     node.CalcSolarFlux()
-                    sys.exit()
             except:
                 raise
                 return False
             n+=1
-            self.Log("Running...",n,max)
         return True
     def Stop(self):
         pass
