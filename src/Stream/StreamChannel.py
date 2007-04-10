@@ -229,7 +229,7 @@ class StreamChannel(object):
         """Calculate initial morphological characteristics in terms of W_bf, z and WD"""
         if self.z >= self.WD/2:
             raise Warning("Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.z, self.WD))
-            self.z = 0.99 * (self.WD/2)  #NOTE: shouldn't this be "self.z =" ? DT -- I went ahead and changed it.
+            self.z = 0.99 * (self.WD/2)
 
         # Average depth of the trapazoid from the width/depth ratio
         self.d_ave = self.W_bf/self.WD
@@ -240,19 +240,16 @@ class StreamChannel(object):
         self.d_bf = self.d_ave
         self.W_b = self.W_bf - 2*self.z*self.d_bf
         Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
+        # We have to iterate to find the bottom width and bankful depth because we have two equations
+        # and two unknowns, so we iterate until the area of the trapazoid (cross-sectional flow area)
+        # is equal to the average area (average depth times bankful width). The purpose of this is to
+        # find the channel's bottom width.
+        #TODO: Find out whether we need bankful depth, and remove it from the class if not.
         while Trap_area < Xarea:
             self.d_bf = self.d_bf + 0.01
             self.W_b = self.W_bf - 2*self.z*self.d_bf
             Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
         
-        # Top and bottom of the trapazoid
-        #self.W_b = self.W_bf - (2 * self.d_ave * self.z) # This formula is not correct, should have been self.d_bf instead of self.d_ave
-        # Calculate the area of this newly estimated trapazoid. This will get reset when the
-        # wetted depth changes
-        self.A = (self.z * self.d_ave) * ((self.W_b + self.W_bf)/2)  # DT -- I have not checked this formula
-        #w = (self.W_bf - self.W_b)/self.W_bf  #DT -- Unnessary with above changes?
-        #self.d_bf = self.d_ave/(w + ((1-w)/2))  #DT -- Unnessary with above changes?
-
     def GetWettedDepth(self, Q_est=None):
         """Use Newton-Raphson method to calculate wetted depth from current conditions
 
