@@ -2,7 +2,6 @@ from unittest import TestCase
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Time.TimeUtil import TimeUtil
 from Dieties.Helios import Helios
-from pytz import timezone,utc
 import datetime
 
 class TestDataSheet(TestCase):

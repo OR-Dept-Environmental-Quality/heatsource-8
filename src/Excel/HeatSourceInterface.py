@@ -30,8 +30,6 @@ class HeatSourceInterface(DataSheet):
 
     def __initialize(self, gauge):
         self.Reach = PlaceList(attr='km', orderdn=True)
-        self.IniParams = IP = IniParams.getInstance()
-        self.Chronos = Chronos.getInstance()
         # Build a quick progress bar
         self.PB = gauge
 
@@ -43,6 +41,7 @@ class HeatSourceInterface(DataSheet):
         # Grab the initialization parameters from the Excel file.
         # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
         self.SetSheet("TTools Data")
+        IP = IniParams
         IP.Name = self.GetValue("I2")
         IP.Date = self.GetValue("I3")
         IP.dt = self.GetValue("I4")
@@ -70,8 +69,8 @@ class HeatSourceInterface(DataSheet):
 
         # from VB: Apparently, only one day is simulated for the shadelator
         # TODO: Check if we need to run for only one day during shadelator-only run.
-        Days = self.IniParams.SimPeriod
-        self.Hours = int(self.IniParams.SimPeriod * 24)
+        Days = IniParams.SimPeriod
+        self.Hours = int(IniParams.SimPeriod * 24)
 
         # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
@@ -110,7 +109,7 @@ class HeatSourceInterface(DataSheet):
         temp_col = self[:,col+1,"Continuous Data"]
         cloud_col = self[:,col+2,"Continuous Data"]
         for I in xrange(self.Hours):
-            time = self.Chronos.MakeDatetime(time_col[16+I][0])
+            time = Chronos.MakeDatetime(time_col[16+I][0])
             # Get the flow boundary condition
             val = flow_col[row + I][0] # We get the 0th index because each column is actually a 1-length row
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
@@ -129,14 +128,14 @@ class HeatSourceInterface(DataSheet):
         Gets a block of continuous data from a sheet, for a
         number of sites, each with mod different data columns"""
                                   #  (col, sites * datums per site, time column)
-        cols = {"Flow Data":         (14, self.IniParams.InflowSites * 2, 13),
-                "Continuous Data":   (11, self.IniParams.ContSites * 4, 6)
+        cols = {"Flow Data":         (14, IniParams.InflowSites * 2, 13),
+                "Continuous Data":   (11, IniParams.ContSites * 4, 6)
                 }
         # Make a list of the times
         time_col = self[:,cols[type][2],type]
         timelist = []
         for II in xrange(self.Hours):
-            timelist.append(self.Chronos.MakeDatetime(time_col[II + 16][0]))
+            timelist.append(Chronos.MakeDatetime(time_col[II + 16][0]))
 
         # Find the bounds of the data block
         c1 = self.excelize(cols[type][0]) # Turn the starting row into an Excel letter
@@ -156,7 +155,7 @@ class HeatSourceInterface(DataSheet):
 
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
-        for site in xrange(self.IniParams.InflowSites):
+        for site in xrange(IniParams.InflowSites):
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
@@ -170,13 +169,13 @@ class HeatSourceInterface(DataSheet):
                 # TimeList instance in the node.
                 node.Q_tribs.append(DataPoint(data[hour][site*2], time=timelist[hour]))
                 node.T_tribs.append(DataPoint(data[hour][1+site*2], time=timelist[hour]))
-            self.PB("Reading Inflow data", site, self.IniParams.InflowSites)
+            self.PB("Reading Inflow data", site, IniParams.InflowSites)
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
         data, timelist = self.GetDataBlock("Continuous Data")
 
-        for site in xrange(self.IniParams.ContSites):
+        for site in xrange(IniParams.ContSites):
             node = self.Reach[self.GetValue((site + 17, 4),"Continuous Data"),1] # Index by kilometer
             for hour in xrange(self.Hours):
                 node.Wind.append(DataPoint(data[hour][site*4],time=timelist[hour]))
@@ -190,7 +189,7 @@ class HeatSourceInterface(DataSheet):
                     if inst.message == "float() argument must be a string or a number":
                         node.T_stream.append(DataPoint(999, time=timelist[hour]))
                     else: raise
-            self.PB("Reading continuous data", site, self.IniParams.ContSites)
+            self.PB("Reading continuous data", site, IniParams.ContSites)
 
     def ScanMorphology(self):
         """Scan morphology variables for null of nonnumeric values"""
@@ -229,12 +228,12 @@ class HeatSourceInterface(DataSheet):
         ####################
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
-        if (self.IniParams.dx%self.IniParams.LongSample
-            or self.IniParams.dx<self.IniParams.LongSample):
+        if (IniParams.dx%IniParams.LongSample
+            or IniParams.dx<IniParams.LongSample):
             raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
-        long = self.IniParams.LongSample
-        dx = self.IniParams.dx
-        length = self.IniParams.Length
+        long = IniParams.LongSample
+        dx = IniParams.dx
+        length = IniParams.Length
         multiple = int(dx/long) #We have this many samples per distance step
         datapoints = self.Num_Q_Var-1 # We subtract one because the first datapoint is a boundary node.
         row = 18 # Current row (Skipping the boundary node row)
@@ -247,7 +246,7 @@ class HeatSourceInterface(DataSheet):
         for cond in ["Q_bc","T_bc"]:
             setattr(self.Reach[0],cond,getattr(self,cond))
         # We also need to reset the dx of the first node, since it's of a shorter length:
-        self.Reach[0].dx = self.IniParams.LongSample # Set it to the length of the sample rate
+        self.Reach[0].dx = IniParams.LongSample # Set it to the length of the sample rate
         # Now, the meat. Most of the nodes will be developed as some multiple of the longitudinal
         # sample rate. Here, we figure out what that multiple is and append stream nodes for all
         # of the samples.
@@ -418,8 +417,8 @@ class HeatSourceInterface(DataSheet):
                          "W":node.Topo_W,
                          "S":node.Topo_S}
             del node.Topo_E, node.Topo_W, node.Topo_S # Delete the unnecessary attributes
-            node.dx = self.IniParams.dx # Set the space-step
-            node.dt = self.IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
+            node.dx = IniParams.dx # Set the space-step
+            node.dt = IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
             # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
             node.C_bc = self.C_bc
             node.SetBankfullMorphology()

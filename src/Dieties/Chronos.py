@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import time, pytz, math
 from Utils.SingletonMixin import Singleton
 
-class Chronos(Singleton):
+class ChronosDiety(Singleton):
     """This class provides a clock to be used in the model timestepping.
 
     This is a class that is the God of Time, and thus seen from The Model as
@@ -146,3 +146,5 @@ class Chronos(Singleton):
                 raise AttributeError(detail)
         tz = pytz.timezone(tz) # Make a local timezone object
         return y,m,d,H,M,S,tz
+
+Chronos = ChronosDiety.getInstance()

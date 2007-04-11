@@ -19,15 +19,14 @@ class StreamNode(StreamChannel):
         StreamChannel.__init__(self)
         # Define members in __slots__ to ensure that later member names cannot be added accidentally
         s = ["Embeddedness","Conductivity","ParticleSize",  # From Morphology Data sheet
-                     "Topo","Latitude","Longitude","Elevation", # Geographic params
-                     "FLIR_Temp","FLIR_Time", # FLIR data
-                     "T_cont","T_sed","T_in","T_tribs", # Temperature attrs
-                     "VHeight","VDensity","Overhang",  #Vegetation params
-                     "Wind","Humidity","T_air","T_stream", # Continuous data
-                     "IniParams","Zone","T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
-                     "Flux",
-                     "Helios" # Singleton class for Solar Insolation
-                     ]
+             "Topo","Latitude","Longitude","Elevation", # Geographic params
+             "FLIR_Temp","FLIR_Time", # FLIR data
+             "T_cont","T_sed","T_in","T_tribs", # Temperature attrs
+             "VHeight","VDensity","Overhang",  #Vegetation params
+             "Wind","Humidity","T_air","T_stream", # Continuous data
+             "Zone","T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
+             "Flux"
+             ]
         # Set all the attributes to bare lists, or set from the constructor
         for attr in s:
             x = kwargs[attr] if attr in kwargs.keys() else None
@@ -35,15 +34,12 @@ class StreamNode(StreamChannel):
         self.slots += s
         for attr in ["Wind","Humidity","T_air","T_tribs","Q_tribs","T_stream"]:
             setattr(self,attr,TimeList())
-        self.IniParams = IniParams.getInstance()
         self.Flux = {"Direct": [0]*8,
                      "Diffuse": [0]*8,
                      "Solar": [0]*8}
         self.Topo = {"E": None,
                      "S": None,
                      "W": None}
-        self.Chronos = Chronos.getInstance()
-        self.Helios = Helios.getInstance()
         self.Log = Logger.getInstance()
 
         # Make Overhang a dictionary (one value for each direction starting at NE (or SW if in southern hemisphere))
@@ -139,12 +135,12 @@ class StreamNode(StreamChannel):
 
         if self.W_w > self.W_bf:
             self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
-            if not self.IniParams.ChannelWidth:
+            if not IniParams.ChannelWidth:
                 msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
                 dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
                 if dlg.ShowModal() == wx.ID_YES:
                     # Put this in a public place so we don't ask again.
-                    self.IniParams.ChannelWidth = True
+                    IniParams.ChannelWidth = True
                 else:    #Stop Model Run and Change Input Data
                     import sys
                     sys.exit(1)
@@ -185,7 +181,7 @@ class StreamNode(StreamChannel):
             else:
                 OH = 0
             Dummy1 = self.Zone[D][Z].VHeight + (self.Zone[D][Z].Elevation - self.Elevation)
-            Dummy2 = self.IniParams.TransSample * (Z - 0.5) - OH
+            Dummy2 = IniParams.TransSample * (Z - 0.5) - OH
             if Dummy2 <= 0:
                 Dummy2 = 0.0001
             LC_Angle = (180 / math.pi) * math.atan(Dummy1 / Dummy2) * self.Zone[D][Z].VDensity
@@ -200,9 +196,9 @@ class StreamNode(StreamChannel):
         #Like the others, taken from VB code unless otherwise noted
         #======================================================
         # Get the sun's altitude and azimuth:
-        Altitude, Azimuth = self.Helios.CalcSolarPosition(self.Latitude, self.Longitude)
+        Altitude, Azimuth = Helios.CalcSolarPosition(self.Latitude, self.Longitude)
         # Helios calculates the julian date, so we lazily snag that calculation.
-        JD = self.Chronos.JD
+        JD = Chronos.JD
         # If it's night, we get out quick.
         if Altitude <= 0: #Nighttime
             Altitude = 0
@@ -254,9 +250,9 @@ class StreamNode(StreamChannel):
 #            if i == 0: continue
 #            self.LC_TotElev = theVHeight(Node, Zone, Direction) + theSlopeHeight(Node, Zone, Direction)
 #            if Zone == 1:
-#                self.LC_Distance = self.IniParams.TransSample * (Zone - 0.5) - theOverHang(Node, Direction)
+#                self.LC_Distance = IniParams.TransSample * (Zone - 0.5) - theOverHang(Node, Direction)
 #            else
-#                self.LC_Distance = self.IniParams.TransSample * (Zone - 0.5)
+#                self.LC_Distance = IniParams.TransSample * (Zone - 0.5)
 #            if self.LC_Distance < 0:
 #                self.LC_Distance = 0.00001
         #############################################################
@@ -279,7 +275,7 @@ class StreamNode(StreamChannel):
         # TODO: Original VB code's JulianDay calculation:
         # JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - self.Helios.JD + self.Chronos.TheTime.hour / 24))
+        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - Helios.JD + Chronos.TheTime.hour / 24))
         Solar_Constant = 1367 #W/m2
         self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(math.radians(Altitude)) #Global Direct Solar Radiation
         self.Flux["Diffuse"][0] = 0
@@ -288,7 +284,7 @@ class StreamNode(StreamChannel):
         # 1 - Above Topography
         Dummy1 = 35 / math.sqrt(1224 * math.sin(math.radians(Altitude)) + 1)
         Air_Mass = Dummy1 * math.exp(-0.0001184 * self.Zone[0][1].Elevation)
-        Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (self.Chronos.JD + 10)) + 0.8
+        Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (Chronos.JD + 10)) + 0.8
         #Calculate Diffuse Fraction
         self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time,-1] ** 2)
         if self.Flux["Direct"][0] == 0:
@@ -299,7 +295,7 @@ class StreamNode(StreamChannel):
         Dummy1 = 0.938 + 1.071 * Clearness_Index
         Dummy2 = 5.14 * (Clearness_Index ** 2)
         Dummy3 = 2.98 * (Clearness_Index ** 3)
-        Dummy4 = math.sin(2 * math.pi * (self.Chronos.JD - 40) / 365)
+        Dummy4 = math.sin(2 * math.pi * (Chronos.JD - 40) / 365)
         Dummy5 = (0.009 - 0.078 * Clearness_Index)
         Diffuse_Fraction = Dummy1 - Dummy2 + Dummy3 - Dummy4 * Dummy5
         self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
@@ -546,7 +542,7 @@ class StreamNode(StreamChannel):
 #        LHV = 1000 * (2501.4 + (1.83 * T(0, Node))) #J/kg
 #        #===================================================
 #        #Use Jobson Wind Function
-#        if self.IniParams.Penman:
+#        if IniParams.Penman:
 #            #Calculate Evaporation FLUX
 #            Gamma = 1003.5 * Pressure / (LHV * 0.62198) #mb/*C  Cuenca p 141
 #            Delta = 6.1275 * math.exp(17.27 * Air_T / (237.3 + Air_T)) - 6.1275 * math.xp(17.27 * (Air_T - 1) / (237.3 + Air_T - 1))

@@ -16,22 +16,18 @@ class MainModel(object):
         self.HS = HeatSourceInterface(self.filename,gauge=self.Log)
         self.Reach = self.HS.Reach
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
-        self.IniParams = IniParams.getInstance()
-        self.Helios = Helios.getInstance()
-        self.Chronos = Chronos.getInstance()
         ##########################################################
         # Create a Chronos iterator that controls all model time
-        dt = timedelta(minutes=self.IniParams.dt)
-        start = self.Chronos.MakeDatetime(self.IniParams.Date)
-        stop = start + timedelta(days=self.IniParams.SimPeriod)
-        self.Chronos = Chronos.getInstance()
+        dt = timedelta(minutes=IniParams.dt)
+        start = Chronos.MakeDatetime(IniParams.Date)
+        stop = start + timedelta(days=IniParams.SimPeriod)
         # Other classes hold references to the instance, but only we should Start() it.
-        self.Chronos.Start(start, dt, stop)
+        Chronos.Start(start, dt, stop)
         ##########################################################
     def Run(self):
-        max = len(self.Chronos)
+        max = len(Chronos)
         n = 0
-        for t in self.Chronos:
+        for t in Chronos:
             self.Log("Running...",n,max)
             try:
                 for node in self.Reach:

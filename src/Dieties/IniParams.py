@@ -1,7 +1,7 @@
 from __future__ import division
 from Utils.SingletonMixin import Singleton
 
-class IniParams(Singleton):
+class IniParamsDiety(Singleton):
     """A class to hold user-defined data that is static throughout a model run
 
     This is often the data that is in the 9th column, rows 2-13, of most of the
@@ -40,3 +40,4 @@ class IniParams(Singleton):
             if key in kwargs.keys():
                 d[key] = kwargs[key]
             setattr(self,key,d[key])
+IniParams = IniParamsDiety.getInstance()

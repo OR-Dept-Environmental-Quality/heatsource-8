@@ -4,18 +4,17 @@ from datetime import datetime, timedelta
 from Dieties.Chronos import Chronos
 from Utils.SingletonMixin import Singleton
 
-class Helios(Singleton):
+class HeliosDiety(Singleton):
     """The God personification of The Sun"""
     def __init__(self):
         self.DST = None # Holder for a time object
         self.UTC = None # datetime object is Coordinated Universal Time (Greenwich Mean Time in the ol' days)
         self.JD = None # Julian Date
         self.JDC = None # Julian Century
-        self.Chronos = Chronos.getInstance() # The God of Time
 
     def ResetSolarVars(self):
         """Reset solar variables for time=dtime which is a datetime object"""
-        self.JD, self.JDC = self.Chronos.JD, self.Chronos.JDC
+        self.JD, self.JDC = Chronos.JD, Chronos.JDC
         cos,sin,atan,tan,rad,deg,pi = math.cos, math.sin, math.atan, math.tan, math.radians, math.degrees, math.pi
         #======================================================
         #Obliquity of the eliptic
@@ -82,13 +81,13 @@ class Helios(Singleton):
         ## Numerical methods are copied from Heat Source VB code except where noted
 
         # Get the time (in DST) from Chronos
-        dst = self.Chronos.TheTime
+        dst = Chronos.TheTime
         #########################################################
         # We need to get the DST hour, minute, second and offset from the python class
         H = dst.hour*60
         M = dst.minute
         S = dst.second/60
-        tz = self.Chronos.TZOffset(dst)*60
+        tz = Chronos.TZOffset(dst)*60
         #======================================================
         #Solar Time (minutes)
         SolarTime = H + M + S + (self.Et - 4 * (-1*lon) + tz)
@@ -146,4 +145,5 @@ class Helios(Singleton):
         Altitude = 90 - Zenith
         return Azimuth, Altitude
 
+Helios = HeliosDiety.getInstance()
 

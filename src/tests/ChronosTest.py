@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 class TestChronos(TestCase):
     def setUp(self):
-        self.TS = Chronos.getInstance()
         self.TS.Start(datetime.now(),timedelta(hours=1.5),datetime.now()+timedelta(days=10))
 
     def test_TheTime(self):

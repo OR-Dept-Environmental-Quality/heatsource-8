@@ -3,6 +3,7 @@ import math
 from warnings import warn
 from itertools import imap
 from Utils.Maths import NewtonRaphson
+from Dieties.Chronos import Chronos
 
 class StreamChannel(object):
     """Class that describes the geometry of a stream channel
@@ -51,7 +52,6 @@ class StreamChannel(object):
                     "dt", # This is the timestep (for kinematic wave movement, etc.)
                     "phi", # Porosity of the bed
                     "K_h", # Horizontal bed conductivity
-                    "Chronos", # The God of Time
                     "Log"  # Global logging class
                     ]
         for attr in self.slots:
@@ -60,7 +60,7 @@ class StreamChannel(object):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
     def GetInputs(self):
         """Returns a value for inputs-outputs to the channel at the time=t"""
-        t = self.Chronos.TheTime
+        t = Chronos.TheTime
         Q = 0
         Q += self.Q_in or 0 # Input volume
         Q -= self.Q_out or 0 # Output volume
@@ -85,7 +85,7 @@ class StreamChannel(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
-        t = self.Chronos.TheTime
+        t = Chronos.TheTime
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             # Get the tuples for C and Q values, multiply the each C by the cooresponding Q, then sum it up
@@ -109,7 +109,7 @@ class StreamChannel(object):
         self.Q = Q
 
         if Q < 0.0071: #Channel is going dry
-            self.Log.write("The channel is going dry at %s, model time: %s." % (self, self.Chronos.TheTime))
+            self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
             return
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
