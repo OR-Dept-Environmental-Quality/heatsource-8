@@ -117,7 +117,7 @@ class StreamChannel(object):
         self.CalcHyporheic()
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
-        
+
         This is only used if we are not using Muskingum routing, at least in the original code."""
         pass
 #        Maxdt = 1e6
@@ -233,7 +233,7 @@ class StreamChannel(object):
 
         # Average depth of the trapazoid from the width/depth ratio
         self.d_ave = self.W_bf/self.WD
-        # Calculate the maximum depth of the channel and the bottom width by iterating to a solution where  
+        # Calculate the maximum depth of the channel and the bottom width by iterating to a solution where
         # the cross-sectional area (Xarea) = trapezoidal area (Tarea)
         Xarea = self.d_ave * self.W_bf
         #Initialize maximum depth and bottom width
@@ -245,11 +245,11 @@ class StreamChannel(object):
         # is equal to the average area (average depth times bankful width). The purpose of this is to
         # find the channel's bottom width.
         #TODO: Find out whether we need bankful depth, and remove it from the class if not.
-        while Trap_area < Xarea:
+        while (Xarea - Trap_area) > 0.001:
             self.d_bf = self.d_bf + 0.01
             self.W_b = self.W_bf - 2*self.z*self.d_bf
             Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
-        
+
     def GetWettedDepth(self, Q_est=None):
         """Use Newton-Raphson method to calculate wetted depth from current conditions
 
