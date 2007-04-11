@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
-import time, pytz, math
+import time, math
 from Utils.SingletonMixin import Singleton
+from Utils.TimeZones import Eastern,Central,Mountain,Pacific,utc
 
 class ChronosDiety(Singleton):
     """This class provides a clock to be used in the model timestepping.
@@ -23,10 +24,10 @@ class ChronosDiety(Singleton):
         self.minute = timedelta(minutes=1)
         self.second = timedelta(seconds=1)
         self.year = timedelta(weeks=52)
-        self.tz = "US/Pacific"
+        self.tz = Pacific
         self.__current = None # Current time
 
-    def Start(self, start, dt=None, stop=None, tz="US/Pacific"):
+    def Start(self, start, dt=None, stop=None, tz=Pacific):
         if (not isinstance(start, datetime)) or (stop and not isinstance(stop, datetime)):
             raise Exception("Start and stop times much be Python datetime.datetime instances.")
         if dt and not isinstance(dt,timedelta):
@@ -92,15 +93,17 @@ class ChronosDiety(Singleton):
     def FracJD(self, t=None):
         """Takes a datetime object in UTC and returns a fractional julian date"""
         t = t or self.__current
-        if not t.tzinfo == pytz.utc:
-            t = self.GetUTC(t)
         y,m,d,H,M,S,tz = self.makeTuple(t)
+        # TODO: We should find out if this DST correction is proper
+        H -= t.tzinfo.dst(t).seconds == 3600 # Correct the time for DST
         dec_day = d + (H + (M + S/60)/60)/24
+
         if m < 3:
             m += 12;
             y -= 1;
         julian_day = math.floor(365.25*(y+4716.0)) + math.floor(30.6001*(m+1)) + dec_day - 1524.5;
 
+        # This value should only be added if we fall after a certain date
         if julian_day > 2299160.0:
             a = math.floor(y/100);
             julian_day += (2 - a + math.floor(a/4));
@@ -125,8 +128,8 @@ class ChronosDiety(Singleton):
     def GetUTC(self, t=None):
         """Return UTC version of a datetime object"""
         t = t or self.__current
-        s = t.replace(tzinfo=pytz.utc) # Replace our timezone info
-        return s - t.tzinfo._utcoffset #then subtract the offset and return the object
+        s = t.replace(tzinfo=utc) # Replace our timezone info
+        return s - t.tzinfo.utcoffset(t) #then subtract the offset and return the object
     def MakeDatetime(self, t=None, tz=None):
         if not t:
             return self.__current
@@ -144,7 +147,6 @@ class ChronosDiety(Singleton):
             else:
                 print t
                 raise AttributeError(detail)
-        tz = pytz.timezone(tz) # Make a local timezone object
         return y,m,d,H,M,S,tz
 
 Chronos = ChronosDiety.getInstance()
