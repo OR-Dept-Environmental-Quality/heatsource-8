@@ -303,7 +303,7 @@ class StreamNode(StreamChannel):
         Dummy5 = (0.009 - 0.078 * Clearness_Index)
         Diffuse_Fraction = Dummy1 - Dummy2 + Dummy3 - Dummy4 * Dummy5
         self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
-        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.Cloudiness[time,-1] ** 2)
+        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[time,-1] ** 2)
 #    def CalcFlux2(self):
 #        #======================================================
 #        #2 - Above Land Cover

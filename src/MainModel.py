@@ -33,7 +33,7 @@ class MainModel(object):
             try:
                 for node in self.Reach:
                     node.CalcHydraulics()
-                    node.CalcSolarFlux()
+                    #node.CalcSolarFlux()
             except:
                 raise
                 return False
