@@ -21,8 +21,9 @@ class MainModel(object):
         dt = timedelta(minutes=IniParams.dt)
         start = Chronos.MakeDatetime(IniParams.Date)
         stop = start + timedelta(days=IniParams.SimPeriod)
+        spin = 0 # IniParams.FlushDays # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
-        Chronos.Start(start, dt, stop)
+        Chronos.Start(start, dt, stop, spin)
         ##########################################################
     def Run(self):
         max = len(Chronos)

@@ -4,6 +4,7 @@ from warnings import warn
 from itertools import imap
 from Utils.Maths import NewtonRaphson
 from Dieties.Chronos import Chronos
+from Dieties.IniParams import IniParams
 
 class StreamChannel(object):
     """Class that describes the geometry of a stream channel
@@ -93,7 +94,12 @@ class StreamChannel(object):
 
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
-            Q = self.Q_bc[t,-1] # Get the value at this time, or the closest previous time
+            try:
+                Q = self.Q_bc[t,-1] # Get the value at this time, or the closest previous time
+            except:
+                if Chronos.TheTime < Chronos.MakeDatetime(IniParams.Date):
+                    Q = self.Q_bc[0]
+                else: raise
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.

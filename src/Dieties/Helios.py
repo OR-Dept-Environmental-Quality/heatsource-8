@@ -7,8 +7,6 @@ from Utils.SingletonMixin import Singleton
 class HeliosDiety(Singleton):
     """The God personification of The Sun"""
     def __init__(self):
-        self.DST = None # Holder for a time object
-        self.UTC = None # datetime object is Coordinated Universal Time (Greenwich Mean Time in the ol' days)
         self.JD = None # Julian Date
         self.JDC = None # Julian Century
 
@@ -62,7 +60,7 @@ class HeliosDiety(Singleton):
         self.SunTrueAnomaly = self.GeoMeanAnomalySun + self.SunEqofCenter
         #======================================================
         #Distance to the sun in AU
-        self.unRadVector = (1.000001018 * (1 - self.Eccentricity**2)) / (1 + self.Eccentricity * cos(rad(self.SunTrueAnomaly)))
+        self.SunRadVector = (1.000001018 * (1 - self.Eccentricity**2)) / (1 + self.Eccentricity * cos(rad(self.SunTrueAnomaly)))
         #======================================================
         #Equation of time (minutes)
         Dummy = (tan(self.Obliquity * pi / 360))**2

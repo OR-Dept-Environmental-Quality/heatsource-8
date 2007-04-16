@@ -196,7 +196,7 @@ class StreamNode(StreamChannel):
         #Like the others, taken from VB code unless otherwise noted
         #======================================================
         # Get the sun's altitude and azimuth:
-        Altitude, Azimuth = Helios.CalcSolarPosition(self.Latitude, self.Longitude)
+        Azimuth, Altitude = Helios.CalcSolarPosition(self.Latitude, self.Longitude)
         # Helios calculates the julian date, so we lazily snag that calculation.
         JD = Chronos.JD
         # If it's night, we get out quick.
@@ -280,6 +280,10 @@ class StreamNode(StreamChannel):
         self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(math.radians(Altitude)) #Global Direct Solar Radiation
         self.Flux["Diffuse"][0] = 0
     def CalcFlux1(self, Altitude):
+        time = Chronos.TheTime
+        print time, Chronos.start, time < Chronos.start
+        if time < Chronos.start:
+            time = Chronos.start
         #======================================================
         # 1 - Above Topography
         Dummy1 = 35 / math.sqrt(1224 * math.sin(math.radians(Altitude)) + 1)
