@@ -282,6 +282,10 @@ class StreamChannel(object):
         third = lambda x: (4 * (x**(5/3)) * (x*z+W)**(5/3) * math.sqrt(z**2+1)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(5/3)))
 
         Fdd = lambda x: first(x) + second(x) - third(x)
+        # This might not work, but as a first approximation for a secant-based derivative:
+        #Fdd = lambda x: (Fd(x+0.001) - Fd(x))/0.001
+        # The problem is that the NewtonRaphson method might be doing calculations based on fact that
+        # Fdd is a true derivative, rather than a secant approximation. I'm not sure.
 
         # Our Newton-Raphson method uses bracketing and binary search methods to dial down the function's zero.
         # Since we don't know our brackets each time, we make one up here, and assume that no stream is more than
