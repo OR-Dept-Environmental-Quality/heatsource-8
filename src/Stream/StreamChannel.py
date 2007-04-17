@@ -121,6 +121,9 @@ class StreamChannel(object):
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
         self.CalcGeometry()
         self.CalcHyporheic()
+        if self.km == 0:
+            print self.km, Chronos.TheTime, self.Q
+        
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
 
@@ -185,7 +188,7 @@ class StreamChannel(object):
             dw = self.GetWettedDepth(Q_est)
 
         self.d_w = dw
-        self.A = dw + (self.W_b + self.z*dw)
+        self.A = dw * (self.W_b + self.z*dw)
         self.P_w = self.W_b + 2 * dw * math.sqrt(1+self.z**2)
         self.R_h = self.A/self.P_w
         self.W_w = self.W_b + 2 * self.z * dw
@@ -196,11 +199,11 @@ class StreamChannel(object):
         using current timestep and optional discharge"""
 
         # Taken from the VB source.
-        c_k = (5/3) * self.U
-        X = 0.5 * (1 - (self.Q / (self.W_w * self.S * self.dx * c_k)))
+        c_k = (5/3) * self.U # Wave celerity
+        X = 0.5 * (1 - ((self.prev_km.Q + self.GetInputs()) / (self.W_w * self.S * self.dx * c_k)))
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
-        K = self.dx / ((5 * self.U) / 3) # Wave celerity
+        K = self.dx / c_k
         dt = self.dt
 
         # Check the celerity to ensure stability
