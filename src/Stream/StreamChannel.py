@@ -104,14 +104,14 @@ class StreamChannel(object):
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
             Q_in = self.GetInputs() # Add up our inputs to this segment
-            Q = self.prev_km.Q + Q_in
+            Q = self.prev_km.Q_prev + Q_in # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
         else: raise Exception("WTF?")
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         try:
-            self.Q_prev = self.Q
-        except AttributeError: # If there's no Q, then we are here for the first time. Set to Boundary Condition
-            self.Q_prev = self.Q_bc[t,-1]
+            self.Q_prev = self.Q or self.Q_bc[t,-1]
+        except TypeError:
+            self.Q_prev = self.Q  or self.prev_km.Q_prev
         self.Q = Q
 
         if Q < 0.0071: #Channel is going dry
@@ -194,16 +194,10 @@ class StreamChannel(object):
     def GetMuskingum(self, Q=None):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
-        if not self.W_w:
-            pass
-        try:
-            A = self.Q / (2 * self.W_w * self.S)
-        except ZeroDivisionError, err:
-            raise
 
         # Taken from the VB source.
-        B = (5/3) * self.U * self.dx
-        X = 0.5 * (1 - A / B)
+        c_k = (5/3) * self.U
+        X = 0.5 * (1 - (self.Q / (self.W_w * self.S * self.dx * c_k)))
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
         K = self.dx / ((5 * self.U) / 3) # Wave celerity
