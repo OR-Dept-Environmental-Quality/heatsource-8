@@ -200,7 +200,7 @@ class StreamChannel(object):
 
         # Taken from the VB source.
         c_k = (5/3) * self.U # Wave celerity
-        X = 0.5 * (1 - ((self.prev_km.Q + self.GetInputs()) / (self.W_w * self.S * self.dx * c_k)))
+        X = 0.5 * (1 - ((self.Q + self.GetInputs()) / (self.W_w * self.S * self.dx * c_k)))
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
         K = self.dx / c_k
