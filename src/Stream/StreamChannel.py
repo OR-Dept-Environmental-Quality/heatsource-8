@@ -164,12 +164,12 @@ class StreamChannel(object):
         be called accordingly.
         """
         # (t, x-1) = flow from the upstream channel at this timestep
-        Q1 = self.prev_km.Q
+        Q1 = self.prev_km.Q + self.GetInputs()
         # Then we make sure it's been calculated- in case there's a problem with the code
         if Q1 is None: raise Exception("Previous channel of %s has no discharge calculation" % self)
 
         # (t-1, x-1) = flow from the upstream channel's previous timestep.
-        Q2 = self.prev_km.Q_prev
+        Q2 = self.prev_km.Q_prev + self.GetInputs()
         if Q2 is None: raise Exception("Previous channel of %s has no previous discharge calculation" % self)
 
         # (t-1, x) = flow from the previous timestep in this channel
@@ -214,8 +214,8 @@ class StreamChannel(object):
         self.CalcGeometry(Q_est)
         # Taken from the VB source.
 #        X = 0.5 * (1 - (Q_est / (self.W_w * self.S * self.dx * c_k)))
-        A = self.Q / (2 * self.W_w * self.S)
-        B = (5 / 3) * self.U * self.dx
+        A = (Q_est) / (2 * self.W_w * self.S)
+        B = c_k * self.dx
         X = 0.5 * (1 - A / B)
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
@@ -238,7 +238,7 @@ class StreamChannel(object):
         # remultiply by dx. We save a step here by only multiplying Q*dt and achieve the same
         # result (plus something like 3.5e-16 seconds too! :)
         # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
-        C4 = (self.GetInputs()*dt)/D
+        C4 = 0#(self.GetInputs()*dt)/D
         test = C1 + C2 + C3
 #        if test != 1:
 #            raise Exception("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self.km))
@@ -287,7 +287,7 @@ class StreamChannel(object):
         W = self.W_b
         # The function def is given in the HeatSource manual Sec 3.2... in three sections
         first = lambda x: x * (W + z * x) # Cross-sectional area formula
-        second = lambda x: x * ((W + z * x) / (W + 2 * x * math.sqrt(1+(z**2))))**(2/3) # Hydraulic Radius to the 2/3,
+        second = lambda x: (x * (W + z * x) / (W + 2 * x * math.sqrt(1+(z**2))))**(2/3) # Hydraulic Radius to the 2/3,
         # The functional definition of wetted depth:
         Fd = lambda x: first(x) * second(x) - ((Q_est*self.n)/(self.S**(1/2)))
         # Here is the formula in terms of x, where x is the wetted depth.
