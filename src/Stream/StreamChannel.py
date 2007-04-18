@@ -98,7 +98,7 @@ class StreamChannel(object):
             # Use (t,x-1) to calculate the Muskingum coefficients
             C1,C2,C3,C4 = self.GetMuskingum(Q1)
             # Calculate the new Q
-            Q = C1*Q1 + C2*Q2 + C3*Q3# + C4
+            Q = C1*Q1 + C2*Q2 + C3*Q3 + C4
 
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
@@ -119,7 +119,7 @@ class StreamChannel(object):
         try:
             self.Q_prev = self.Q or self.Q_bc[t,-1]
         except TypeError:
-            self.Q_prev = self.Q  or self.prev_km.Q_prev
+            self.Q_prev = self.Q  or Q
         self.Q = Q
 
         if Q < 0.0071: #Channel is going dry
@@ -208,15 +208,15 @@ class StreamChannel(object):
     def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
+        c_k = (5/3) * self.U # Wave celerity
 
         #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         self.CalcGeometry(Q_est)
         # Taken from the VB source.
-        c_k = (5/3) * self.U # Wave celerity
-        X = 0.5 * (1 - (Q_est / (self.W_w * self.S * self.dx * c_k)))
-#        A = self.Q / (2 * self.W_w * self.S)
-#        B = (5 / 3) * self.U * self.dx
-#        X = 0.5 * (1 - A / B)
+#        X = 0.5 * (1 - (Q_est / (self.W_w * self.S * self.dx * c_k)))
+        A = self.Q / (2 * self.W_w * self.S)
+        B = (5 / 3) * self.U * self.dx
+        X = 0.5 * (1 - A / B)
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
         K = self.dx / c_k
@@ -238,10 +238,10 @@ class StreamChannel(object):
         # remultiply by dx. We save a step here by only multiplying Q*dt and achieve the same
         # result (plus something like 3.5e-16 seconds too! :)
         # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
-        C4 = 0#(self.GetInputs()*dt)/D
+        C4 = (self.GetInputs()*dt)/D
         test = C1 + C2 + C3
-        if test != 1:
-            raise Exception("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self.km))
+#        if test != 1:
+#            raise Exception("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self.km))
         return C1, C2, C3, C4
 
 

@@ -11,6 +11,7 @@ class MainModel(object):
     def __init__(self, filename,log):
         self.Log = log
         self.filename = filename
+
     def Initialize(self):
         self.Log("Initializing Model")
         self.HS = HeatSourceInterface(self.filename,gauge=self.Log)
