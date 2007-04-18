@@ -241,7 +241,7 @@ class StreamChannel(object):
         C4 = 0#(self.GetInputs()*dt)/D
         test = C1 + C2 + C3
 #        if test != 1:
-#            raise Exception("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self.km))
+ #           raise Exception("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self.km))
         return C1, C2, C3, C4
 
 
