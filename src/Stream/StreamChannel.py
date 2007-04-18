@@ -28,6 +28,7 @@ class StreamChannel(object):
                     "d_bf", # Bankfull Depth, See below or HeatSource manual
                     "d_ave", # Average bankfull depth, calculated as W_bf/WD
                     "d_w", # Wetted depth. Calculated in GetWettedDepth()
+                    "d_w_prev", # Wetted depth for the previous timestep
                     "d_cont", # Control depth
                     "W_b", # Bottom width, calculated as W_bf - (2 * d_bf * z)
                     "W_w", # Wetted width, calculated as W_b + 2*z*d_w
@@ -71,7 +72,7 @@ class StreamChannel(object):
             Q -= self.E * self.dx * self.W_w
         return Q
 
-    def CalculateDischarge(self, t=None):
+    def CalculateDischarge(self):
         """Return the discharge for the current timestep
 
         This method uses the GetKnownDischarges() and GetMuskigum() methods to
@@ -87,10 +88,17 @@ class StreamChannel(object):
         the timestep in minutes, which cannot be None.
         """
         t = Chronos.TheTime
+        if self.km == 0.85:
+            pass
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
-            # Get the tuples for C and Q values, multiply the each C by the cooresponding Q, then sum it up
-            Q = sum(imap(lambda x,y:x*y,self.GetMuskingum(),self.GetKnownDischarges()))
+            # Get all of the discharges that we know about.
+            # In order, they are (t,x-1), (t-1,x-1), (t-1,x).
+            Q1,Q2,Q3 = self.GetKnownDischarges()
+            # Use (t,x-1) to calculate the Muskingum coefficients
+            C1,C2,C3,C4 = self.GetMuskingum(Q1)
+            # Calculate the new Q
+            Q = C1*Q1 + C2*Q2 + C3*Q3# + C4
 
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
@@ -119,11 +127,9 @@ class StreamChannel(object):
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
             return
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-        self.CalcGeometry()
-        self.CalcHyporheic()
-        if self.km == 0:
-            print self.km, Chronos.TheTime, self.Q
-        
+#        self.CalcGeometry()
+#        self.CalcHyporheic()
+
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
 
@@ -170,7 +176,7 @@ class StreamChannel(object):
         Q3 = self.Q_prev
         if Q3 is None: raise Exception("Channel %s has no previous discharge calculation" % self)
 
-        return Q1,Q2,Q3,1
+        return Q1,Q2,Q3
 
     def CalcGeometry(self, Q_est=None):
         """Calculate all morphological characteristics that are flow dependent
@@ -179,13 +185,18 @@ class StreamChannel(object):
         a depth value that is then used to calculate all depth dependent channel
         characteristics.
         """
-        Q_est = Q_est or self.Q
         # Set using control depth or GetWettedDepth
-        if self.d_cont:
-            dw = self.d_cont
+#        if self.d_cont:
+#            dw = self.d_cont
+#        else:
+        if not self.S: raise Exception("Must have a control depth with zero slope")
+        # If we're called using the upstream's discharge, use the upstream's depth
+        if Q_est:
+            dw = self.prev_km.d_w
+        # Otherwise, calculate a new depth based on our calculated discharge
         else:
-            if not self.S: raise Exception("Must have a control depth with zero slope")
-            dw = self.GetWettedDepth(Q_est)
+            Q_est = self.Q
+            dw = self.GetWettedDepth(self.Q)
 
         self.d_w = dw
         self.A = dw * (self.W_b + self.z*dw)
@@ -194,13 +205,18 @@ class StreamChannel(object):
         self.W_w = self.W_b + 2 * self.z * dw
         self.U = Q_est / self.A
 
-    def GetMuskingum(self, Q=None):
+    def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
 
+        #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
+        self.CalcGeometry(Q_est)
         # Taken from the VB source.
         c_k = (5/3) * self.U # Wave celerity
-        X = 0.5 * (1 - ((self.Q + self.GetInputs()) / (self.W_w * self.S * self.dx * c_k)))
+        X = 0.5 * (1 - (Q_est / (self.W_w * self.S * self.dx * c_k)))
+#        A = self.Q / (2 * self.W_w * self.S)
+#        B = (5 / 3) * self.U * self.dx
+#        X = 0.5 * (1 - A / B)
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
         K = self.dx / c_k
@@ -222,9 +238,10 @@ class StreamChannel(object):
         # remultiply by dx. We save a step here by only multiplying Q*dt and achieve the same
         # result (plus something like 3.5e-16 seconds too! :)
         # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
-        C4 = (self.GetInputs()*dt)/D
+        C4 = 0#(self.GetInputs()*dt)/D
         test = C1 + C2 + C3
-        if 1-test > 0.015: warn("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self))
+        if test != 1:
+            raise Exception("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self.km))
         return C1, C2, C3, C4
 
 
@@ -285,6 +302,7 @@ class StreamChannel(object):
         third = lambda x: (4 * (x**(5/3)) * (x*z+W)**(5/3) * math.sqrt(z**2+1)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(5/3)))
 
         Fdd = lambda x: first(x) + second(x) - third(x)
+        #TODO: Remove this secant derivative after debugging if it's not needed
         # This might not work, but as a first approximation for a secant-based derivative:
         #Fdd = lambda x: (Fd(x+0.001) - Fd(x))/0.001
         # The problem is that the NewtonRaphson method might be doing calculations based on fact that

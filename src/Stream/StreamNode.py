@@ -1,5 +1,5 @@
 from __future__ import division
-import math,wx
+import math, wx
 from warnings import warn
 from scipy.optimize.minpack import newton
 from Dieties.IniParams import IniParams
@@ -18,22 +18,22 @@ class StreamNode(StreamChannel):
     def __init__(self, **kwargs):
         StreamChannel.__init__(self)
         # Define members in __slots__ to ensure that later member names cannot be added accidentally
-        s = ["Embeddedness","Conductivity","ParticleSize",  # From Morphology Data sheet
-             "Topo","Latitude","Longitude","Elevation", # Geographic params
-             "FLIR_Temp","FLIR_Time", # FLIR data
-             "T_cont","T_sed","T_in","T_tribs", # Temperature attrs
-             "VHeight","VDensity","Overhang",  #Vegetation params
-             "Wind","Humidity","T_air","T_stream", # Continuous data
-             "Zone","T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
+        s = ["Embeddedness", "Conductivity", "ParticleSize", # From Morphology Data sheet
+             "Topo", "Latitude", "Longitude", "Elevation", # Geographic params
+             "FLIR_Temp", "FLIR_Time", # FLIR data
+             "T_cont", "T_sed", "T_in", "T_tribs", # Temperature attrs
+             "VHeight", "VDensity", "Overhang", #Vegetation params
+             "Wind", "Humidity", "T_air", "T_stream", # Continuous data
+             "Zone", "T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
              "Flux"
              ]
         # Set all the attributes to bare lists, or set from the constructor
         for attr in s:
             x = kwargs[attr] if attr in kwargs.keys() else None
-            setattr(self,attr,x)
+            setattr(self, attr, x)
         self.slots += s
-        for attr in ["Wind","Humidity","T_air","T_tribs","Q_tribs","T_stream"]:
-            setattr(self,attr,TimeList())
+        for attr in ["Wind", "Humidity", "T_air", "T_tribs", "Q_tribs", "T_stream"]:
+            setattr(self, attr, TimeList())
         self.Flux = {"Direct": [0]*8,
                      "Diffuse": [0]*8,
                      "Solar": [0]*8}
@@ -60,26 +60,26 @@ class StreamNode(StreamChannel):
 #        self.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
 
     def __eq__(self, other):
-        cmp = other.km if isinstance(other,StreamNode) else other
+        cmp = other.km if isinstance(other, StreamNode) else other
         return self.km == cmp
     def __ne__(self, other):
-        cmp = other.km if isinstance(other,StreamNode) else other
+        cmp = other.km if isinstance(other, StreamNode) else other
         return self.km != cmp
     def __gt__(self, other):
-        cmp = other.km if isinstance(other,StreamNode) else other
+        cmp = other.km if isinstance(other, StreamNode) else other
         return self.km > cmp
     def __lt__(self, other):
-        cmp = other.km if isinstance(other,StreamNode) else other
+        cmp = other.km if isinstance(other, StreamNode) else other
         return self.km < cmp
     def __ge__(self, other):
-        cmp = other.km if isinstance(other,StreamNode) else other
+        cmp = other.km if isinstance(other, StreamNode) else other
         return self.km >= cmp
     def __le__(self, other):
-        cmp = other.km if isinstance(other,StreamNode) else other
+        cmp = other.km if isinstance(other, StreamNode) else other
         return self.km <= cmp
     def GetZones(self):
         return self.Zone
-    def GetAttributes(self,zone=False):
+    def GetAttributes(self, zone=False):
         """Return a dictionary of all class attribute names and values
 
         This class returns a dictionary with keys that are the attribute name
@@ -98,7 +98,7 @@ class StreamNode(StreamChannel):
         """
         # Make a dictionary to return
         attrDict = {}
-        ignoreList = ["Zone","Chronos","Helios","IniParams","Log"]
+        ignoreList = ["Zone", "Chronos", "Helios", "IniParams", "Log"]
         # First we get all the attributes of __slots__
         for k in self.slots:
             if k in ignoreList: continue # Ignore the Zonator, clock, etc.
@@ -107,7 +107,7 @@ class StreamNode(StreamChannel):
             except AttributeError:
                 attrDict[k] = None
         if zone:
-            for k,v in self.GetZoneAttributes().iteritems():
+            for k, v in self.GetZoneAttributes().iteritems():
                 attrDict[k] = v
         return attrDict
     def GetZoneAttributes(self):
@@ -116,9 +116,9 @@ class StreamNode(StreamChannel):
         See GetAttributes() for details of the key format"""
         attrDict = {}
         # Expand the Zonator portion into the dictionary
-        for i,j,zone in self.Zone:
+        for i, j, zone in self.Zone:
             for attr in zone.__slots__:
-                k = "%i_%i_%s" %(i,j,attr)
+                k = "%i_%i_%s" %(i, j, attr)
                 attrDict[k] = getattr(zone, attr)
         return attrDict
     def Initialize(self):
@@ -132,10 +132,10 @@ class StreamNode(StreamChannel):
         dx = self.dx
         # Iterate down the stream channel, calculating the discharges
         self.CalculateDischarge()
-
+        print self, self.Q, Chronos.TheTime
         if self.W_w > self.W_bf:
-            self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
             if not IniParams.ChannelWidth:
+                self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
                 msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
                 dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
                 if dlg.ShowModal() == wx.ID_YES:
@@ -174,17 +174,17 @@ class StreamNode(StreamChannel):
         #======================================================
         #Calculate View to Sky
         VTS_Total = 0
-        for D,Z,zone in self.Zone:
+        for D, Z, zone in self.Zone:
             if Z == 0:
                 LC_Angle_Max = 0 #Set new value for each zone
                 OH = self.Overhang[D]
             else:
                 OH = 0
-            Dummy1 = self.Zone[D][Z].VHeight + (self.Zone[D][Z].Elevation - self.Elevation)
+            Dummy1 = zone.VHeight + (zone.Elevation - self.Elevation)
             Dummy2 = IniParams.TransSample * (Z - 0.5) - OH
             if Dummy2 <= 0:
                 Dummy2 = 0.0001
-            LC_Angle = (180 / math.pi) * math.atan(Dummy1 / Dummy2) * self.Zone[D][Z].VDensity
+            LC_Angle = (180 / math.pi) * math.atan(Dummy1 / Dummy2) * zone.VDensity
             if Z == 1:
                 LC_Angle_Max = LC_Angle
             if LC_Angle_Max < LC_Angle:
@@ -194,10 +194,12 @@ class StreamNode(StreamChannel):
 
     def CalcSolarFlux(self):
         #Like the others, taken from VB code unless otherwise noted
+        #TODO: This is a ridiculously long method. It should be cleaned up.
         #======================================================
         # Get the sun's altitude and azimuth:
         Azimuth, Altitude = Helios.CalcSolarPosition(self.Latitude, self.Longitude)
         # Helios calculates the julian date, so we lazily snag that calculation.
+        time = Chronos.TheTime
         JD = Chronos.JD
         # If it's night, we get out quick.
         if Altitude <= 0: #Nighttime
@@ -206,6 +208,15 @@ class StreamNode(StreamChannel):
             self.Flux["Diffuse"] = [0]*8
             self.Flux["Solar"] = [0]*8
             return #Nothing else to do, so ignore rest of method
+
+        #########################################################
+        ## A bunch of lists that the original VB code held things in.
+        ## This could be cleaned up, but I'm too lazy
+        LC_Distance = [0]*4
+        Rip_Extinct = [0]*4
+        Path = [0]*4
+        Shade_Density = [0]*4
+
         #######################################
         #   Solar_Constant = kj/m2*hr
         #   Air_Mass = Optical air mass thickness
@@ -245,16 +256,14 @@ class StreamNode(StreamChannel):
             Topo_Alt = self.Topo['W']
         #======================================================
         #Calculate Land Cover Horizontal Spacing
-        #TODO: Figure out the purpose of this and correct it.
-#        for i,j,Zone in zonator:
-#            if i == 0: continue
-#            self.LC_TotElev = theVHeight(Node, Zone, Direction) + theSlopeHeight(Node, Zone, Direction)
-#            if Zone == 1:
-#                self.LC_Distance = IniParams.TransSample * (Zone - 0.5) - theOverHang(Node, Direction)
-#            else
-#                self.LC_Distance = IniParams.TransSample * (Zone - 0.5)
-#            if self.LC_Distance < 0:
-#                self.LC_Distance = 0.00001
+        for i in xrange(4):
+            LC_TotElev = self.Zone[Direction][i].VHeight + self.Zone[Direction][i].Elevation - self.Elevation
+            if not i:
+                LC_Distance[i] = IniParams.TransSample * (i - 0.5) - self.Overhang[Direction]
+            else:
+                LC_Distance[i] = IniParams.TransSample * (i - 0.5)
+            if self.LC_Distance[i] < 0:
+                self.LC_Distance[i] = 0.00001
         #############################################################
         #Route solar radiation to the stream surface
         #   Flux_Solar(x) and Flux_Diffuse = Solar flux at various positions
@@ -266,31 +275,24 @@ class StreamNode(StreamChannel):
         #       5 - Entering Stream
         #       6 - Received by Water Column
         #       7 - Received by Bed
-        self.CalcFlux0(Altitude)
-        self.CalcFlux1(Altitude)
-
-    def CalcFlux0(self, Altitude):
+        ########################################################
         #======================================================
         # 0 - Edge of atmosphere
         # TODO: Original VB code's JulianDay calculation:
         # JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - Helios.JD + Chronos.TheTime.hour / 24))
+        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - Helios.JD + time.hour / 24))
         Solar_Constant = 1367 #W/m2
         self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(math.radians(Altitude)) #Global Direct Solar Radiation
         self.Flux["Diffuse"][0] = 0
-    def CalcFlux1(self, Altitude):
-        time = Chronos.TheTime
-        print time, Chronos.start, time < Chronos.start
-        if time < Chronos.start:
-            time = Chronos.start
+        ########################################################
         #======================================================
         # 1 - Above Topography
         Dummy1 = 35 / math.sqrt(1224 * math.sin(math.radians(Altitude)) + 1)
         Air_Mass = Dummy1 * math.exp(-0.0001184 * self.Zone[0][1].Elevation)
-        Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (Chronos.JD + 10)) + 0.8
+        Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (JD + 10)) + 0.8
         #Calculate Diffuse Fraction
-        self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time,-1] ** 2)
+        self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
         if self.Flux["Direct"][0] == 0:
             Clearness_Index = 1
         else:
@@ -299,80 +301,84 @@ class StreamNode(StreamChannel):
         Dummy1 = 0.938 + 1.071 * Clearness_Index
         Dummy2 = 5.14 * (Clearness_Index ** 2)
         Dummy3 = 2.98 * (Clearness_Index ** 3)
-        Dummy4 = math.sin(2 * math.pi * (Chronos.JD - 40) / 365)
+        Dummy4 = math.sin(2 * math.pi * (JD - 40) / 365)
         Dummy5 = (0.009 - 0.078 * Clearness_Index)
         Diffuse_Fraction = Dummy1 - Dummy2 + Dummy3 - Dummy4 * Dummy5
         self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
-        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[time,-1] ** 2)
-#    def CalcFlux2(self):
-#        #======================================================
-#        #2 - Above Land Cover
-#        pass
-#    def CalcFlux3(self):
-#        #3 - Above Stream Surface (Above Bank Shade)
-#        if Altitude <= Topo_Alt:    #>Topographic Shade IS Occurring<
-#            Flag_Topo = 1
-#            self.Flux["Direct"][2] = 0
-#            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (self.Topo["E"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3)
-#            self.Flux["Direct"][3] = 0
-#            self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.View_To_Sky
-#        else:  #>Topographic Shade is NOT Occurring<
-#            self.Flux["Direct"][2] = self.Flux["Direct"][1]
-#            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - (self.Topo["W"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3))
-#            Dummy1 = self.Flux["Direct"][2]
-#            for i,j,Zone in zonator:# = 4 To 1 Step -1 #Calculate shade density and self.Flux["Direct"][3]
-#                if i != Direction: continue
-#                LC_ShadowLength = (zone[Direction][j].VHeight + zone[Direction][j].SlopeHeight) / math.tan(Altitude * math.pi / 180) #Vegetation Shadow Casting
-#                if LC_ShadowLength >= LC_Distance: #Veg Shade IS Occurring
-#                    Path(Zone) = Dx_lc / math.cos(Altitude * math.pi / 180)
-#                    if zone[Direction][j].VDensity == 1:
-#                        Rip_Extinct(Zone) = 1
-#                        Shade_Density(Zone) = 1
-#                    else:
-#                        Rip_Extinct(Zone) = -Log(1 - zone[Direction][j].VDensity) / 10
-#                        Shade_Density(Zone) = 1 - Exp(-Rip_Extinct(Zone) * Path(Zone))
-#                else: #Veg Shade IS NOT Occurring
-#                    Shade_Density(Zone) = 0
-#                Dummy1 = Dummy1 * (1 - Shade_Density(Zone))
-#            self.Flux["Direct"][3] = Dummy1
-#            self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.View_To_Sky
-#    def CalcFlux4(self):
-#        #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#        #4 - Above Stream Surface (What a Solar Pathfinder measures)
-#        #Account for bank shade
-#        if Flag_Topo == 0:
-#            for Zone = 4 To 1 Step -1 #Calculate bank shade and self.Flux["Direct"][4]
-#                DEM_ShadowLength = zone[Direction][j].SlopeHeight / math.tan(Altitude * math.pi / 180) #Bank Shadow Casting
-#                if DEM_ShadowLength >= self.LC_Distance: #Bank Shade is Occurring
-#                    self.Flux["Direct"][4] = 0
-#                    self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
-#                else:
-#                    self.Flux["Direct"][4] = self.Flux["Direct"][3]
-#                    self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
-#        else:
-#            self.Flux["Direct"][4] = 0
-#            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
-#        #Account for emergent vegetation
-#        if Flag_Emergent == 1:
-#            Path(0) = zone[Direction][j].VHeight / Sin(Altitude * math.pi / 180)
-#            if Path(0) > Width_B(Node):
-#                Path(0) = theWidth_B(Node)
-#            if zone[0][0].VDensity = 1 Then
-#                zone[0][0].VDensity = 0.9999
-#                Rip_Extinct(0) = 1
-#                Shade_Density(0) = 1
-#            elif zone[0][0].VDensity = 0 Then
-#                zone[0][0].VDensity = 0.00001
-#                Rip_Extinct(0) = 0
-#                Shade_Density(0) = 0
-#            else:
-#                Rip_Extinct(0) = -Log(1 - zone[0][0].VDensity) / 10
-#                Shade_Density(0) = 1 - Exp(-Rip_Extinct(0) * Path(0))
-#            self.Flux["Direct"][4] = self.Flux["Direct"][4] * (1 - Shade_Density(0))
-#            Path(0) = zone[0][0].VHeight
-#            Rip_Extinct(0) = -Log(1 - zone[0][0].VDensity) / zone[0][0].VHeight
-#            Shade_Density(0) = 1 - Exp(-Rip_Extinct(0) * Path(0))
-#            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density(0))
+        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
+        ########################################################
+        #======================================================
+        #2 - Above Land Cover
+        # Empty
+        ########################################################
+        #======================================================
+        #3 - Above Stream Surface (Above Bank Shade)
+        if Altitude <= Topo_Alt:    #>Topographic Shade IS Occurring<
+            Flag_Topo = True
+            self.Flux["Direct"][2] = 0
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (self.Topo["E"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3)
+            self.Flux["Direct"][3] = 0
+            self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.View_To_Sky
+        else:  #>Topographic Shade is NOT Occurring<
+            Flag_Topo = False
+            self.Flux["Direct"][2] = self.Flux["Direct"][1]
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - (self.Topo["W"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3))
+            Dummy1 = self.Flux["Direct"][2]
+            for i in xrange(4): #Calculate shade density and self.Flux["Direct"][3]
+                zone = self.Zone[Direction][i]
+                LC_ShadowLength = (zone.VHeight + zone.Elevation-self.Elevation) / math.tan(math.radians(Altitude)) #Vegetation Shadow Casting
+                if LC_ShadowLength >= LC_Distance[i]: #Veg Shade IS Occurring
+                    Path = Dx_lc / math.cos(math.radians(Altitude))
+                    if zone.VDensity == 1:
+                        Rip_Extinct[i] = 1
+                        Shade_Density[i] = 1
+                    else:
+                        Rip_Extinct[i] = -math.log(1 - zone.VDensity) / 10
+                        Shade_Density[i] = 1 - math.exp(-Rip_Extinct[i] * Path[i])
+                else: #Veg Shade IS NOT Occurring
+                    Shade_Density[i] = 0
+                Dummy1 = Dummy1 * (1 - Shade_Density[i])
+            self.Flux["Direct"][3] = Dummy1
+            self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.View_To_Sky
+        ###########################################################
+        #==========================================================
+        #4 - Above Stream Surface (What a Solar Pathfinder measures)
+        #Account for bank shade
+        if not Flag_Topo:
+            for i in xrange(3,-1,-1): #VB Code goes backwards for some reason to Calculate bank shade and self.Flux["Direct"][4]
+                DEM_ShadowLength = (zone.Elevation - self.Elevation) / math.tan(math.radians(Altitude)) #Bank Shadow Casting
+                if DEM_ShadowLength >= LC_Distance[i]: #Bank Shade is Occurring
+                    self.Flux["Direct"][4] = 0
+                    self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+                else:
+                    self.Flux["Direct"][4] = self.Flux["Direct"][3]
+                    self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+        else:
+            self.Flux["Direct"][4] = 0
+            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+        #Account for emergent vegetation
+        if Flag_Emergent == 1:
+            Path[0] = zone[0][0].VHeight / math.sin(math.radians(Altitude))
+            if Path[0] > self.W_b:
+                Path[0] = self.W_b
+            if zone[0][0].VDensity == 1:
+                zone[0][0].VDensity = 0.9999
+                Rip_Extinct[0] = 1
+                Shade_Density[0] = 1
+            elif zone[0][0].VDensity == 0:
+                zone[0][0].VDensity = 0.00001
+                Rip_Extinct[0] = 0
+                Shade_Density[0] = 0
+            else:
+                Rip_Extinct[0] = -math.log(1 - zone[0][0].VDensity) / 10
+                Shade_Density[0] = 1 - math.exp(-Rip_Extinct[0] * Path[0])
+            self.Flux["Direct"][4] = self.Flux["Direct"][4] * (1 - Shade_Density[0])
+            Path[0] = zone[0][0].VHeight
+            Rip_Extinct[0] = -math.log(1 - zone[0][0].VDensity) / zone[0][0].VHeight
+            Shade_Density[0] = 1 - math.exp(-Rip_Extinct[0] * Path[0])
+            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density[0])
+
+        raise Exception("Debug Breakpoint")
 #    def CalcFlux5(self):
 #        #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #        #5 - Entering Stream

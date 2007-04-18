@@ -41,6 +41,29 @@ def NewtonRaphson(f, df, a, b, tol=1.0e-5, maxiter=30):
     #print x, abs(dx), tol + max(abs(b), 1.0)
     raise Exception("No convergences when calculating NewtonRaphson, is there a code problem?")
 
+def NewtonRaphsonSecant(Fy):
+    iterations = 1000
+    Convergence = 10000
+    dy = 0.001
+    while True:
+        y = y if y else 10
+        data2.append(y)
+        Fy = Yj(y)
+#        print Fy, y,
+        y += dy
+        Fyy = Yj(y)
+#        print Fyy, y
+        dFy = (Fyy - Fy) / dy
+        if y < 0 or y > 1e10 or iterations > 500:
+          y = random.randint(1,100)
+          Converge = 10
+          iterations = 0
+        Converge = abs(Fy/dFy)
+        if Converge < 0.001:
+            print "y is ", y
+            break
+        iterations += 1
+        print y
 
 ##########################################################################
 ### Older version of Newton Raphson tests using SciPy and the secant method
@@ -69,24 +92,6 @@ def NewtonRaphson(f, df, a, b, tol=1.0e-5, maxiter=30):
 #def Q(dw): return (1/n)*A(dw)*(Rh(dw)**(2/3))*(S**(1/2))
 #def Yj(dw): return A(dw)*(Rh(dw)**(2/3))-((Q(dw)*n)/(S**(1/2)))
 #
-#def manual(y):
-#  while True:
-#    y = y if y else 10
-#    data2.append(y)
-#    Fy = Yj(y)
-#    print Fy, y,
-#    y += dy
-#    Fyy = Yj(y)
-#    print Fyy, y
-#    dFy = (Fyy - Fy) / dy
-#    if y < 0 or y > 1e10 or iterations > 500:
-#      y = random.randint(1,100)
-#      Converge = 10
-#      iterations = 0
-#    Converge = abs(Fy/dFy)
-#    if Converge < 0.001: break
-#    iterations += 1
-#  print data2
 #
 #def func(dw):
 #  global data

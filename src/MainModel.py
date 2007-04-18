@@ -29,11 +29,14 @@ class MainModel(object):
         max = len(Chronos)
         n = 0
         for t in Chronos:
-            self.Log("Running...",n,max)
+#            self.Log("Running...",n,max)
+            self.Log("Timestep: %i" % n)
             try:
-                for node in self.Reach:
+                for node in self.Reach[:-1]:
                     node.CalcHydraulics()
                     #node.CalcSolarFlux()
+                for node in self.Reach[:-1]:
+                    node.CalcGeometry()
             except:
                 raise
                 return False
