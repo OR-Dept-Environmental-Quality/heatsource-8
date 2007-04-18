@@ -185,18 +185,14 @@ class StreamChannel(object):
         a depth value that is then used to calculate all depth dependent channel
         characteristics.
         """
+        Q_est = Q_est or self.Q
         # Set using control depth or GetWettedDepth
-#        if self.d_cont:
-#            dw = self.d_cont
-#        else:
-        if not self.S: raise Exception("Must have a control depth with zero slope")
-        # If we're called using the upstream's discharge, use the upstream's depth
-        if Q_est:
-            dw = self.prev_km.d_w
-        # Otherwise, calculate a new depth based on our calculated discharge
+        if self.d_cont:
+            dw = self.d_cont
         else:
-            Q_est = self.Q
-            dw = self.GetWettedDepth(self.Q)
+            if not self.S: raise Exception("Must have a control depth with zero slope")
+            # If we're called using the upstream's discharge, use the upstream's depth
+            dw = self.GetWettedDepth(Q_est)
 
         self.d_w = dw
         self.A = dw * (self.W_b + self.z*dw)
