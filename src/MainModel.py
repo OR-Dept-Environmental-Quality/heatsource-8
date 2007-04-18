@@ -18,7 +18,7 @@ class MainModel(object):
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
         ##########################################################
         # Create a Chronos iterator that controls all model time
-        dt = timedelta(minutes=IniParams.dt)
+        dt = timedelta(seconds=IniParams.dt)
         start = Chronos.MakeDatetime(IniParams.Date)
         stop = start + timedelta(days=IniParams.SimPeriod)
         spin = 0 # IniParams.FlushDays # Spin up period
@@ -32,15 +32,19 @@ class MainModel(object):
 #            self.Log("Running...",n,max)
             self.Log("Timestep: %i" % n)
             try:
-                for node in self.Reach[:-1]:
+                for node in self.Reach:
                     node.CalcHydraulics()
                     #node.CalcSolarFlux()
-                for node in self.Reach[:-1]:
-                    node.CalcGeometry()
+#                for node in self.Reach:
+#                    d = node.GetAttributes()
+#                    for attr in ['self.d_w', 'self.A', 'self.P_w', 'self.R_h', 'self.W_w', 'self.U']:
+
+#                    node.CalcGeometry()
             except:
                 raise
                 return False
             n+=1
+#            raise Exception()
         return True
     def Stop(self):
         pass

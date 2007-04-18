@@ -44,7 +44,7 @@ class HeatSourceInterface(DataSheet):
         IP = IniParams
         IP.Name = self.GetValue("I2")
         IP.Date = self.GetValue("I3")
-        IP.dt = self.GetValue("I4")
+        IP.dt = self.GetValue("I4")*60
         IP.dx = self.GetValue("I5")
         IP.Length = self.GetValue("I6")
         IP.LongSample = self.GetValue("I7")

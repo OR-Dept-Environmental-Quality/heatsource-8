@@ -127,7 +127,7 @@ class StreamChannel(object):
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
             return
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-#        self.CalcGeometry()
+        self.CalcGeometry()
 #        self.CalcHyporheic()
 
     def CalcHydroStability(self):

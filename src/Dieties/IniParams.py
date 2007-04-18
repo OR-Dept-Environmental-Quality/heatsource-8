@@ -12,9 +12,9 @@ class IniParamsDiety(Singleton):
     def __init__(self,**kwargs):
         d = {'Name': None,
              'Date': None,
-             'dt': None,
-             'dx': None,
-             'Length': None,
+             'dt': None, # This time should be in seconds.
+             'dx': None, # This should be in meters
+             'Length': None, # kilometers
              'LongSample': None,
              'TransSample': None,
              'InflowSites': None,
