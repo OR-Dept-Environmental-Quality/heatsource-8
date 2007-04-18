@@ -287,7 +287,7 @@ class StreamChannel(object):
         W = self.W_b
         # The function def is given in the HeatSource manual Sec 3.2... in three sections
         first = lambda x: x * (W + z * x) # Cross-sectional area formula
-        second = lambda x: (x * (W + z * x) / (W + 2 * x * math.sqrt(1+(z**2))))**(2/3) # Hydraulic Radius to the 2/3,
+        second = lambda x: (first(x) / (W + 2 * x * math.sqrt(1+z**2)))**(2/3) # Hydraulic Radius to the 2/3,
         # The functional definition of wetted depth:
         Fd = lambda x: first(x) * second(x) - ((Q_est*self.n)/(self.S**(1/2)))
         # Here is the formula in terms of x, where x is the wetted depth.
