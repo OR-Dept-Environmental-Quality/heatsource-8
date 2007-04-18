@@ -14,8 +14,9 @@ class MainModel(object):
 
     def Initialize(self):
         self.Log("Initializing Model")
-        self.HS = HeatSourceInterface(self.filename,gauge=self.Log)
-        self.Reach = self.HS.Reach
+        HS = HeatSourceInterface(self.filename,gauge=self.Log)
+        self.Reach = HS.Reach
+        del HS
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
         ##########################################################
         # Create a Chronos iterator that controls all model time
