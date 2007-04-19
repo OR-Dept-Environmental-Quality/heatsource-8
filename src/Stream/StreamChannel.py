@@ -193,7 +193,8 @@ class StreamChannel(object):
             if not self.S: raise Exception("Must have a control depth with zero slope")
             # If we're called using the upstream's discharge, use the upstream's depth
             dw = self.GetWettedDepth(Q_est)
-
+        
+        print self.km, Q_est, dw
         self.d_w = dw
         self.A = dw * (self.W_b + self.z*dw)
         self.P_w = self.W_b + 2 * dw * math.sqrt(1+self.z**2)
@@ -293,9 +294,9 @@ class StreamChannel(object):
         # to do it myself or anything.
 
         # Here is the derivative of the equation in sections.
-        first = lambda x: (5 * (x**(2/3)) * (x*z+W)**(5/3)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(2/3)))
+        first = lambda x: (5 * (x**(2/3)) * ((x*z+W)**(5/3))) / (3*((2*x*math.sqrt((z**2)+1)+W)**(2/3)))
         second = lambda x: (5 * (x**(5/3)) * z * ((x*z+W)**(2/3))) / (3*((2*x*math.sqrt((z**2)+1)+W)**(2/3)))
-        third = lambda x: (4 * (x**(5/3)) * (x*z+W)**(5/3) * math.sqrt(z**2+1)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(5/3)))
+        third = lambda x: (4 * (x**(5/3)) * ((x*z+W)**(5/3)) * math.sqrt(z**2+1)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(5/3)))
 
         Fdd = lambda x: first(x) + second(x) - third(x)
         #TODO: Remove this secant derivative after debugging if it's not needed
