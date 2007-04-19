@@ -132,7 +132,6 @@ class StreamNode(StreamChannel):
         dx = self.dx
         # Iterate down the stream channel, calculating the discharges
         self.CalculateDischarge()
-        print self, self.Q, Chronos.TheTime
         if self.W_w > self.W_bf:
             if not IniParams.ChannelWidth:
                 self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))

@@ -128,8 +128,10 @@ class HSFrame(sc.SizedFrame):
 
         ################################
         ## debugging conveniences
-        #self.FileName = "D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls"
-        self.FileName = "D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC.xls"
+#        self.FileName = "D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls"
+#        self.FileName = "D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC.xls"
+        self.FileName = "C:\\eclipse\\HeatSource\\Toketee_CCC.xls"
+#        self.FileName = "C:\\eclipse\\HeatSource\\Jackson_CCC.xls"
         self.OnLoadFile(True)
         self.OnStartStop(True)
 

@@ -87,7 +87,7 @@ class HeatSourceInterface(DataSheet):
 # TODO: Uncomment after debugging
 #        self.ScanMorphology()
         self.BuildStreamNodes()
-        self.GetInflowData()
+#        self.GetInflowData()
         self.GetContinuousData()
         n = 1
         for i in self.Reach:
