@@ -212,15 +212,14 @@ class StreamChannel(object):
     def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
-        c_k = (5/3) * self.U # Wave celerity
+        c_k = (5/3) * self.U#(Q_est/self.A) # Wave celerity
 
         #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         self.CalcGeometry(Q_est)
         # Taken from the VB source.
-        X = 0.5 * (1 - (Q_est / (self.W_w * self.S * self.dx * c_k)))
-        A = (Q_est) / (2 * self.W_w * self.S)
-        B = c_k * self.dx
-#        X = 0.5 * (1 - A / B)
+        den = (self.W_w * self.S * self.dx * c_k)
+#        den *= 2
+        X = 0.5 * (1 - Q_est / den)
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
         K = self.dx / c_k
