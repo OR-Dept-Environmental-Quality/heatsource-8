@@ -33,7 +33,7 @@ class IniParamsDiety(Singleton):
              'Emergent': False,# IV5
              'Penman': False, # IU1 and IT1. Here, True:Penman Combination method, False: Jobson Wind Method
              'DryChannel': False, # Flag in original code to tell us whether we accept dry channels?
-             'ChannelWidth': False # Flag meaning we know that our channel widths are over bounding.
+             'ChannelWidth': True # Flag meaning we know that our channel widths are over bounding.
              }
         # If any of these are in the constructor, replace the values with them.
         for key in d.keys():

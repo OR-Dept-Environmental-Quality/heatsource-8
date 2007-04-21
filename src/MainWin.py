@@ -191,7 +191,7 @@ class HSFrame(sc.SizedFrame):
 class HSApp(wx.App):
     def OnInit(self):
         self.frame = HSFrame()
-        self.frame.Show()
+#        self.frame.Show()
         return True
 
 if __name__ == "__main__":

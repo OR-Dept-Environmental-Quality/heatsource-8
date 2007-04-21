@@ -246,7 +246,7 @@ class HeatSourceInterface(DataSheet):
         for cond in ["Q_bc","T_bc"]:
             setattr(self.Reach[0],cond,getattr(self,cond))
         # We also need to reset the dx of the first node, since it's of a shorter length:
-        self.Reach[0].dx = dx#IniParams.LongSample # Set it to the length of the sample rate
+        self.Reach[0].dx = IniParams.LongSample # Set it to the length of the sample rate
         # Now, the meat. Most of the nodes will be developed as some multiple of the longitudinal
         # sample rate. Here, we figure out what that multiple is and append stream nodes for all
         # of the samples.

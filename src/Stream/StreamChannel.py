@@ -105,7 +105,8 @@ class StreamChannel(object):
             try:
                 Q = self.Q_bc[t,-1]*1 # Get the value at this time, or the closest previous time
             except:
-                if Chronos.TheTime < Chronos.MakeDatetime(IniParams.Date):
+                date = Chronos.MakeDatetime(IniParams.Date)
+                if Chronos.TheTime < date:
                     Q = self.Q_bc[0]*1 #Multiplying by 1 turns it into a true Python float
                 else: raise
             # TODO: Might want some error checking here.
@@ -117,6 +118,8 @@ class StreamChannel(object):
 
 #        Q = round(Q,5) # Numerical Stability hack
 
+        if Q != 0.53:
+            pass
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         try:
@@ -181,7 +184,8 @@ class StreamChannel(object):
         Q3 = self.Q_prev
         if Q3 is None: raise Exception("Channel %s has no previous discharge calculation" % self)
 
-        return Q1,Q2,Q3
+        V = lambda x:x# * self.dt
+        return V(Q1), V(Q2), V(Q3)
 
     def CalcGeometry(self, Q_est=None):
         """Calculate all morphological characteristics that are flow dependent
@@ -190,17 +194,19 @@ class StreamChannel(object):
         a depth value that is then used to calculate all depth dependent channel
         characteristics.
         """
-        # Set using control depth or GetWettedDepth
-        if self.d_cont:
-            dw = self.d_cont
-            Q_est = self.Q
-        else:
-            if not self.S: raise Exception("Must have a control depth with zero slope")
-            # If we're called using the upstream's discharge, use the upstream's depth
-            if Q_est: dw = self.prev_km.d_w
-            else:
-                Q_est = self.Q
-                dw = self.GetWettedDepth(self.Q)
+        Q_est = Q_est or self.Q
+        dw = self.GetWettedDepth(Q_est)
+#        # Set using control depth or GetWettedDepth
+#        if self.d_cont:
+#            dw = self.d_cont
+#            Q_est = self.Q
+#        else:
+#            if not self.S: raise Exception("Must have a control depth with zero slope")
+#            # If we're called using the upstream's discharge, use the upstream's depth
+#            if Q_est: dw = self.prev_km.d_w
+#            else:
+#                Q_est = self.Q
+#                dw = self.GetWettedDepth(self.Q)
 
         self.d_w = dw
         self.A = dw * (self.W_b + self.z*dw)
@@ -214,23 +220,23 @@ class StreamChannel(object):
         using current timestep and optional discharge"""
         c_k = (5/3) * self.U#(Q_est/self.A) # Wave celerity
 
-        #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         self.CalcGeometry(Q_est)
+        #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         # Taken from the VB source.
         den = (self.W_w * self.S * self.dx * c_k)
 #        den *= 2
         X = 0.5 * (1 - Q_est / den)
         if X > 0.5: X = 0.5
-        elif X < 0.0: X = 0.0
+        elif X < 0.0:
+            X = 0.0
         K = self.dx / c_k
         dt = self.dt
 
         # Check the celerity to ensure stability. These tests are from the VB code.
-        test = 2 * K * (1 - X)
-        V_storage = (K * self.Q) + K * X * (self.prev_km.Q_prev - self.Q)
-        V_reach = V_storage + (self.prev_km.Q * self.dt)
-        if V_reach < 0 or dt > test or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
-            raise Exception("Unstable timestep. dt should be less than %0.3f" % test/60)
+        test0 = 2 * K * X
+        test1 = 2 * K * (1 - X)
+        if dt >= test1 or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
+            raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
 
         # These calculations are from Chow's "Applied Hydrology"
         D = 2 * K * (1 - X) + dt

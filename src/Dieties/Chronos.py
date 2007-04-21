@@ -37,14 +37,16 @@ class ChronosDiety(Singleton):
         self.__dt = dt or self.minute
         self.__stop = stop or self.__start + self.year
         self.__spin = timedelta(days=spin)
+        self.__current = self.__start - self.__spin if self.__spin else self.__start
 
+    def Tick(self):
+        self.__current += self.__dt
     def __iter__(self):
         if not self.__start or not self.__dt:
             raise Exception("Must call %s with the Start() method before using." % self.__class__.__name__)
         # We set current to one behind the starttime, because we
         # increment BEFORE we yield the iterator value, that way
         # the current time is current until it's updated in the outer world.
-        self.__current = self.__start - self.__spin if self.__spin else self.__start
         while self.__current <= self.__stop:
             yield self.__current
             self.__current += self.__dt

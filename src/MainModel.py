@@ -1,11 +1,22 @@
 from __future__ import division
 from datetime import datetime, timedelta
-import time, sys
+import time, sys, wx, random
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties.Helios import Helios
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
+from Utils.DynaPlot import DynaPlot, TIMER_ID
+
+global app
+
+class TimeStepper(wx.Timer):
+    def __init__(self, cb):
+        wx.Timer.__init__(self)
+        self.cb = cb
+
+    def Notify(self):
+        self.cb()
 
 class MainModel(object):
     def __init__(self, filename,log):
@@ -14,10 +25,16 @@ class MainModel(object):
 
     def Initialize(self):
         self.Log("Initializing Model")
-        HS = HeatSourceInterface(self.filename,gauge=self.Log)
-        self.Reach = HS.Reach
-        del HS
+        self.Reach = HeatSourceInterface(self.filename,gauge=self.Log).Reach
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
+        self.DPlot = DynaPlot()
+        self.PlotAttr = "Q" # Attribute to plot at the reach level
+        self.X = [n.km for n in self.Reach]
+        self.Y = [0 for i in xrange(len(self.Reach))]
+        self.DPlot.Show()
+        self.DPlot.Initialize(self.X, self.Y)
+        self.timer = TimeStepper(self.TimeStep)
+    def Reset(self):
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams.dt)
@@ -28,25 +45,23 @@ class MainModel(object):
         Chronos.Start(start, dt, stop, spin)
         ##########################################################
     def Run(self):
-        max = len(Chronos)
-        n = 0
-        for t in Chronos:
-#            self.Log("Running...",n,max)
-            self.Log("Timestep: %i" % n)
-            try:
-                for node in self.Reach:
-                    node.CalcHydraulics()
-                    #node.CalcSolarFlux()
-#                for node in self.Reach:
-#                    d = node.GetAttributes()
-#                    for attr in ['self.d_w', 'self.A', 'self.P_w', 'self.R_h', 'self.W_w', 'self.U']:
+        self.Reset()
+        self.timer.Start(100)
 
-#                    node.CalcGeometry()
-            except:
-                raise
-                return False
-            n+=1
-#            raise Exception()
-        return True
+    def TimeStep(self):
+        try:
+            del self.Y[:]
+            # Calculate the hydraulics
+            map(lambda x:x.CalcHydraulics(), self.Reach)
+            [self.Y.append(getattr(node,self.PlotAttr)) for node in self.Reach]
+            # Calculate the solar flux
+            map(lambda x:x.CalcSolarFlux(), self.Reach)
+            self.DPlot.onTimer(False)
+            Chronos.Tick()
+            return True
+        except:
+            self.Stop()
+            raise
+
     def Stop(self):
-        pass
+        self.timer.Stop()
