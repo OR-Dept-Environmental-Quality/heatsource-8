@@ -183,6 +183,7 @@ class StreamNode(StreamChannel):
             Dummy2 = IniParams.TransSample * (Z - 0.5) - OH
             if Dummy2 <= 0:
                 Dummy2 = 0.0001
+            #TODO: The following seems to be already in degrees, so why are we multiplying by 180/pi
             LC_Angle = (180 / math.pi) * math.atan(Dummy1 / Dummy2) * zone.VDensity
             if Z == 1:
                 LC_Angle_Max = LC_Angle
@@ -378,54 +379,52 @@ class StreamNode(StreamChannel):
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density[0])
 
         raise Exception("Debug Breakpoint")
-#    def CalcFlux5(self):
-#        #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#        #5 - Entering Stream
-#        if self.Solar.Zenith > 80:
-#            Stream_Reflect = 0.0515 * (self.Solar.Zenith) - 3.636
-#        else:
-#            Stream_Reflect = 0.091 * (1 / math.cos(self.Solar.Zenith * math.pi / 180)) - 0.0386
-#        if abs(Stream_Reflect) > 1:
-#            Stream_Reflect = 0.0515 * (self.Solar.Zenith * math.pi / 180) - 3.636
-#        if abs(Stream_Reflect) > 1:
-#            Stream_Reflect = 0.091 * (1 / self.cos(self.Solar.Zenith * math.pi / 180)) - 0.0386
-#        self.Flux["Diffuse"][5] = self.Flux["Diffuse"][4] * 0.91
-#        self.Flux["Direct"][5] = self.Flux["Direct"][4] * (1 - Stream_Reflect)
-#    def CalcFlux6(self):
-#        #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-#        #6 - Received by Water Column
-#        pass
-#    def CalcFlux7(self):
-#        #7 - Received by Bed
-#        Dummy = math.atn((math.sin(self.Solar.Zenith * math.pi / 180) / 1.3333) / math.sqrt(-(math.sin(self.Solar.Zenith * math.pi / 180) / 1.3333) * (math.sin(self.Solar.Zenith * math.pi / 180) / 1.3333) + 1))
-#        Water_Path = theDepth(Node, 1) / math.cos(Dummy) #Jerlov (1976)
-#        Trans_Stream = 0.415 - (0.194 * math.log10(Water_Path * 100))
-#        if Trans_Stream > 1:
-#            Trans_Stream = 1
-#        Dummy1 = self.Flux["Direct"][5] * (1 - Trans_Stream)       'Direct Solar Radiation attenuated on way down
-#        Dummy2 = self.Flux["Direct"][5] - Dummy1                   'Direct Solar Radiation Hitting Stream bed
-#        Bed_Reflect = math.exp(0.0214 * (self.Solar.Zenith * math.pi / 180) - 1.941)   'Reflection Coef. for Direct Solar
-#        BedRock = 1 - thePorosity
-#        Dummy3 = Dummy2 * (1 - Bed_Reflect)                'Direct Solar Radiation Absorbed in Bed
-#        Dummy4 = 0.53 * BedRock * Dummy3                   'Direct Solar Radiation Immediately Returned to Water Column as Heat
-#        Dummy5 = Dummy2 * Bed_Reflect                      'Direct Solar Radiation Reflected off Bed
-#        Dummy6 = Dummy5 * (1 - Trans_Stream)               'Direct Solar Radiation attenuated on way up
-#        self.Flux["Direct"][6] = Dummy1 + Dummy4 + Dummy6
-#        self.Flux["Direct"][7] = Dummy3 - Dummy4
-#        Trans_Stream = 0.415 - (0.194 * math.log10(100 * theDepth(Node, 1)))
-#        if Trans_Stream > 1:
-#            Trans_Stream = 1
-#        if Trans_Stream > 1:
-#            Trans_Stream = 1
-#        Dummy1 = self.Flux["Diffuse"][5] * (1 - Trans_Stream)      'Diffuse Solar Radiation attenuated on way down
-#        Dummy2 = self.Flux["Diffuse"][5] - Dummy1                  'Diffuse Solar Radiation Hitting Stream bed
-#        Bed_Reflect = Exp(0.0214 * (0) - 1.941) 'Reflection Coef. for Diffuse Solar
-#        Dummy3 = Dummy2 * (1 - Bed_Reflect)                'Diffuse Solar Radiation Absorbed in Bed
-#        Dummy4 = 0.53 * BedRock * Dummy3                   'Diffuse Solar Radiation Immediately Returned to Water Column as Heat
-#        Dummy5 = Dummy2 * Bed_Reflect                      'Diffuse Solar Radiation Reflected off Bed
-#        Dummy6 = Dummy5 * (1 - Trans_Stream)               'Diffuse Solar Radiation attenuated on way up
-#        self.Flux["Diffuse"][6] = Dummy1 + Dummy4 + Dummy6
-#        self.Flux["Diffuse"][7] = Dummy3 - Dummy4
+        #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        #5 - Entering Stream
+        if self.Solar.Zenith > 80:
+            Stream_Reflect = 0.0515 * (self.Solar.Zenith) - 3.636
+        else:
+            Stream_Reflect = 0.091 * (1 / math.cos(self.Solar.Zenith * math.pi / 180)) - 0.0386
+        if abs(Stream_Reflect) > 1:
+            Stream_Reflect = 0.0515 * (self.Solar.Zenith * math.pi / 180) - 3.636
+        if abs(Stream_Reflect) > 1:
+            Stream_Reflect = 0.091 * (1 / self.cos(self.Solar.Zenith * math.pi / 180)) - 0.0386
+        self.Flux["Diffuse"][5] = self.Flux["Diffuse"][4] * 0.91
+        self.Flux["Direct"][5] = self.Flux["Direct"][4] * (1 - Stream_Reflect)
+        #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        #6 - Received by Water Column
+        #=========================================================
+    def CalcFlux7(self):
+        #7 - Received by Bed
+        Dummy = math.atn((math.sin(math.radians(self.Solar.Zenith)) / 1.3333) / math.sqrt(-(math.sin(math.radians(self.Solar.Zenith)) / 1.3333) * (math.sin(math.radians(self.Solar.Zenith)) / 1.3333) + 1))
+        Water_Path = theDepth(Node, 1) / math.cos(Dummy) #Jerlov (1976)
+        Trans_Stream = 0.415 - (0.194 * math.log10(Water_Path * 100))
+        if Trans_Stream > 1:
+            Trans_Stream = 1
+        Dummy1 = self.Flux["Direct"][5] * (1 - Trans_Stream)       #Direct Solar Radiation attenuated on way down
+        Dummy2 = self.Flux["Direct"][5] - Dummy1                   #Direct Solar Radiation Hitting Stream bed
+        Bed_Reflect = math.exp(0.0214 * (self.Solar.Zenith * math.pi / 180) - 1.941)   #Reflection Coef. for Direct Solar
+        BedRock = 1 - thePorosity
+        Dummy3 = Dummy2 * (1 - Bed_Reflect)                #Direct Solar Radiation Absorbed in Bed
+        Dummy4 = 0.53 * BedRock * Dummy3                   #Direct Solar Radiation Immediately Returned to Water Column as Heat
+        Dummy5 = Dummy2 * Bed_Reflect                      #Direct Solar Radiation Reflected off Bed
+        Dummy6 = Dummy5 * (1 - Trans_Stream)               #Direct Solar Radiation attenuated on way up
+        self.Flux["Direct"][6] = Dummy1 + Dummy4 + Dummy6
+        self.Flux["Direct"][7] = Dummy3 - Dummy4
+        Trans_Stream = 0.415 - (0.194 * math.log10(100 * theDepth(Node, 1)))
+        if Trans_Stream > 1:
+            Trans_Stream = 1
+        if Trans_Stream > 1:
+            Trans_Stream = 1
+        Dummy1 = self.Flux["Diffuse"][5] * (1 - Trans_Stream)      #Diffuse Solar Radiation attenuated on way down
+        Dummy2 = self.Flux["Diffuse"][5] - Dummy1                  #Diffuse Solar Radiation Hitting Stream bed
+        Bed_Reflect = Exp(0.0214 * (0) - 1.941)             #Reflection Coef. for Diffuse Solar
+        Dummy3 = Dummy2 * (1 - Bed_Reflect)                #Diffuse Solar Radiation Absorbed in Bed
+        Dummy4 = 0.53 * BedRock * Dummy3                  #Diffuse Solar Radiation Immediately Returned to Water Column as Heat
+        Dummy5 = Dummy2 * Bed_Reflect                      #Diffuse Solar Radiation Reflected off Bed
+        Dummy6 = Dummy5 * (1 - Trans_Stream)               #Diffuse Solar Radiation attenuated on way up
+        self.Flux["Diffuse"][6] = Dummy1 + Dummy4 + Dummy6
+        self.Flux["Diffuse"][7] = Dummy3 - Dummy4
 #        '   Flux_Solar(x) and Flux_Diffuse = Solar flux at various positions
 #        '       0 - Edge of atmosphere
 #        '       1 - Above Topography
@@ -435,12 +434,12 @@ class StreamNode(StreamChannel):
 #        '       5 - Entering Stream
 #        '       6 - Received by Water Column
 #        '       7 - Received by Bed
-#        self.Flux["Solar"][1] = self.Flux["Diffuse"][1] + self.Flux["Direct"][1]
-#        self.Flux["Solar"][2] = self.Flux["Diffuse"][2] + self.Flux["Direct"][2]
-#        self.Flux["Solar"][4] = self.Flux["Diffuse"][4] + self.Flux["Direct"][4]
-#        self.Flux["Solar"][5] = self.Flux["Diffuse"][5] + self.Flux["Direct"][5]
-#        self.Flux["Solar"][6] = self.Flux["Diffuse"][6] + self.Flux["Direct"][6]
-#        self.Flux["Solar"][7] = self.Flux["Diffuse"][7] + self.Flux["Direct"][7]
+        self.Flux["Solar"][1] = self.Flux["Diffuse"][1] + self.Flux["Direct"][1]
+        self.Flux["Solar"][2] = self.Flux["Diffuse"][2] + self.Flux["Direct"][2]
+        self.Flux["Solar"][4] = self.Flux["Diffuse"][4] + self.Flux["Direct"][4]
+        self.Flux["Solar"][5] = self.Flux["Diffuse"][5] + self.Flux["Direct"][5]
+        self.Flux["Solar"][6] = self.Flux["Diffuse"][6] + self.Flux["Direct"][6]
+        self.Flux["Solar"][7] = self.Flux["Diffuse"][7] + self.Flux["Direct"][7]
 #
 #    def CalcConductionFlux()
 #        #======================================================

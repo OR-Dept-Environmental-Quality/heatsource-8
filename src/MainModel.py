@@ -23,6 +23,9 @@ class MainModel(object):
         self.Log = log
         self.filename = filename
 
+    def __del__(self):
+        DPlot.Destroy()
+
     def Initialize(self):
         self.Log("Initializing Model")
         self.Reach = HeatSourceInterface(self.filename,gauge=self.Log).Reach
@@ -51,12 +54,14 @@ class MainModel(object):
     def TimeStep(self):
         try:
             del self.Y[:]
+            if Chronos.TheTime > Chronos.start + timedelta(minutes=59):
+                pass
             # Calculate the hydraulics
-            map(lambda x:x.CalcHydraulics(), self.Reach)
-            [self.Y.append(getattr(node,self.PlotAttr)) for node in self.Reach]
+#            map(lambda x:x.CalcHydraulics(), self.Reach)
+#            [self.Y.append(getattr(node,self.PlotAttr)) for node in self.Reach]
             # Calculate the solar flux
             map(lambda x:x.CalcSolarFlux(), self.Reach)
-            self.DPlot.onTimer(False)
+#            self.DPlot.onTimer(False)
             Chronos.Tick()
             return True
         except:

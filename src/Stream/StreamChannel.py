@@ -1,5 +1,5 @@
 from __future__ import division
-import math
+import math, decimal
 from warnings import warn
 from itertools import imap
 from Utils.Maths import NewtonRaphson
@@ -105,8 +105,7 @@ class StreamChannel(object):
             try:
                 Q = self.Q_bc[t,-1]*1 # Get the value at this time, or the closest previous time
             except:
-                date = Chronos.MakeDatetime(IniParams.Date)
-                if Chronos.TheTime < date:
+                if Chronos.TheTime < Chronos.MakeDatetime(IniParams.Date):
                     Q = self.Q_bc[0]*1 #Multiplying by 1 turns it into a true Python float
                 else: raise
             # TODO: Might want some error checking here.
@@ -229,6 +228,7 @@ class StreamChannel(object):
         if X > 0.5: X = 0.5
         elif X < 0.0:
             X = 0.0
+            
         K = self.dx / c_k
         dt = self.dt
 
