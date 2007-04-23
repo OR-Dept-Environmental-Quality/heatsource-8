@@ -197,7 +197,7 @@ class StreamNode(StreamChannel):
         #TODO: This is a ridiculously long method. It should be cleaned up.
         #======================================================
         # Get the sun's altitude and azimuth:
-        Azimuth, Altitude = Helios.CalcSolarPosition(self.Latitude, self.Longitude)
+        Azimuth, Altitude, Zenith = Helios.CalcSolarPosition(self.Latitude, self.Longitude)
         # Helios calculates the julian date, so we lazily snag that calculation.
         time = Chronos.TheTime
         JD = Chronos.JD
@@ -234,36 +234,37 @@ class StreamNode(StreamChannel):
         #   Topo_Alt = Topo shade angle (rad)
         #======================================================
         if Azimuth <= 67.5: #NE Direction
-            Direction = 1
+            Direction = 0
             Topo_Alt = self.Topo['E']
         elif Azimuth > 67.5 and Azimuth <= 112.5: #E Direction
-            Direction = 2
+            Direction = 1
             Topo_Alt = self.Topo['E']
         elif Azimuth > 112.5 and Azimuth <= 157.5: #SE Direction
-            Direction = 3
+            Direction = 2
             Topo_Alt = 0.5 * (self.Topo['E'] + self.Topo['S'])
         elif Azimuth > 157.5 and Azimuth <= 202.5: #S Direction
-            Direction = 4
+            Direction = 3
             Topo_Alt = self.Topo['S']
         elif Azimuth > 202.5 and Azimuth <= 247.5: #SW Direction
-            Direction = 5
+            Direction = 4
             Topo_Alt = 0.5 * (self.Topo['W'] + self.Topo['S'])
         elif Azimuth > 247.5 and Azimuth <= 292.5: #W Direction
-            Direction = 6
+            Direction = 5
             Topo_Alt = self.Topo['W']
         else: #NW Direction
-            Direction = 7
+            Direction = 6
             Topo_Alt = self.Topo['W']
         #======================================================
         #Calculate Land Cover Horizontal Spacing
         for i in xrange(4):
-            LC_TotElev = self.Zone[Direction][i].VHeight + self.Zone[Direction][i].Elevation - self.Elevation
+             #TODO: Is LC_TotElv (below) used?
+#            LC_TotElev = self.Zone[Direction][i].VHeight + self.Zone[Direction][i].Elevation - self.Elevation    
             if not i:
                 LC_Distance[i] = IniParams.TransSample * (i - 0.5) - self.Overhang[Direction]
             else:
                 LC_Distance[i] = IniParams.TransSample * (i - 0.5)
-            if self.LC_Distance[i] < 0:
-                self.LC_Distance[i] = 0.00001
+            if LC_Distance[i] < 0:
+                LC_Distance[i] = 0.00001
         #############################################################
         #Route solar radiation to the stream surface
         #   Flux_Solar(x) and Flux_Diffuse = Solar flux at various positions
@@ -328,13 +329,13 @@ class StreamNode(StreamChannel):
                 zone = self.Zone[Direction][i]
                 LC_ShadowLength = (zone.VHeight + zone.Elevation-self.Elevation) / math.tan(math.radians(Altitude)) #Vegetation Shadow Casting
                 if LC_ShadowLength >= LC_Distance[i]: #Veg Shade IS Occurring
-                    Path = Dx_lc / math.cos(math.radians(Altitude))
+                    Path = IniParams.TransSample / math.cos(math.radians(Altitude))
                     if zone.VDensity == 1:
                         Rip_Extinct[i] = 1
                         Shade_Density[i] = 1
                     else:
                         Rip_Extinct[i] = -math.log(1 - zone.VDensity) / 10
-                        Shade_Density[i] = 1 - math.exp(-Rip_Extinct[i] * Path[i])
+                        Shade_Density[i] = 1 - math.exp(-Rip_Extinct[i] * Path)
                 else: #Veg Shade IS NOT Occurring
                     Shade_Density[i] = 0
                 Dummy1 = Dummy1 * (1 - Shade_Density[i])
@@ -357,7 +358,7 @@ class StreamNode(StreamChannel):
             self.Flux["Direct"][4] = 0
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         #Account for emergent vegetation
-        if Flag_Emergent == 1:
+        if IniParams.Emergent:
             Path[0] = zone[0][0].VHeight / math.sin(math.radians(Altitude))
             if Path[0] > self.W_b:
                 Path[0] = self.W_b
@@ -378,53 +379,55 @@ class StreamNode(StreamChannel):
             Shade_Density[0] = 1 - math.exp(-Rip_Extinct[0] * Path[0])
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density[0])
 
-        raise Exception("Debug Breakpoint")
+#        raise Exception("Debug Breakpoint")
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         #5 - Entering Stream
-        if self.Solar.Zenith > 80:
-            Stream_Reflect = 0.0515 * (self.Solar.Zenith) - 3.636
+#        Zenith = 90 - Altitude
+        if Zenith > 80:
+            Stream_Reflect = 0.0515 * (Zenith) - 3.636
         else:
-            Stream_Reflect = 0.091 * (1 / math.cos(self.Solar.Zenith * math.pi / 180)) - 0.0386
+            Stream_Reflect = 0.091 * (1 / math.cos(Zenith * math.pi / 180)) - 0.0386
         if abs(Stream_Reflect) > 1:
-            Stream_Reflect = 0.0515 * (self.Solar.Zenith * math.pi / 180) - 3.636
+            Stream_Reflect = 0.0515 * (Zenith * math.pi / 180) - 3.636
         if abs(Stream_Reflect) > 1:
-            Stream_Reflect = 0.091 * (1 / self.cos(self.Solar.Zenith * math.pi / 180)) - 0.0386
+            Stream_Reflect = 0.091 * (1 / self.cos(Zenith * math.pi / 180)) - 0.0386
         self.Flux["Diffuse"][5] = self.Flux["Diffuse"][4] * 0.91
         self.Flux["Direct"][5] = self.Flux["Direct"][4] * (1 - Stream_Reflect)
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         #6 - Received by Water Column
         #=========================================================
-    def CalcFlux7(self):
+
+        #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         #7 - Received by Bed
-        Dummy = math.atn((math.sin(math.radians(self.Solar.Zenith)) / 1.3333) / math.sqrt(-(math.sin(math.radians(self.Solar.Zenith)) / 1.3333) * (math.sin(math.radians(self.Solar.Zenith)) / 1.3333) + 1))
-        Water_Path = theDepth(Node, 1) / math.cos(Dummy) #Jerlov (1976)
+        Dummy = math.atan((math.sin(math.radians(Zenith)) / 1.3333) / math.sqrt(-(math.sin(math.radians(Zenith)) / 1.3333) * (math.sin(math.radians(Zenith)) / 1.3333) + 1))
+        Water_Path = self.d_w / math.cos(Dummy)         #Jerlov (1976)
         Trans_Stream = 0.415 - (0.194 * math.log10(Water_Path * 100))
         if Trans_Stream > 1:
             Trans_Stream = 1
         Dummy1 = self.Flux["Direct"][5] * (1 - Trans_Stream)       #Direct Solar Radiation attenuated on way down
         Dummy2 = self.Flux["Direct"][5] - Dummy1                   #Direct Solar Radiation Hitting Stream bed
-        Bed_Reflect = math.exp(0.0214 * (self.Solar.Zenith * math.pi / 180) - 1.941)   #Reflection Coef. for Direct Solar
-        BedRock = 1 - thePorosity
+        Bed_Reflect = math.exp(0.0214 * (Zenith * math.pi / 180) - 1.941)   #Reflection Coef. for Direct Solar
+        BedRock = 1 - self.phi
         Dummy3 = Dummy2 * (1 - Bed_Reflect)                #Direct Solar Radiation Absorbed in Bed
         Dummy4 = 0.53 * BedRock * Dummy3                   #Direct Solar Radiation Immediately Returned to Water Column as Heat
         Dummy5 = Dummy2 * Bed_Reflect                      #Direct Solar Radiation Reflected off Bed
         Dummy6 = Dummy5 * (1 - Trans_Stream)               #Direct Solar Radiation attenuated on way up
         self.Flux["Direct"][6] = Dummy1 + Dummy4 + Dummy6
         self.Flux["Direct"][7] = Dummy3 - Dummy4
-        Trans_Stream = 0.415 - (0.194 * math.log10(100 * theDepth(Node, 1)))
-        if Trans_Stream > 1:
-            Trans_Stream = 1
+        Trans_Stream = 0.415 - (0.194 * math.log10(100 * self.d_w))
         if Trans_Stream > 1:
             Trans_Stream = 1
         Dummy1 = self.Flux["Diffuse"][5] * (1 - Trans_Stream)      #Diffuse Solar Radiation attenuated on way down
         Dummy2 = self.Flux["Diffuse"][5] - Dummy1                  #Diffuse Solar Radiation Hitting Stream bed
-        Bed_Reflect = Exp(0.0214 * (0) - 1.941)             #Reflection Coef. for Diffuse Solar
+        Bed_Reflect = math.exp(0.0214 * (0) - 1.941)               #Reflection Coef. for Diffuse Solar
         Dummy3 = Dummy2 * (1 - Bed_Reflect)                #Diffuse Solar Radiation Absorbed in Bed
-        Dummy4 = 0.53 * BedRock * Dummy3                  #Diffuse Solar Radiation Immediately Returned to Water Column as Heat
+        Dummy4 = 0.53 * BedRock * Dummy3                   #Diffuse Solar Radiation Immediately Returned to Water Column as Heat
         Dummy5 = Dummy2 * Bed_Reflect                      #Diffuse Solar Radiation Reflected off Bed
         Dummy6 = Dummy5 * (1 - Trans_Stream)               #Diffuse Solar Radiation attenuated on way up
         self.Flux["Diffuse"][6] = Dummy1 + Dummy4 + Dummy6
         self.Flux["Diffuse"][7] = Dummy3 - Dummy4
+        #=========================================================
+
 #        '   Flux_Solar(x) and Flux_Diffuse = Solar flux at various positions
 #        '       0 - Edge of atmosphere
 #        '       1 - Above Topography
@@ -440,6 +443,7 @@ class StreamNode(StreamChannel):
         self.Flux["Solar"][5] = self.Flux["Diffuse"][5] + self.Flux["Direct"][5]
         self.Flux["Solar"][6] = self.Flux["Diffuse"][6] + self.Flux["Direct"][6]
         self.Flux["Solar"][7] = self.Flux["Diffuse"][7] + self.Flux["Direct"][7]
+        print self.km, self.Flux["Solar"][1], self.Flux["Solar"][2], self.Flux["Solar"][3], self.Flux["Solar"][4], self.Flux["Solar"][5], self.Flux["Solar"][6], self.Flux["Solar"][7]
 #
 #    def CalcConductionFlux()
 #        #======================================================
