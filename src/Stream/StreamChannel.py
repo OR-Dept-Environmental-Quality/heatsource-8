@@ -88,16 +88,15 @@ class StreamChannel(object):
         the timestep in minutes, which cannot be None.
         """
         t = Chronos.TheTime
-        print self.km, t,
-        if self.km == 0.85:
-            pass
+#        print self.km, t,
+
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             # Get all of the discharges that we know about.
             # In order, they are (t,x-1), (t-1,x-1), (t-1,x).
             Q1,Q2,Q3 = self.GetKnownDischarges()
             # Use (t,x-1) to calculate the Muskingum coefficients
-            C1,C2,C3,C4 = self.GetMuskingum(Q1)
+            C1,C2,C3,C4 = self.GetMuskingum(Q2)
             # Calculate the new Q
             Q = C1*Q1 + C2*Q2 + C3*Q3 + C4
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
@@ -108,6 +107,8 @@ class StreamChannel(object):
                 if Chronos.TheTime < Chronos.MakeDatetime(IniParams.Date):
                     Q = self.Q_bc[0]*1 #Multiplying by 1 turns it into a true Python float
                 else: raise
+            if Q == 1:
+                pass
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
@@ -121,11 +122,19 @@ class StreamChannel(object):
             pass
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
-        try:
-            self.Q_prev = self.Q or self.Q_bc[t,-1]*1 # Multiplying by 1 makes a true Python float
-        except TypeError:
-            self.Q_prev = self.Q  or Q
+        if self.Q:
+            self.Q_prev = self.Q
+        else:
+            self.Q_prev = Q
+#        try:
+#            self.Q_prev = self.Q or self.Q_bc[t,-1]*1 # Multiplying by 1 makes a true Python float
+#        except TypeError:
+#            self.Q_prev = self.Q  or Q
         self.Q = Q
+
+        #This is how Heat Source VB is implemented:
+        if not self.prev_km:
+            self.Q_prev = self.Q
 
         if Q < 0.0071: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
@@ -135,7 +144,7 @@ class StreamChannel(object):
         self.CalcGeometry()
 #        self.CalcHyporheic()
 
-        print self.Q
+        print Chronos.TheTime, self.km, self.Q
 
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
@@ -179,8 +188,9 @@ class StreamChannel(object):
         Q2 = self.prev_km.Q_prev + self.GetInputs()
         if Q2 is None: raise Exception("Previous channel of %s has no previous discharge calculation" % self)
 
-        # (t-1, x) = flow from the previous timestep in this channel
-        Q3 = self.Q_prev
+        # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep
+        # because we have not yet assigned a new value for this timesetp)
+        Q3 = self.Q
         if Q3 is None: raise Exception("Channel %s has no previous discharge calculation" % self)
 
         V = lambda x:x# * self.dt
@@ -207,28 +217,69 @@ class StreamChannel(object):
 #                Q_est = self.Q
 #                dw = self.GetWettedDepth(self.Q)
 
+#        #From VB version (secant method)
+#        dy = 0.01
+#        if self.d_w:
+#            D_Est = self.d_w
+#        else:
+#            D_Est = 1
+#        A_Est = self.A
+#        Count_Iterations = 0
+#        Converge = 10
+#        while abs(Converge) > 0.0001:
+#            if D_Est == 0:
+#                D_Est = 10
+#            A_Est = D_Est * (self.W_b + self.z * D_Est)
+#            Pw = self.W_b + 2 * D_Est * ((1 + (self.z ** 2))**0.5)
+#            if Pw <= 0:
+#                Pw = 0.00001
+#            Rh = A_Est / Pw
+#            Fy = A_Est * (Rh ** (2 / 3)) - (self.n) * Q_est / (self.S**0.5)
+#            thed = D_Est + dy
+#            A_Est = thed * (self.W_b + self.z * thed)
+#            Pw = self.W_b + 2 * thed * ((1 + (self.z ** 2))**0.5)
+#            if Pw <= 0:
+#                Pw = 0.00001
+#            Rh = A_Est / Pw
+#            Fyy = A_Est * (Rh ** (2 / 3)) - (self.n) * Q_est / (self.S**0.5)
+#            dFy = (Fyy - Fy) / dy
+#            if dFy == 0:
+#                dFy = 0.99
+#            thed = D_Est - Fy / dFy
+#            D_Est = thed
+#            if(D_Est < 0 or D_Est > 1000000000000):# Or Count_Iterations > 1000 Then
+#                #Newton-Raphson didn't converge on a solution
+#                #need to reseed initial guess and restart method
+#                D_Est = 5 #Randomly reseed initial value
+#                Converge = 10
+#                Count_Iterations = 0
+#            #Check convergence tolerance
+#            Converge = abs(Fy / dFy)
+#            Count_Iterations = Count_Iterations + 1
+#            dw = D_Est
+            
         self.d_w = dw
-        self.A = dw * (self.W_b + self.z*dw)
-        self.P_w = self.W_b + 2 * dw * math.sqrt(1+self.z**2)
+        self.A = self.d_w * (self.W_b + self.z*self.d_w)
+        self.P_w = self.W_b + 2 * self.d_w * math.sqrt(1+self.z**2)
         self.R_h = self.A/self.P_w
-        self.W_w = self.W_b + 2 * self.z * dw
+        self.W_w = self.W_b + 2 * self.z * self.d_w
         self.U = Q_est / self.A
 
     def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
-        c_k = (5/3) * self.U#(Q_est/self.A) # Wave celerity
 
         self.CalcGeometry(Q_est)
         #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         # Taken from the VB source.
+        c_k = (5/3) * self.U  # Wave celerity
         den = (self.W_w * self.S * self.dx * c_k)
 #        den *= 2
         X = 0.5 * (1 - Q_est / den)
         if X > 0.5: X = 0.5
         elif X < 0.0:
             X = 0.0
-            
+
         K = self.dx / c_k
         dt = self.dt
 
