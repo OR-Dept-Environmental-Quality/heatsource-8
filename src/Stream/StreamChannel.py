@@ -88,7 +88,6 @@ class StreamChannel(object):
         the timestep in minutes, which cannot be None.
         """
         t = Chronos.TheTime
-#        print self.km, t,
 
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
@@ -127,8 +126,6 @@ class StreamChannel(object):
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
         self.CalcGeometry()
 #        self.CalcHyporheic()
-
-        print Chronos.TheTime, self.km, self.Q
 
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
@@ -187,19 +184,13 @@ class StreamChannel(object):
         a depth value that is then used to calculate all depth dependent channel
         characteristics.
         """
-        Q_est = Q_est or self.Q
-        dw = self.GetWettedDepth(Q_est)
-#        # Set using control depth or GetWettedDepth
-#        if self.d_cont:
-#            dw = self.d_cont
-#            Q_est = self.Q
-#        else:
-#            if not self.S: raise Exception("Must have a control depth with zero slope")
-#            # If we're called using the upstream's discharge, use the upstream's depth
-#            if Q_est: dw = self.prev_km.d_w
-#            else:
-#                Q_est = self.Q
-#                dw = self.GetWettedDepth(self.Q)
+        if self.d_cont:
+            dw = self.d_cont
+            Q_est = self.Q
+        else:
+            if not self.S: raise Exception("Control depth must be given with zero slope")
+            Q_est = Q_est or self.Q
+            dw = self.GetWettedDepth(Q_est)
 
         self.d_w = dw
         self.A = self.d_w * (self.W_b + self.z*self.d_w)
@@ -222,14 +213,10 @@ class StreamChannel(object):
         K = self.dx / c_k
         test0 = 2 * K * X
         test1 = 2 * K * (1 - X)
-        if K < test0: K = test0
-        elif K > test1: K = test1
-
-        K = self.dt
-        raise Exception("look here")
-
         dt = self.dt
 
+        if dt <= test0:
+            pass
         # Check the celerity to ensure stability. These tests are from the VB code.
         if dt >= test1 or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
             raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))

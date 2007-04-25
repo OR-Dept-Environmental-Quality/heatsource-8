@@ -31,6 +31,8 @@ class IniParamsDiety(Singleton):
              'Muskingum': True, # IS1
              'EvapLoss': False, # IV1
              'Emergent': False,# IV5
+             'Wind_A': 1.505e-9, #Default wind values taken from Umpqua:Toketee basin model
+             'Wind_B': 1.6e-9,
              'Penman': False, # IU1 and IT1. Here, True:Penman Combination method, False: Jobson Wind Method
              'DryChannel': False, # Flag in original code to tell us whether we accept dry channels?
              'ChannelWidth': True # Flag meaning we know that our channel widths are over bounding.

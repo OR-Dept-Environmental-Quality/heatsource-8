@@ -41,7 +41,7 @@ class MainModel(object):
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams.dt)
-        start = Chronos.MakeDatetime(IniParams.Date)
+        start = Chronos.MakeDatetime(IniParams.Date)+timedelta(hours=5)
         stop = start + timedelta(days=IniParams.SimPeriod)
         spin = 0 # IniParams.FlushDays # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
@@ -52,15 +52,13 @@ class MainModel(object):
         self.timer.Start(100)
 
     def TimeStep(self):
-        try:
+        try: #Wrap this in a try/except block to catch errors. Othewise, the model will continue running past them
 #            del self.Y[:]
-            if Chronos.TheTime > Chronos.start + timedelta(minutes=59):
-                pass
             # Calculate the hydraulics
             map(lambda x:x.CalcHydraulics(), self.Reach)
 #            [self.Y.append(getattr(node,self.PlotAttr)) for node in self.Reach]
             # Calculate the solar flux
-#            map(lambda x:x.CalcSolarFlux(), self.Reach)
+            map(lambda x:x.CalcHeat(), self.Reach)
 #            self.DPlot.onTimer(False)
             Chronos.Tick()
             return True
@@ -70,4 +68,4 @@ class MainModel(object):
 
     def Stop(self):
         self.timer.Stop()
-        self.DPlot.Destroy()
+#        self.DPlot.Destroy()

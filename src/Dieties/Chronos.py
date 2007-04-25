@@ -43,6 +43,7 @@ class ChronosDiety(Singleton):
 
     def Tick(self):
         self.__current += self.__dt
+        return self.__current
     def __iter__(self):
         if not self.__start or not self.__dt:
             raise Exception("Must call %s with the Start() method before using." % self.__class__.__name__)

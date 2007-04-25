@@ -89,6 +89,8 @@ class HeatSourceInterface(DataSheet):
         self.BuildStreamNodes()
 #        self.GetInflowData()
         self.GetContinuousData()
+        self.SetAtmosphericData()
+
         n = 1
         for i in self.Reach:
             self.PB("Initializing StreamNodes",n,len(self.Reach))
@@ -98,6 +100,13 @@ class HeatSourceInterface(DataSheet):
 #        self.SetupSheets2()
 
         del self.PB
+
+    def SetAtmosphericData(self):
+        for node in self.Reach:
+            if not node.T_air:
+                node.Wind, node.Humidity, node.T_air = self.AtmosphericData
+            else:
+                self.AtmosphericData = node.Wind, node.Humidity, node.T_air
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
@@ -181,14 +190,18 @@ class HeatSourceInterface(DataSheet):
                 node.Wind.append(DataPoint(data[hour][site*4],time=timelist[hour]))
                 node.Humidity.append(DataPoint(data[hour][1+site*4],time=timelist[hour]))
                 node.T_air.append(DataPoint(data[hour][2+site*4], time=timelist[hour]))
-                try:
-                    node.T_stream.append(DataPoint(data[hour][3+site*4], time=timelist[hour]))
-                except TypeError, inst:
-                    # Often, Stream Temp will be blank. Let's make sure that we catch that case.
-                    # We set the result to a 999 instead of zero to state that it's unknown
-                    if inst.message == "float() argument must be a string or a number":
-                        node.T_stream.append(DataPoint(999, time=timelist[hour]))
-                    else: raise
+                #TODO: Uncomment this if necessary, delete it if not. T_stream should be renamed
+#                try:
+#                    node.T_stream.append(DataPoint(data[hour][3+site*4], time=timelist[hour]))
+#                except TypeError, inst:
+#                    # Often, Stream Temp will be blank. Let's make sure that we catch that case.
+#                    # We set the result to a 999 instead of zero to state that it's unknown
+#                    if inst.message == "float() argument must be a string or a number":
+#                        node.T_stream.append(DataPoint(999, time=timelist[hour]))
+#                    else: raise
+            # The VB code essentially uses the last continuous node's
+            if not site:
+                self.AtmosphericData = [node.Wind, node.Humidity, node.T_air]
             self.PB("Reading continuous data", site, IniParams.ContSites)
 
     def ScanMorphology(self):
@@ -409,34 +422,34 @@ class HeatSourceInterface(DataSheet):
         ##############################################################
         #Now that we have a stream node, we set the node's dx value, because
         # we have most nodes that are long-sample-distance times multiple,
-        try:
-            # To make our life easier when building the node we created Topo_W,
-            # Topo_S, and Topo_E, however,
-            # these are better in a dictionary, so we fix that here.
-            node.Topo = {"E":node.Topo_E,
-                         "W":node.Topo_W,
-                         "S":node.Topo_S}
-            del node.Topo_E, node.Topo_W, node.Topo_S # Delete the unnecessary attributes
-            node.dx = IniParams.dx # Set the space-step
-            node.dt = IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
-            # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
-            node.C_bc = self.C_bc
-            node.SetBankfullMorphology()
-            node.ViewToSky()
-            # Taken from the VB code in SubHydraulics- this doesn't have to run at every
-            # timestep, since the values don't change. Thus, we just set horizontal conductivity
-            # and porosity once here, and remove the other attributes.
-            # TODO: Research this mathematics further
-            Dummy1 = node.Conductivity * (1 - node.Embeddedness) #Ratio Conductivity of dominant sunstrate
-            Dummy2 = 0.00002 * node.Embeddedness  #Ratio Conductivity of sand - low range
-            node.K_h = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
-            Dummy1 = node.ParticleSize * (1 - node.Embeddedness) #Ratio Size of dominant substrate
-            Dummy2 = 0.062 * node.Embeddedness  #Ratio Conductivity of sand - low range
-            node.phi = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
-            del node.Conductivity, node.Embeddedness
-        except: # Shit, something happened, WTF?
-            print node, node.S, node.W_bf, node.z, node.WD
-            raise
+
+        # To make our life easier when building the node we created Topo_W,
+        # Topo_S, and Topo_E, however,
+        # these are better in a dictionary, so we fix that here.
+        node.Topo = {"E":node.Topo_E,
+                     "W":node.Topo_W,
+                     "S":node.Topo_S}
+        del node.Topo_E, node.Topo_W, node.Topo_S # Delete the unnecessary attributes
+        node.dx = IniParams.dx # Set the space-step
+        node.dt = IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
+        # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
+        node.C_bc = self.C_bc
+        node.T = self.T_bc[0]
+        node.T_prev = self.T_bc[0]
+        node.T_sed = self.T_bc[0]
+        node.SetBankfullMorphology()
+        # Taken from the VB code in SubHydraulics- this doesn't have to run at every
+        # timestep, since the values don't change. Thus, we just set horizontal conductivity
+        # and porosity once here, and remove the other attributes.
+        # TODO: Research this mathematics further
+        Dummy1 = node.Conductivity * (1 - node.Embeddedness) #Ratio Conductivity of dominant sunstrate
+        Dummy2 = 0.00002 * node.Embeddedness  #Ratio Conductivity of sand - low range
+        node.K_h = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
+        Dummy1 = node.ParticleSize * (1 - node.Embeddedness) #Ratio Size of dominant substrate
+        Dummy2 = 0.062 * node.Embeddedness  #Ratio Conductivity of sand - low range
+        node.phi = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
+
+        del node.Conductivity, node.Embeddedness
         #############################################################
         #The original VB code has this method BFMorph, which calculates some things and
         # spits them back to the spreadsheet. We want to keep everything in the node, but
