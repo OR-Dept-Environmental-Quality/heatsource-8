@@ -116,18 +116,9 @@ class StreamChannel(object):
             Q = self.prev_km.Q_prev + Q_in # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
         else: raise Exception("WTF?")
 
-#        Q = round(Q,5) # Numerical Stability hack
-
-        if Q != 0.53:
-            pass
-
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q  or Q
         self.Q = Q
-
-        #This is how Heat Source VB is implemented:
-        if not self.prev_km:
-            self.Q_prev = self.Q
 
         if Q < 0.0071: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
