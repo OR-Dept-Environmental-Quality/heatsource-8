@@ -210,47 +210,6 @@ class StreamChannel(object):
 #                Q_est = self.Q
 #                dw = self.GetWettedDepth(self.Q)
 
-#        #From VB version (secant method)
-#        dy = 0.01
-#        if self.d_w:
-#            D_Est = self.d_w
-#        else:
-#            D_Est = 1
-#        A_Est = self.A
-#        Count_Iterations = 0
-#        Converge = 10
-#        while abs(Converge) > 0.0001:
-#            if D_Est == 0:
-#                D_Est = 10
-#            A_Est = D_Est * (self.W_b + self.z * D_Est)
-#            Pw = self.W_b + 2 * D_Est * ((1 + (self.z ** 2))**0.5)
-#            if Pw <= 0:
-#                Pw = 0.00001
-#            Rh = A_Est / Pw
-#            Fy = A_Est * (Rh ** (2 / 3)) - (self.n) * Q_est / (self.S**0.5)
-#            thed = D_Est + dy
-#            A_Est = thed * (self.W_b + self.z * thed)
-#            Pw = self.W_b + 2 * thed * ((1 + (self.z ** 2))**0.5)
-#            if Pw <= 0:
-#                Pw = 0.00001
-#            Rh = A_Est / Pw
-#            Fyy = A_Est * (Rh ** (2 / 3)) - (self.n) * Q_est / (self.S**0.5)
-#            dFy = (Fyy - Fy) / dy
-#            if dFy == 0:
-#                dFy = 0.99
-#            thed = D_Est - Fy / dFy
-#            D_Est = thed
-#            if(D_Est < 0 or D_Est > 1000000000000):# Or Count_Iterations > 1000 Then
-#                #Newton-Raphson didn't converge on a solution
-#                #need to reseed initial guess and restart method
-#                D_Est = 5 #Randomly reseed initial value
-#                Converge = 10
-#                Count_Iterations = 0
-#            #Check convergence tolerance
-#            Converge = abs(Fy / dFy)
-#            Count_Iterations = Count_Iterations + 1
-#            dw = D_Est
-
         self.d_w = dw
         self.A = self.d_w * (self.W_b + self.z*self.d_w)
         self.P_w = self.W_b + 2 * self.d_w * math.sqrt(1+self.z**2)
