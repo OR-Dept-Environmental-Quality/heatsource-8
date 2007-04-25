@@ -141,7 +141,7 @@ class HeliosDiety(Singleton):
             RefractionCorrection = RefractionCorrection / 3600
         Zenith = Zenith - RefractionCorrection
         Altitude = 90 - Zenith
-        return Azimuth, Altitude
+        return Azimuth, Altitude, Zenith
 
 Helios = HeliosDiety.getInstance()
 
