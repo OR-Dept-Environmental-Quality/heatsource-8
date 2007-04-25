@@ -1,7 +1,8 @@
 from __future__ import division
+import math
 """Various mathematical routines and classes"""
 
-def NewtonRaphson(f, df, a, b, tol=1.0e-7, maxiter=500):
+def NewtonRaphson(f, df, a, b, tol=1.0e-9, maxiter=500):
     """Calculate the root of f(x) using the Newton-Raphson method.
 
     This method is taken from "Numerical Methods in Engineering with Python",
@@ -41,4 +42,27 @@ def NewtonRaphson(f, df, a, b, tol=1.0e-7, maxiter=500):
     #print x, abs(dx), tol + max(abs(b), 1.0)
     raise Exception("No convergences when calculating NewtonRaphson, is there a code problem?")
 
+def NewtonRaphsonSecant(Q_est, W_b, z, n, S, D_est=0):
+    """Copy of the method used in the HeatSource VB code"""
+    dy = 0.01
+    count = 0
+    A = lambda d: d * (W_b + z * d)
+    P_w = lambda d: W_b + 2 * d * math.sqrt(1+ z**2) or 0.00001
+    R_h = lambda d: A(d)/P_w(d)
+    Converge = 10
+    while Converge > 0.0001:
+        if not D_est: D_est = 10
+        Fy = A(D_est) * (R_h(D_est)**(2/3)) - (n * Q_est) / math.sqrt(S)
+        thed = D_est + dy
+        Fyy = A(thed) * (R_h(thed)**(2/3)) - (n * Q_est) / math.sqrt(S)
+        dFy = (Fyy - Fy) / dy or 0.99
+        thed = D_est - Fy / dFy
+        D_est = thed
+        if D_est < 0 or D_est > 1.0e10 or count > 1000:
+            D_est = random(randint(0,100))
+            Converge = 10
+            count = 0
+        Converge = abs(Fy/dFy)
+        count += 1
+    return D_est
 

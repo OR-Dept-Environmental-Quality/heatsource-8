@@ -12,7 +12,7 @@ class HeliosDiety(Singleton):
 
     def ResetSolarVars(self):
         """Reset solar variables for time=dtime which is a datetime object"""
-        self.JD, self.JDC = Chronos.JD, Chronos.JDC
+        self.JDC = Chronos.JDC
         cos,sin,atan,tan,rad,deg,pi = math.cos, math.sin, math.atan, math.tan, math.radians, math.degrees, math.pi
         #======================================================
         #Obliquity of the eliptic

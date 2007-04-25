@@ -282,7 +282,7 @@ class StreamNode(StreamChannel):
         # TODO: Original VB code's JulianDay calculation:
         # JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - Helios.JD + time.hour / 24))
+        Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - JD + time.hour / 24))
         Solar_Constant = 1367 #W/m2
         self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(math.radians(Altitude)) #Global Direct Solar Radiation
         self.Flux["Diffuse"][0] = 0

@@ -30,12 +30,12 @@ class MainModel(object):
         self.Log("Initializing Model")
         self.Reach = HeatSourceInterface(self.filename,gauge=self.Log).Reach
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
-        self.DPlot = DynaPlot()
-        self.PlotAttr = "Q" # Attribute to plot at the reach level
-        self.X = [n.km for n in self.Reach]
-        self.Y = [0 for i in xrange(len(self.Reach))]
-        self.DPlot.Show()
-        self.DPlot.Initialize(self.X, self.Y)
+#        self.DPlot = DynaPlot()
+#        self.PlotAttr = "Q" # Attribute to plot at the reach level
+#        self.X = [n.km for n in self.Reach]
+#        self.Y = [0 for i in xrange(len(self.Reach))]
+#        self.DPlot.Show()
+#        self.DPlot.Initialize(self.X, self.Y)
         self.timer = TimeStepper(self.TimeStep)
     def Reset(self):
         ##########################################################
@@ -53,14 +53,14 @@ class MainModel(object):
 
     def TimeStep(self):
         try:
-            del self.Y[:]
+#            del self.Y[:]
             if Chronos.TheTime > Chronos.start + timedelta(minutes=59):
                 pass
             # Calculate the hydraulics
-#            map(lambda x:x.CalcHydraulics(), self.Reach)
+            map(lambda x:x.CalcHydraulics(), self.Reach)
 #            [self.Y.append(getattr(node,self.PlotAttr)) for node in self.Reach]
             # Calculate the solar flux
-            map(lambda x:x.CalcSolarFlux(), self.Reach)
+#            map(lambda x:x.CalcSolarFlux(), self.Reach)
 #            self.DPlot.onTimer(False)
             Chronos.Tick()
             return True
@@ -70,3 +70,4 @@ class MainModel(object):
 
     def Stop(self):
         self.timer.Stop()
+        self.DPlot.Destroy()

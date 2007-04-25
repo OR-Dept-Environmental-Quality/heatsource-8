@@ -25,6 +25,7 @@ class ChronosDiety(Singleton):
         self.second = timedelta(seconds=1)
         self.year = timedelta(weeks=52)
         self.tz = Pacific
+        self.__dayone = None
         self.__current = None # Current time
 
     def Start(self, start, dt=None, stop=None, spin=0, tz=Pacific):
@@ -38,6 +39,7 @@ class ChronosDiety(Singleton):
         self.__stop = stop or self.__start + self.year
         self.__spin = timedelta(days=spin)
         self.__current = self.__start - self.__spin if self.__spin else self.__start
+        self.__dayone = datetime(self.__start.year,1,1,tzinfo=tz)
 
     def Tick(self):
         self.__current += self.__dt
@@ -86,12 +88,18 @@ class ChronosDiety(Singleton):
     def SetJD(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
     def GetJDC(self): return self.FracJDC()
     def SetJDC(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
+    def GetJDay(self):
+        if self.__dayone.year != self.__current.year:
+            self.__dayone = datetime(self.__current.year,1,1,tzinfo=self.tz)
+        return (self.__current - self.__dayone).days
+    def SetJDay(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
     start = property(GetStart, SetStart)
     dt = property(GetDT, SetDT)
     stop = property(GetStop, SetStop)
     TheTime = property(GetCurrent, SetCurrent)
     JD = property(GetJD, SetJD)
     JDC = property(GetJDC, SetJDC)
+    JDay = property(GetJDay, SetJDay)
     def FracJD(self, t=None):
         """Takes a datetime object in UTC and returns a fractional julian date"""
         t = t or self.__current

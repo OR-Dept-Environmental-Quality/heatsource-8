@@ -151,9 +151,12 @@ class HSFrame(sc.SizedFrame):
 
     def OnStartStop(self,evt):
         if self.Switch(): #Switch model on (GUI and timers)
-            self.Model.Run()
-            self.Switch()
-            return
+            try:
+                self.Model.Run()
+                self.Switch()
+                return
+            except:
+                raise
         else:
             self.Model.Stop()
             del self.Model
