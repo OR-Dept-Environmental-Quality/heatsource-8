@@ -2,7 +2,7 @@ from __future__ import division
 import math, decimal
 from warnings import warn
 from itertools import imap
-from Utils.Maths import NewtonRaphson
+from Utils.Maths import NewtonRaphson, NewtonRaphsonSecant
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
 
@@ -98,7 +98,7 @@ class StreamChannel(object):
             # Use (t,x-1) to calculate the Muskingum coefficients
             C1,C2,C3,C4 = self.GetMuskingum(Q2)
             # Calculate the new Q
-            Q = C1*Q1 + C2*Q2 + C3*Q3 + C4
+            Q = round(C1*Q1 + C2*Q2 + C3*Q3 + C4,4)
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
             try:
@@ -122,14 +122,7 @@ class StreamChannel(object):
             pass
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
-        if self.Q:
-            self.Q_prev = self.Q
-        else:
-            self.Q_prev = Q
-#        try:
-#            self.Q_prev = self.Q or self.Q_bc[t,-1]*1 # Multiplying by 1 makes a true Python float
-#        except TypeError:
-#            self.Q_prev = self.Q  or Q
+        self.Q_prev = self.Q  or Q
         self.Q = Q
 
         #This is how Heat Source VB is implemented:
@@ -257,7 +250,7 @@ class StreamChannel(object):
 #            Converge = abs(Fy / dFy)
 #            Count_Iterations = Count_Iterations + 1
 #            dw = D_Est
-            
+
         self.d_w = dw
         self.A = self.d_w * (self.W_b + self.z*self.d_w)
         self.P_w = self.W_b + 2 * self.d_w * math.sqrt(1+self.z**2)
@@ -268,32 +261,34 @@ class StreamChannel(object):
     def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
-
-        self.CalcGeometry(Q_est)
         #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         # Taken from the VB source.
         c_k = (5/3) * self.U  # Wave celerity
         den = (self.W_w * self.S * self.dx * c_k)
 #        den *= 2
-        X = 0.5 * (1 - Q_est / den)
+        X = 0.5 * (1 - self.Q / den)
         if X > 0.5: X = 0.5
-        elif X < 0.0:
-            X = 0.0
-
+        elif X < 0.0: X = 0.0
         K = self.dx / c_k
+        test0 = 2 * K * X
+        test1 = 2 * K * (1 - X)
+        if K < test0: K = test0
+        elif K > test1: K = test1
+
+        K = self.dt
+        raise Exception("look here")
+
         dt = self.dt
 
         # Check the celerity to ensure stability. These tests are from the VB code.
-        test0 = 2 * K * X
-        test1 = 2 * K * (1 - X)
         if dt >= test1 or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
             raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
 
         # These calculations are from Chow's "Applied Hydrology"
-        D = 2 * K * (1 - X) + dt
-        C1 = (dt - 2 * K * X) / D
-        C2 = (dt + 2 * K * X) / D
-        C3 = (2 * K * (1 - X) - dt) / D
+        D = K * (1 - X) + 0.5 * dt
+        C1 = (0.5*dt - K * X) / D
+        C2 = (0.5*dt + K * X) / D
+        C3 = (K * (1 - X) - 0.5*dt) / D
         # For the lateral inflow (C4), we need [l/t], given as the input depth for the channel. Thus,
         # we divide the input inflows in cms by the channel length times one unit. This gives us a
         # rate for lateral inflow per unit length of stream. The formula in Bedient and Huber for the
@@ -376,7 +371,9 @@ class StreamChannel(object):
         # 20 meters deep. We CAN put these minimum and maximum values in the IniParams class just to make things
         # easier to change, but until we know we need to, they will be left here.
         try:
-            return NewtonRaphson(Fd, Fdd, 0, 50) # Assume minimum (0) and maximum (50) meters in depth
+            # val = NewtonRaphson(Fd, Fdd, 0, 50) # Assume minimum (0) and maximum (50) meters in depth
+            val = NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
+            return val
         except:
             print "Failure to converge on a depth. Check minimum and maximum values defined in this method."
             raise
