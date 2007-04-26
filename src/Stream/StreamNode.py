@@ -36,6 +36,9 @@ class StreamNode(StreamChannel):
         self.slots += s
         for attr in ["Wind", "Humidity", "T_air", "T_tribs", "Q_tribs", "T_stream"]:
             setattr(self, attr, TimeList())
+        self.Flux = {"Direct":  [0]*8,
+                     "Diffuse": [0]*8,
+                     "Solar":   [0]*8}
         self.Topo = {"E": None,
                      "S": None,
                      "W": None}
@@ -192,17 +195,18 @@ class StreamNode(StreamChannel):
         return 1 - VTS_Total / (7 * 90)
 
     def CalcHeat(self):
-        self.Flux = {"Direct":  [0]*8,
-                "Diffuse": [0]*8,
-                "Solar":   [0]*8}
+        # Move our current temperature to T_prev before we calculate
+        # our new temperature. This just ensures that T and T_prev are
+        # known at this point as the current and future temperature.
+        self.T_prev = self.T
+        self.T = None # This just ensures we don't accidentally use it until it's reset
         view = self.ViewToSky()
         DayTime = self.CalcSolarFlux(view) # Returns false if night
         self.CalcConductionFlux()
         self.CalcLongwaveFlux(view)
         self.CalcEvapConvFlux()
-
         self.RecordHeatData(DayTime)
-        print self, Chronos.TheTime, self.Delta_T
+        self.MacCormick1()
 
     def CalcSolarFlux(self, ViewToSky):
         #Like the others, taken from VB code unless otherwise noted
@@ -494,7 +498,7 @@ class StreamNode(StreamChannel):
         ThermalDiffuse = (Sed_ThermalDiffuse * Ratio_Sediment) + (H2O_ThermalDiffuse * Ratio_H2O)
         #======================================================
         #Calculate the conduction flux between water column & substrate
-        self.Flux["Conduction"] = ThermalDiffuse * Density * HeatCapacity * (self.T_sed - self.T) / (Sed_Depth / 2)
+        self.Flux["Conduction"] = ThermalDiffuse * Density * HeatCapacity * (self.T_sed - self.T_prev) / (Sed_Depth / 2)
         #Calculate the conduction flux between deeper alluvium & substrate
         # TODO: Figure out when this is necessary or desirable
 ##        If Sheet2.Range("IV21").Value = 1 Then
@@ -528,7 +532,7 @@ class StreamNode(StreamChannel):
         self.Flux["LW_Atm"] = 0.96 * ViewToSky * Emissivity * Sigma * (Air_T + 273.2) ** 4
         #self.Flux["LW_Atm"] = 0.96 * Emissivity * Sigma * (Air_T + 273.2) ^ 4
         #Calcualte the backradiation longwave flux
-        self.Flux["LW_Stream"] = -0.96 * Sigma * (self.T + 273.2) ** 4
+        self.Flux["LW_Stream"] = -0.96 * Sigma * (self.T_prev + 273.2) ** 4
         #Calcualte the vegetation longwave flux
         self.Flux["LW_Veg"] = 0.96 * (1 - ViewToSky) * 0.96 * Sigma * (Air_T + 273.2) ** 4
         #Calcualte the net longwave flux
@@ -544,7 +548,7 @@ class StreamNode(StreamChannel):
         Air_T = self.T_air[time,-1]
         Humidity = self.Humidity[time,-1]
         Pressure = 1013 - 0.1055 * self.Zone[1][0].Elevation #mbar
-        Sat_Vapor = 6.1275 * math.exp(17.27 * self.T / (237.3 + self.T)) #mbar (Chapra p. 567)
+        Sat_Vapor = 6.1275 * math.exp(17.27 * self.T_prev / (237.3 + self.T_prev)) #mbar (Chapra p. 567)
         Air_Vapor = self.Humidity[time,-1] * Sat_Vapor
         #===================================================
         #Calculate the frictional reduction in wind velocity
@@ -567,7 +571,7 @@ class StreamNode(StreamChannel):
         Wind_Function = the_a + the_b * Friction_Velocity #m/mbar/s
         #===================================================
         #Latent Heat of Vaporization
-        LHV = 1000 * (2501.4 + (1.83 * self.T)) #J/kg
+        LHV = 1000 * (2501.4 + (1.83 * self.T_prev)) #J/kg
         #===================================================
         #Use Jobson Wind Function
         if IniParams.Penman:
@@ -581,7 +585,7 @@ class StreamNode(StreamChannel):
             Evap_Rate = ((NetRadiation * Delta / (P * LHV)) + Ea * Gamma) / (Delta + Gamma)
             self.Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
             #Calculate Convection FLUX
-            Bowen = Gamma * (self.T - Air_T) / (Sat_Vapor - Air_Vapor)
+            Bowen = Gamma * (self.T_prev - Air_T) / (Sat_Vapor - Air_Vapor)
             self.Flux["Convection"] = self.Flux["Evaporation"] * Bowen
         else:
             #===================================================
@@ -591,7 +595,7 @@ class StreamNode(StreamChannel):
             self.Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
             #Calculate Convection FLUX
             if (Sat_Vapor - Air_Vapor) <> 0:
-                Bowen = 0.61 * (Pressure / 1000) * (self.T - Air_T) / (Sat_Vapor - Air_Vapor)
+                Bowen = 0.61 * (Pressure / 1000) * (self.T_prev - Air_T) / (Sat_Vapor - Air_Vapor)
             else:
                 Bowen = 1
             self.Flux["Convection"] = self.Flux["Evaporation"] * Bowen
@@ -631,3 +635,92 @@ class StreamNode(StreamChannel):
             Heat["Convection"] = dt * self.Flux["Convection"]
             Heat["Total"] = dt * self.Flux["Total"]
             print Heat["Total"]
+
+    def MacCormick1(self):
+        dt = self.dt
+        dx = self.dx
+        Dispersion = 0
+        S1 = 0
+        SkipNode = False
+        if self.prev_km:
+            if not SkipNode:
+                mix = self.MixItUp(0)
+                T0 = self.prev_km.T_prev + mix
+                T1 = self.T_prev
+                T2 = self.next_km.T if self.next_km else self.T_prev
+                if not self.S:
+                    Shear_Velocity = self.U
+                else:
+                    Shear_Velocity = math.sqrt(9.8 * self.d_w * self.S)
+                Dispersion = 0.011 * (self.U ** 2) * self.W_w ** 2 / (self.d_w * Shear_Velocity)
+                if Dispersion * dt / (dx ** 2) > 0.5:
+                    Dispersion = (0.45 * (dx ** 2)) / dt
+                Dummy1 = -self.U * (T1 - T0) / dx
+                Dummy2 = Dispersion * (T2 - 2 * T1 + T0) / (dx ** 2)
+                S1 = Dummy1 + Dummy2 + self.Delta_T / dt
+                self.T = T1 + S1 * dt
+            else:
+                self.T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev
+        else:
+            self.T = self.T_bc[Chronos.TheTime, -1]
+        print self.T,
+        return Dispersion,S1
+
+    def MacCormick2(self, Dispersion, S1):
+        dt = self.dt
+        dx = self.dx
+        SkipNode = False
+        #===================================================
+        #Set control temps
+        if self.T_cont:
+            self.T = self.T_cont
+            return
+        #===================================================
+        if self.prev_km:
+            if not SkipNode:
+                mix = self.MixItUp(1)
+                T0 = self.prev_km.T + mix
+                T1 = self.T
+                T2 = self.next_km.T if self.next_km else self.T
+                #======================================================
+                #Final MacCormick Finite Difference Calc.
+                #===================================================
+                Dummy1 = -self.U * (T1 - T0) / dx
+                Dummy2 = Dispersion * (T2 - 2 * T1 + T0) / dx ** 2
+                S2 = Dummy1 + Dummy2 + self.Delta_T / dt
+                self.T = self.T_prev + ((S1 + S2) / 2) * dt
+            else:
+                self.T = self.T_prev
+        if self.T > 50 or self.T < 0:
+            raise Exception("Unstable model")
+        print self.T
+
+    def MixItUp(self,timestep=0):
+        time = Chronos.TheTime
+        if self.Q:
+            Q_up = self.prev_km.Q if timestep else self.prev_km.Q_prev
+            T_up = self.prev_km.T if timestep else self.prev_km.T_prev
+        else:
+            Q_up = 0
+        if Q_up:
+            # Get any point-source inflow data
+            try:
+                Q_in = self.Q_tribs[time,-1]
+                T_in = self.T_tribs[time,-1]
+            except IndexError:
+                Q_in = 0
+                T_in = 0
+            # Hyporheic flows if available
+            Q_hyp = self.Q_hyp or 0
+            # And accretionary flows
+            Q_accr = self.Q_in or 0
+            T_accr = self.T_in or 0
+            #Calculate temperature change from mass transfer from point inflows
+            T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in)
+            #Calculate temperature change from mass transfer from hyporheic zone
+            T_mix = ((self.T_sed * Q_hyp) + (T_mix * (Q_up + Q_in))) / (Q_hyp + Q_up + Q_in)
+            #Calculate temperature change from accretion inflows
+            T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp)
+            return T_mix - T_up
+        else:
+            return 0

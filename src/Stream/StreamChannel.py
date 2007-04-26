@@ -125,7 +125,7 @@ class StreamChannel(object):
             return
         # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
         self.CalcGeometry()
-#        self.CalcHyporheic()
+        self.CalcHyporheic()
 
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
