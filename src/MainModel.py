@@ -7,6 +7,7 @@ from Dieties.Helios import Helios
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
 from Utils.DynaPlot import DynaPlot, TIMER_ID
+from Utils.Output import Output
 
 global app
 
@@ -37,6 +38,7 @@ class MainModel(object):
 #        self.DPlot.Show()
 #        self.DPlot.Initialize(self.X, self.Y)
         self.timer = TimeStepper(self.TimeStep)
+        
     def Reset(self):
         ##########################################################
         # Create a Chronos iterator that controls all model time
@@ -47,6 +49,9 @@ class MainModel(object):
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start, dt, stop, spin)
         ##########################################################
+        dt_out = timedelta(minutes=60)
+        self.Output = Output(dt_out, self.Reach, start)
+        
     def Run(self):
         self.Reset()
         self.timer.Start(100)
@@ -60,6 +65,7 @@ class MainModel(object):
             # Calculate the solar flux
             map(lambda x:x.CalcHeat(), self.Reach)
 #            self.DPlot.onTimer(False)
+            self.Output.Store(Chronos.TheTime)
             Chronos.Tick()
             return True
         except:
