@@ -26,7 +26,8 @@ class StreamNode(StreamChannel):
              "Wind", "Humidity", "T_air", # Continuous data
              "Zone", "T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
              "Delta_T", # Current temperature calculated from only local fluxes
-             "T", "T_prev" # Current and previous stream temperature
+             "T", "T_prev", # Current and previous stream temperature
+             "Flux" # Dictionary to hold heat flux values
              ]
         # Set all the attributes to bare lists, or set from the constructor
         for attr in s:
@@ -191,22 +192,19 @@ class StreamNode(StreamChannel):
         return 1 - VTS_Total / (7 * 90)
 
     def CalcHeat(self):
-        Flux = {"Direct":  [0]*8,
+        self.Flux = {"Direct":  [0]*8,
                 "Diffuse": [0]*8,
                 "Solar":   [0]*8}
-        Heat = {}
-        Heat["Solar"] = [0]*8
         view = self.ViewToSky()
-        DayTime = self.CalcSolarFlux(Flux,view) # Returns false if night
-        if DayTime:
-            self.CalcConductionFlux(Flux)
-            self.CalcLongwaveFlux(Flux,view)
-            self.CalcEvapConvFlux(Flux)
+        DayTime = self.CalcSolarFlux(view) # Returns false if night
+        self.CalcConductionFlux()
+        self.CalcLongwaveFlux(view)
+        self.CalcEvapConvFlux()
 
-        self.RecordHeatData(Flux,Heat,DayTime)
+        self.RecordHeatData(DayTime)
         print self, Chronos.TheTime, self.Delta_T
 
-    def CalcSolarFlux(self, Flux, ViewToSky):
+    def CalcSolarFlux(self, ViewToSky):
         #Like the others, taken from VB code unless otherwise noted
         #TODO: This is a ridiculously long method. It should be cleaned up.
         #======================================================
@@ -218,9 +216,9 @@ class StreamNode(StreamChannel):
         # If it's night, we get out quick.
         if Altitude <= 0: #Nighttime
             Altitude = 0
-            Flux["Direct"] = [0]*8
-            Flux["Diffuse"] = [0]*8
-            Flux["Solar"] = [0]*8
+            self.Flux["Direct"] = [0]*8
+            self.Flux["Diffuse"] = [0]*8
+            self.Flux["Solar"] = [0]*8
             return False #Nothing else to do, so ignore rest of method
 
         #########################################################
@@ -298,8 +296,8 @@ class StreamNode(StreamChannel):
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
         Rad_Vec = 1 + 0.017 * math.cos((2 * math.pi / 365) * (186 - JD + time.hour / 24))
         Solar_Constant = 1367 #W/m2
-        Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(math.radians(Altitude)) #Global Direct Solar Radiation
-        Flux["Diffuse"][0] = 0
+        self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * math.sin(math.radians(Altitude)) #Global Direct Solar Radiation
+        self.Flux["Diffuse"][0] = 0
         ########################################################
         #======================================================
         # 1 - Above Topography
@@ -307,20 +305,20 @@ class StreamNode(StreamChannel):
         Air_Mass = Dummy1 * math.exp(-0.0001184 * self.Zone[0][1].Elevation)
         Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (JD + 10)) + 0.8
         #Calculate Diffuse Fraction
-        Flux["Direct"][1] = Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
-        if Flux["Direct"][0] == 0:
+        self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
+        if self.Flux["Direct"][0] == 0:
             Clearness_Index = 1
         else:
-            Clearness_Index = Flux["Direct"][1] / Flux["Direct"][0]
-        Dummy = Flux["Direct"][1]
+            Clearness_Index = self.Flux["Direct"][1] / self.Flux["Direct"][0]
+        Dummy = self.Flux["Direct"][1]
         Dummy1 = 0.938 + 1.071 * Clearness_Index
         Dummy2 = 5.14 * (Clearness_Index ** 2)
         Dummy3 = 2.98 * (Clearness_Index ** 3)
         Dummy4 = math.sin(2 * math.pi * (JD - 40) / 365)
         Dummy5 = (0.009 - 0.078 * Clearness_Index)
         Diffuse_Fraction = Dummy1 - Dummy2 + Dummy3 - Dummy4 * Dummy5
-        Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
-        Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
+        self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
+        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
         ########################################################
         #======================================================
         #2 - Above Land Cover
@@ -330,16 +328,16 @@ class StreamNode(StreamChannel):
         #3 - Above Stream Surface (Above Bank Shade)
         if Altitude <= Topo_Alt:    #>Topographic Shade IS Occurring<
             Flag_Topo = True
-            Flux["Direct"][2] = 0
-            Flux["Diffuse"][2] = Flux["Diffuse"][1] * (self.Topo["E"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3)
-            Flux["Direct"][3] = 0
-            Flux["Diffuse"][3] = Flux["Diffuse"][2] * ViewToSky
+            self.Flux["Direct"][2] = 0
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (self.Topo["E"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3)
+            self.Flux["Direct"][3] = 0
+            self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * ViewToSky
         else:  #>Topographic Shade is NOT Occurring<
             Flag_Topo = False
-            Flux["Direct"][2] = Flux["Direct"][1]
-            Flux["Diffuse"][2] = Flux["Diffuse"][1] * (1 - (self.Topo["W"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3))
-            Dummy1 = Flux["Direct"][2]
-            for i in xrange(4): #Calculate shade density and Flux["Direct"][3]
+            self.Flux["Direct"][2] = self.Flux["Direct"][1]
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - (self.Topo["W"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3))
+            Dummy1 = self.Flux["Direct"][2]
+            for i in xrange(4): #Calculate shade density and self.Flux["Direct"][3]
                 zone = self.Zone[Direction][i]
                 LC_ShadowLength = (zone.VHeight + zone.Elevation-self.Elevation) / math.tan(math.radians(Altitude)) #Vegetation Shadow Casting
                 if LC_ShadowLength >= LC_Distance[i]: #Veg Shade IS Occurring
@@ -353,24 +351,24 @@ class StreamNode(StreamChannel):
                 else: #Veg Shade IS NOT Occurring
                     Shade_Density[i] = 0
                 Dummy1 = Dummy1 * (1 - Shade_Density[i])
-            Flux["Direct"][3] = Dummy1
-            Flux["Diffuse"][3] = Flux["Diffuse"][2] * ViewToSky
+            self.Flux["Direct"][3] = Dummy1
+            self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * ViewToSky
         ###########################################################
         #==========================================================
         #4 - Above Stream Surface (What a Solar Pathfinder measures)
         #Account for bank shade
         if not Flag_Topo:
-            for i in xrange(3,-1,-1): #VB Code goes backwards for some reason to Calculate bank shade and Flux["Direct"][4]
+            for i in xrange(3,-1,-1): #VB Code goes backwards for some reason to Calculate bank shade and self.Flux["Direct"][4]
                 DEM_ShadowLength = (zone.Elevation - self.Elevation) / math.tan(math.radians(Altitude)) #Bank Shadow Casting
                 if DEM_ShadowLength >= LC_Distance[i]: #Bank Shade is Occurring
-                    Flux["Direct"][4] = 0
-                    Flux["Diffuse"][4] = Flux["Diffuse"][3]
+                    self.Flux["Direct"][4] = 0
+                    self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
                 else:
-                    Flux["Direct"][4] = Flux["Direct"][3]
-                    Flux["Diffuse"][4] = Flux["Diffuse"][3]
+                    self.Flux["Direct"][4] = self.Flux["Direct"][3]
+                    self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         else:
-            Flux["Direct"][4] = 0
-            Flux["Diffuse"][4] = Flux["Diffuse"][3]
+            self.Flux["Direct"][4] = 0
+            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         #Account for emergent vegetation
         if IniParams.Emergent:
             Path[0] = zone[0][0].VHeight / math.sin(math.radians(Altitude))
@@ -387,11 +385,11 @@ class StreamNode(StreamChannel):
             else:
                 Rip_Extinct[0] = -math.log(1 - zone[0][0].VDensity) / 10
                 Shade_Density[0] = 1 - math.exp(-Rip_Extinct[0] * Path[0])
-            Flux["Direct"][4] = Flux["Direct"][4] * (1 - Shade_Density[0])
+            self.Flux["Direct"][4] = self.Flux["Direct"][4] * (1 - Shade_Density[0])
             Path[0] = zone[0][0].VHeight
             Rip_Extinct[0] = -math.log(1 - zone[0][0].VDensity) / zone[0][0].VHeight
             Shade_Density[0] = 1 - math.exp(-Rip_Extinct[0] * Path[0])
-            Flux["Diffuse"][4] = Flux["Diffuse"][4] * (1 - Shade_Density[0])
+            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density[0])
 
 #        raise Exception("Debug Breakpoint")
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -405,8 +403,8 @@ class StreamNode(StreamChannel):
             Stream_Reflect = 0.0515 * (Zenith * math.pi / 180) - 3.636
         if abs(Stream_Reflect) > 1:
             Stream_Reflect = 0.091 * (1 / self.cos(Zenith * math.pi / 180)) - 0.0386
-        Flux["Diffuse"][5] = Flux["Diffuse"][4] * 0.91
-        Flux["Direct"][5] = Flux["Direct"][4] * (1 - Stream_Reflect)
+        self.Flux["Diffuse"][5] = self.Flux["Diffuse"][4] * 0.91
+        self.Flux["Direct"][5] = self.Flux["Direct"][4] * (1 - Stream_Reflect)
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         #6 - Received by Water Column
         #=========================================================
@@ -418,28 +416,28 @@ class StreamNode(StreamChannel):
         Trans_Stream = 0.415 - (0.194 * math.log10(Water_Path * 100))
         if Trans_Stream > 1:
             Trans_Stream = 1
-        Dummy1 = Flux["Direct"][5] * (1 - Trans_Stream)       #Direct Solar Radiation attenuated on way down
-        Dummy2 = Flux["Direct"][5] - Dummy1                   #Direct Solar Radiation Hitting Stream bed
+        Dummy1 = self.Flux["Direct"][5] * (1 - Trans_Stream)       #Direct Solar Radiation attenuated on way down
+        Dummy2 = self.Flux["Direct"][5] - Dummy1                   #Direct Solar Radiation Hitting Stream bed
         Bed_Reflect = math.exp(0.0214 * (Zenith * math.pi / 180) - 1.941)   #Reflection Coef. for Direct Solar
         BedRock = 1 - self.phi
         Dummy3 = Dummy2 * (1 - Bed_Reflect)                #Direct Solar Radiation Absorbed in Bed
         Dummy4 = 0.53 * BedRock * Dummy3                   #Direct Solar Radiation Immediately Returned to Water Column as Heat
         Dummy5 = Dummy2 * Bed_Reflect                      #Direct Solar Radiation Reflected off Bed
         Dummy6 = Dummy5 * (1 - Trans_Stream)               #Direct Solar Radiation attenuated on way up
-        Flux["Direct"][6] = Dummy1 + Dummy4 + Dummy6
-        Flux["Direct"][7] = Dummy3 - Dummy4
+        self.Flux["Direct"][6] = Dummy1 + Dummy4 + Dummy6
+        self.Flux["Direct"][7] = Dummy3 - Dummy4
         Trans_Stream = 0.415 - (0.194 * math.log10(100 * self.d_w))
         if Trans_Stream > 1:
             Trans_Stream = 1
-        Dummy1 = Flux["Diffuse"][5] * (1 - Trans_Stream)      #Diffuse Solar Radiation attenuated on way down
-        Dummy2 = Flux["Diffuse"][5] - Dummy1                  #Diffuse Solar Radiation Hitting Stream bed
+        Dummy1 = self.Flux["Diffuse"][5] * (1 - Trans_Stream)      #Diffuse Solar Radiation attenuated on way down
+        Dummy2 = self.Flux["Diffuse"][5] - Dummy1                  #Diffuse Solar Radiation Hitting Stream bed
         Bed_Reflect = math.exp(0.0214 * (0) - 1.941)               #Reflection Coef. for Diffuse Solar
         Dummy3 = Dummy2 * (1 - Bed_Reflect)                #Diffuse Solar Radiation Absorbed in Bed
         Dummy4 = 0.53 * BedRock * Dummy3                   #Diffuse Solar Radiation Immediately Returned to Water Column as Heat
         Dummy5 = Dummy2 * Bed_Reflect                      #Diffuse Solar Radiation Reflected off Bed
         Dummy6 = Dummy5 * (1 - Trans_Stream)               #Diffuse Solar Radiation attenuated on way up
-        Flux["Diffuse"][6] = Dummy1 + Dummy4 + Dummy6
-        Flux["Diffuse"][7] = Dummy3 - Dummy4
+        self.Flux["Diffuse"][6] = Dummy1 + Dummy4 + Dummy6
+        self.Flux["Diffuse"][7] = Dummy3 - Dummy4
         #=========================================================
 
 #        '   Flux_Solar(x) and Flux_Diffuse = Solar flux at various positions
@@ -451,20 +449,15 @@ class StreamNode(StreamChannel):
 #        '       5 - Entering Stream
 #        '       6 - Received by Water Column
 #        '       7 - Received by Bed
-        Flux["Solar"][1] = Flux["Diffuse"][1] + Flux["Direct"][1]
-        Flux["Solar"][2] = Flux["Diffuse"][2] + Flux["Direct"][2]
-        Flux["Solar"][4] = Flux["Diffuse"][4] + Flux["Direct"][4]
-        Flux["Solar"][5] = Flux["Diffuse"][5] + Flux["Direct"][5]
-        Flux["Solar"][6] = Flux["Diffuse"][6] + Flux["Direct"][6]
-        Flux["Solar"][7] = Flux["Diffuse"][7] + Flux["Direct"][7]
-        for i in Flux:
-            for j in i:
-                if j < 0:
-                    print Chronos.TheTime, j
-                    raise Exception
+        self.Flux["Solar"][1] = self.Flux["Diffuse"][1] + self.Flux["Direct"][1]
+        self.Flux["Solar"][2] = self.Flux["Diffuse"][2] + self.Flux["Direct"][2]
+        self.Flux["Solar"][4] = self.Flux["Diffuse"][4] + self.Flux["Direct"][4]
+        self.Flux["Solar"][5] = self.Flux["Diffuse"][5] + self.Flux["Direct"][5]
+        self.Flux["Solar"][6] = self.Flux["Diffuse"][6] + self.Flux["Direct"][6]
+        self.Flux["Solar"][7] = self.Flux["Diffuse"][7] + self.Flux["Direct"][7]
         return True
 
-    def CalcConductionFlux(self,Flux):
+    def CalcConductionFlux(self):
         #======================================================
         #Calculate Bed Conduction FLUX
         #and hyporheic exchange temperature change
@@ -501,7 +494,7 @@ class StreamNode(StreamChannel):
         ThermalDiffuse = (Sed_ThermalDiffuse * Ratio_Sediment) + (H2O_ThermalDiffuse * Ratio_H2O)
         #======================================================
         #Calculate the conduction flux between water column & substrate
-        Flux_Conduction = ThermalDiffuse * Density * HeatCapacity * (self.T_sed - self.T) / (Sed_Depth / 2)
+        self.Flux["Conduction"] = ThermalDiffuse * Density * HeatCapacity * (self.T_sed - self.T) / (Sed_Depth / 2)
         #Calculate the conduction flux between deeper alluvium & substrate
         # TODO: Figure out when this is necessary or desirable
 ##        If Sheet2.Range("IV21").Value = 1 Then
@@ -511,13 +504,13 @@ class StreamNode(StreamChannel):
         #======================================================
         #Calculate the changes in temperature in the substrate conduction layer
         #Temperature change in substrate from solar exposure and conducted heat
-        NetHeat_Sed = Flux["Solar"][7] - Flux_Conduction - Flux_Conduction_Alluvium
+        NetHeat_Sed = self.Flux["Solar"][7] - self.Flux["Conduction"] - Flux_Conduction_Alluvium
         DT_Sed = NetHeat_Sed * self.P_w * self.dx * self.dt / (Volume_Hyp * Density * HeatCapacity)
         #======================================================
         #Calculate the temperature of the substrate conduction layer
         self.T_sed = self.T_sed + DT_Sed
 #
-    def CalcLongwaveFlux(self,Flux,ViewToSky):
+    def CalcLongwaveFlux(self,ViewToSky):
         #=====================================================
         #Calculate Longwave FLUX
         #======================================================
@@ -532,16 +525,16 @@ class StreamNode(StreamChannel):
         Emissivity = 1.72 * (((Air_Vapor * 0.1) / (273.2 + Air_T)) ** (1 / 7)) * (1 + 0.22 * self.C_bc[time,-1] ** 2) #Dingman p 282
         #======================================================
         #Calcualte the atmospheric longwave flux
-        Flux["LW_Atm"] = 0.96 * ViewToSky * Emissivity * Sigma * (Air_T + 273.2) ** 4
-        #FLUX["LW_Atm"] = 0.96 * Emissivity * Sigma * (Air_T + 273.2) ^ 4
+        self.Flux["LW_Atm"] = 0.96 * ViewToSky * Emissivity * Sigma * (Air_T + 273.2) ** 4
+        #self.Flux["LW_Atm"] = 0.96 * Emissivity * Sigma * (Air_T + 273.2) ^ 4
         #Calcualte the backradiation longwave flux
-        Flux["LW_Stream"] = -0.96 * Sigma * (self.T + 273.2) ** 4
+        self.Flux["LW_Stream"] = -0.96 * Sigma * (self.T + 273.2) ** 4
         #Calcualte the vegetation longwave flux
-        Flux["LW_Veg"] = 0.96 * (1 - ViewToSky) * 0.96 * Sigma * (Air_T + 273.2) ** 4
+        self.Flux["LW_Veg"] = 0.96 * (1 - ViewToSky) * 0.96 * Sigma * (Air_T + 273.2) ** 4
         #Calcualte the net longwave flux
-        Flux["Longwave"] = Flux["LW_Atm"] + Flux["LW_Stream"] + Flux["LW_Veg"]
+        self.Flux["Longwave"] = self.Flux["LW_Atm"] + self.Flux["LW_Stream"] + self.Flux["LW_Veg"]
 
-    def CalcEvapConvFlux(self,Flux):
+    def CalcEvapConvFlux(self):
         #===================================================
         #Calculate Evaporation FLUX
         #===================================================
@@ -581,59 +574,60 @@ class StreamNode(StreamChannel):
             #Calculate Evaporation FLUX
             Gamma = 1003.5 * Pressure / (LHV * 0.62198) #mb/*C  Cuenca p 141
             Delta = 6.1275 * math.exp(17.27 * Air_T / (237.3 + Air_T)) - 6.1275 * math.exp(17.27 * (Air_T - 1) / (237.3 + Air_T - 1))
-            NetRadiation = Flux["Solar"][5] + Flux["Longwave"]  #J/m2/s
+            NetRadiation = self.Flux["Solar"][5] + self.Flux["Longwave"]  #J/m2/s
             if NetRadiation < 0:
                 NetRadiation = 0 #J/m2/s
             Ea = Wind_Function * (Sat_Vapor - Air_Vapor)  #m/s
             Evap_Rate = ((NetRadiation * Delta / (P * LHV)) + Ea * Gamma) / (Delta + Gamma)
-            Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
+            self.Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
             #Calculate Convection FLUX
             Bowen = Gamma * (self.T - Air_T) / (Sat_Vapor - Air_Vapor)
-            Flux["Convection"] = Flux["Evaporation"] * Bowen
+            self.Flux["Convection"] = self.Flux["Evaporation"] * Bowen
         else:
             #===================================================
             #Calculate Evaporation FLUX
             Evap_Rate = Wind_Function * (Sat_Vapor - Air_Vapor)  #m/s
             P = 998.2 # kg/m3
-            Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
+            self.Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
             #Calculate Convection FLUX
             if (Sat_Vapor - Air_Vapor) <> 0:
                 Bowen = 0.61 * (Pressure / 1000) * (self.T - Air_T) / (Sat_Vapor - Air_Vapor)
             else:
                 Bowen = 1
-            Flux["Convection"] = Flux["Evaporation"] * Bowen
+            self.Flux["Convection"] = self.Flux["Evaporation"] * Bowen
 
-    def RecordHeatData(self,Flux,Heat,DayTime):
+    def RecordHeatData(self,DayTime):
         dt = self.dt
+        Heat = {"Solar": [0]*8}
         if DayTime:
-            Flux["Total"] = Flux["Solar"][6] + Flux["Conduction"] + Flux["Evaporation"] + Flux["Convection"] + Flux["Longwave"]
+            self.Flux["Total"] = self.Flux["Solar"][6] + self.Flux["Conduction"] + self.Flux["Evaporation"] + self.Flux["Convection"] + self.Flux["Longwave"]
             Cp = 4182 # J/kg *C
             P = 998.2 # kg/m3
-            self.Delta_T = Flux["Total"] * dt / self.d_ave * Cp * P
+            self.Delta_T = self.Flux["Total"] * dt / self.d_ave * Cp * P
         else:
-            Flux["Total"] = 0
-            Flux["Conduction"] = 0
-            Flux["Evaporation"] = 0
-            Flux["Convection"] = 0
-            Flux["Longwave"] = 0
+            self.Flux["Total"] = 0
+            self.Flux["Conduction"] = 0
+            self.Flux["Evaporation"] = 0
+            self.Flux["Convection"] = 0
+            self.Flux["Longwave"] = 0
             self.Delta_T = 0
-            Flux["Solar"][1] = 0
-            Flux["Solar"][4] = 0
-            Flux["Solar"][6] = 0
+            self.Flux["Solar"][1] = 0
+            self.Flux["Solar"][4] = 0
+            self.Flux["Solar"][6] = 0
             self.E = 0
 
         if False:#Chronos.TheTime > Chronos.start:
             #Calculate Heat by process (J/m2 per day)
-            Heat["Solar"][1] = Heat["Solar"][1] + dt * Flux["Solar"][1]
-            Heat["Solar"][2] = Heat["Solar"][2] + dt * Flux["Solar"][2]
-            Heat["Solar"][4] = Heat["Solar"][4] + dt * Flux["Solar"][4]
-            Heat["Solar"][6] = Heat["Solar"][6] + dt * Flux["Solar"][6]
-            Heat["Conduction"] = dt * Flux["Conduction"]
-            Heat["Longwave"] = dt * Flux["Longwave"]
-            Heat["LW_Atm"] = dt * Flux["LW_Atm"]
-            Heat["LW_LC"] = dt * Flux["LW_Veg"]
-            Heat["LW_BR"] = dt * Flux["LW_Stream"]
-            Heat["Evaporation"] = dt * Flux["Evaporation"]
-            Heat["Convection"] = dt * Flux["Convection"]
-            Heat["Total"] = dt * Flux["Total"]
+            Heat["Solar"][1] = Heat["Solar"][1] + dt * self.Flux["Solar"][1]
+            Heat["Solar"][2] = Heat["Solar"][2] + dt * self.Flux["Solar"][2]
+            Heat["Solar"][4] = Heat["Solar"][4] + dt * self.Flux["Solar"][4]
+            Heat["Solar"][6] = Heat["Solar"][6] + dt * self.Flux["Solar"][6]
+            Heat["Conduction"] = dt * self.Flux["Conduction"]
+            Heat["Longwave"] = dt * self.Flux["Longwave"]
+            Heat["LW_Atm"] = dt * self.Flux["LW_Atm"]
+            Heat["LW_LC"] = dt * self.Flux["LW_Veg"]
+            Heat["LW_BR"] = dt * self.Flux["LW_Stream"]
+            Heat["Evaporation"] = dt * self.Flux["Evaporation"]
+            Heat["Convection"] = dt * self.Flux["Convection"]
+            Heat["Total"] = dt * self.Flux["Total"]
             print Heat["Total"]
