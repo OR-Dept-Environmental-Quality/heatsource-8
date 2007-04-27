@@ -2,7 +2,7 @@ from __future__ import division
 import math, decimal
 from warnings import warn
 from itertools import imap
-from Utils.Maths import NewtonRaphson, NewtonRaphsonSecant
+from Utils.Maths import NewtonRaphsonTangent, NewtonRaphsonSecant
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
 
@@ -87,7 +87,8 @@ class StreamChannel(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
-        t = Chronos.TheTime
+        Clock = Chronos # make a local variable to speed access, since it's done every time/space step
+        time = Clock.TheTime
 
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
@@ -95,15 +96,15 @@ class StreamChannel(object):
             # In order, they are (t,x-1), (t-1,x-1), (t-1,x).
             Q1,Q2,Q3 = self.GetKnownDischarges()
             # Use (t,x-1) to calculate the Muskingum coefficients
-            C1,C2,C3,C4 = self.GetMuskingum(Q2)
+            C1,C2,C3 = self.GetMuskingum(Q2)
             # Calculate the new Q
-            Q = round(C1*Q1 + C2*Q2 + C3*Q3 + C4,4)
+            Q = C1*Q1 + C2*Q2 + C3*Q3
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
             try:
-                Q = self.Q_bc[t,-1]*1 # Get the value at this time, or the closest previous time
+                Q = self.Q_bc[time,-1]*1 # Get the value at this time, or the closest previous time
             except:
-                if Chronos.TheTime < Chronos.MakeDatetime(IniParams.Date):
+                if time < Clock.MakeDatetime(IniParams.Date):
                     Q = self.Q_bc[0]*1 #Multiplying by 1 turns it into a true Python float
                 else: raise
             if Q == 1:
@@ -174,8 +175,7 @@ class StreamChannel(object):
         Q3 = self.Q
         if Q3 is None: raise Exception("Channel %s has no previous discharge calculation" % self)
 
-        V = lambda x:x# * self.dt
-        return V(Q1), V(Q2), V(Q3)
+        return Q1,Q2,Q3
 
     def CalcGeometry(self, Q_est=None):
         """Calculate all morphological characteristics that are flow dependent
@@ -190,7 +190,7 @@ class StreamChannel(object):
         else:
             if not self.S: raise Exception("Control depth must be given with zero slope")
             Q_est = Q_est or self.Q
-            dw = self.GetWettedDepth(Q_est)
+            dw = NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
 
         self.d_w = dw
         self.A = self.d_w * (self.W_b + self.z*self.d_w)
@@ -205,20 +205,15 @@ class StreamChannel(object):
         #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         # Taken from the VB source.
         c_k = (5/3) * self.U  # Wave celerity
-        den = (self.W_w * self.S * self.dx * c_k)
-#        den *= 2
-        X = 0.5 * (1 - self.Q / den)
+        X = 0.5 * (1 - self.Q / (self.W_w * self.S * self.dx * c_k))
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
         K = self.dx / c_k
-        test0 = 2 * K * X
-        test1 = 2 * K * (1 - X)
+#        test0 = 2 * K * X
         dt = self.dt
 
-        if dt <= test0:
-            pass
         # Check the celerity to ensure stability. These tests are from the VB code.
-        if dt >= test1 or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
+        if dt >= (2 * K * (1 - X)) or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
             raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
 
         # These calculations are from Chow's "Applied Hydrology"
@@ -233,11 +228,7 @@ class StreamChannel(object):
         # remultiply by dx. We save a step here by only multiplying Q*dt and achieve the same
         # result (plus something like 3.5e-16 seconds too! :)
         # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
-        C4 = 0#(self.GetInputs()*dt)/D
-#        test = C1 + C2 + C3
-#        if test != 1:
-#            raise Exception("Muskigum coefficents (C1: %0.3f, C2: %0.3f, C3: %0.3f) not at unity in %s" %(C1,C2,C3,self.km))
-        return C1, C2, C3, C4
+        return C1, C2, C3
 
 
     def SetBankfullMorphology(self):
@@ -264,56 +255,6 @@ class StreamChannel(object):
             self.d_bf = self.d_bf + 0.01
             self.W_b = self.W_bf - 2*self.z*self.d_bf
             Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
-
-    def GetWettedDepth(self, Q_est=None):
-        """Use Newton-Raphson method to calculate wetted depth from current conditions
-
-        Details on this can be found in the HeatSource manual Sec. 3.2.
-        More general details on the technique can be found in Applied Hydrology
-        in section 10.4.
-        This method uses the NewtonRaphson method defined in Maths. It requires the
-        derivative of the function, but we go ahead and work that out because using the
-        derivative is more accurate and faster (programatically) than the secant method
-        used in the original code.
-        """
-        if not Q_est: raise Exception("Method must be called with estimated discharge")
-        if not self.W_b: raise Exception("Bankfull morphology must be set before calculations can be performed")
-        z = self.z
-        W = self.W_b
-        # The function def is given in the HeatSource manual Sec 3.2... in three sections
-        first = lambda x: x * (W + z * x) # Cross-sectional area formula
-        second = lambda x: (first(x) / (W + 2 * x * math.sqrt(1+z**2)))**(2/3) # Hydraulic Radius to the 2/3,
-        # The functional definition of wetted depth:
-        Fd = lambda x: first(x) * second(x) - ((Q_est*self.n)/(self.S**(1/2)))
-        # Here is the formula in terms of x, where x is the wetted depth.
-        # (x*(w+(z*x))*((x*(w+(z*x)))/(w+(2*x*sqrt(1+z^2))))^(2/3))-((Q*n)/(s^(1/2)))
-        # This can be used to calculate the derivative using software such as that on
-        # http://wims.unice.fr/wims/ which will calculate derivatives online. Not that I'm too lazy
-        # to do it myself or anything.
-
-        # Here is the derivative of the equation in sections.
-        first = lambda x: (5 * (x**(2/3)) * ((x*z+W)**(5/3))) / (3*((2*x*math.sqrt((z**2)+1)+W)**(2/3)))
-        second = lambda x: (5 * (x**(5/3)) * z * ((x*z+W)**(2/3))) / (3*((2*x*math.sqrt((z**2)+1)+W)**(2/3)))
-        third = lambda x: (4 * (x**(5/3)) * ((x*z+W)**(5/3)) * math.sqrt(z**2+1)) / (3*((2*x*math.sqrt((z**2)+1)+W)**(5/3)))
-
-        Fdd = lambda x: first(x) + second(x) - third(x)
-        #TODO: Remove this secant derivative after debugging if it's not needed
-        # This might not work, but as a first approximation for a secant-based derivative:
-        #Fdd = lambda x: (Fd(x+0.001) - Fd(x))/0.001
-        # The problem is that the NewtonRaphson method might be doing calculations based on fact that
-        # Fdd is a true derivative, rather than a secant approximation. I'm not sure.
-
-        # Our Newton-Raphson method uses bracketing and binary search methods to dial down the function's zero.
-        # Since we don't know our brackets each time, we make one up here, and assume that no stream is more than
-        # 20 meters deep. We CAN put these minimum and maximum values in the IniParams class just to make things
-        # easier to change, but until we know we need to, they will be left here.
-        try:
-            # val = NewtonRaphson(Fd, Fdd, 0, 50) # Assume minimum (0) and maximum (50) meters in depth
-            val = NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
-            return val
-        except:
-            print "Failure to converge on a depth. Check minimum and maximum values defined in this method."
-            raise
 
     def CalcHyporheic(self):
         """Calculate the hyporheic exchange value"""

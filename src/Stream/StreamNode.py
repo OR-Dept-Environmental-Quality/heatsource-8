@@ -6,7 +6,6 @@ from Dieties.IniParams import IniParams
 from Containers.VegZone import VegZone
 from Containers.Zonator import Zonator
 from Containers.AttrList import TimeList
-from Utils.Maths import NewtonRaphson
 from StreamChannel import StreamChannel
 from Dieties.Helios import Helios
 from Dieties.Chronos import Chronos
@@ -305,8 +304,8 @@ class StreamNode(StreamChannel):
         ########################################################
         #======================================================
         # 1 - Above Topography
-        Dummy1 = 35 / math.sqrt(1224 * math.sin(math.radians(Altitude)) + 1)
-        Air_Mass = Dummy1 * math.exp(-0.0001184 * self.Zone[0][1].Elevation)
+        Air_Mass = (35 / math.sqrt(1224 * math.sin(math.radians(Altitude)) + 1)) * \
+            math.exp(-0.0001184 * self.Zone[0][1].Elevation)
         Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (JD + 10)) + 0.8
         #Calculate Diffuse Fraction
         self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
@@ -315,12 +314,11 @@ class StreamNode(StreamChannel):
         else:
             Clearness_Index = self.Flux["Direct"][1] / self.Flux["Direct"][0]
         Dummy = self.Flux["Direct"][1]
-        Dummy1 = 0.938 + 1.071 * Clearness_Index
-        Dummy2 = 5.14 * (Clearness_Index ** 2)
-        Dummy3 = 2.98 * (Clearness_Index ** 3)
-        Dummy4 = math.sin(2 * math.pi * (JD - 40) / 365)
-        Dummy5 = (0.009 - 0.078 * Clearness_Index)
-        Diffuse_Fraction = Dummy1 - Dummy2 + Dummy3 - Dummy4 * Dummy5
+        Diffuse_Fraction = (0.938 + 1.071 * Clearness_Index) - \
+            (5.14 * (Clearness_Index ** 2)) + \
+            (2.98 * (Clearness_Index ** 3)) - \
+            (math.sin(2 * math.pi * (JD - 40) / 365)) * \
+            (0.009 - 0.078 * Clearness_Index)
         self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
         self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
         ########################################################
@@ -415,8 +413,7 @@ class StreamNode(StreamChannel):
 
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         #7 - Received by Bed
-        Dummy = math.atan((math.sin(math.radians(Zenith)) / 1.3333) / math.sqrt(-(math.sin(math.radians(Zenith)) / 1.3333) * (math.sin(math.radians(Zenith)) / 1.3333) + 1))
-        Water_Path = self.d_w / math.cos(Dummy)         #Jerlov (1976)
+        Water_Path = self.d_w / math.cos(math.atan((math.sin(math.radians(Zenith)) / 1.3333) / math.sqrt(-(math.sin(math.radians(Zenith)) / 1.3333) * (math.sin(math.radians(Zenith)) / 1.3333) + 1)))         #Jerlov (1976)
         Trans_Stream = 0.415 - (0.194 * math.log10(Water_Path * 100))
         if Trans_Stream > 1:
             Trans_Stream = 1
@@ -469,13 +466,13 @@ class StreamNode(StreamChannel):
         #Variables used in bed conduction
         #Substrate Conduction Constants
         Sed_Density = 1600 #kg/m3
-        Sed_ThermalDiffuse = 0.0000045 #m2/s
+        Sed_ThermalDiffuse = 4.5e-6 #m2/s
         Sed_HeatCapacity = 2219 #J/(kg *C)
         #======================================================
         #Variables used in bed conduction
         #Water Conduction Constants
         H2O_Density = 1000 #kg/m3
-        H2O_ThermalDiffuse = 0.00000014331 #m2/s
+        H2O_ThermalDiffuse = 14.331e-8 #m2/s
         H2O_HeatCapacity = 4187 #J/(kg *C)
         #======================================================
         #Variables used in bed conduction
@@ -530,7 +527,6 @@ class StreamNode(StreamChannel):
         #======================================================
         #Calcualte the atmospheric longwave flux
         self.Flux["LW_Atm"] = 0.96 * ViewToSky * Emissivity * Sigma * (Air_T + 273.2) ** 4
-        #self.Flux["LW_Atm"] = 0.96 * Emissivity * Sigma * (Air_T + 273.2) ^ 4
         #Calcualte the backradiation longwave flux
         self.Flux["LW_Stream"] = -0.96 * Sigma * (self.T_prev + 273.2) ** 4
         #Calcualte the vegetation longwave flux
@@ -553,8 +549,6 @@ class StreamNode(StreamChannel):
         #===================================================
         #Calculate the frictional reduction in wind velocity
         if IniParams.Emergent and self.Zone[0][0].VHeight > 0:
-            if self.Zone[0][0].VHeight > 2:
-             Dummy = 2
             Zd = 0.7 * self.Zone[0][0].VHeight
             Zo = 0.1 * self.Zone[0][0].VHeight
             Zm = 2
@@ -566,9 +560,7 @@ class StreamNode(StreamChannel):
             Friction_Velocity = Wind
         #===================================================
         #Wind Function f(w)
-        the_a = IniParams.Wind_A
-        the_b = IniParams.Wind_B
-        Wind_Function = the_a + the_b * Friction_Velocity #m/mbar/s
+        Wind_Function = IniParams.Wind_A + IniParams.Wind_B * Friction_Velocity #m/mbar/s
         #===================================================
         #Latent Heat of Vaporization
         LHV = 1000 * (2501.4 + (1.83 * self.T_prev)) #J/kg
@@ -607,7 +599,7 @@ class StreamNode(StreamChannel):
             self.Flux["Total"] = self.Flux["Solar"][6] + self.Flux["Conduction"] + self.Flux["Evaporation"] + self.Flux["Convection"] + self.Flux["Longwave"]
             Cp = 4182 # J/kg *C
             P = 998.2 # kg/m3
-            self.Delta_T = self.Flux["Total"] * dt / self.d_ave * Cp * P
+            self.Delta_T = self.Flux["Total"] * dt / (self.d_ave * Cp * P)
         else:
             self.Flux["Total"] = 0
             self.Flux["Conduction"] = 0
@@ -663,10 +655,11 @@ class StreamNode(StreamChannel):
                 self.T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev
         else:
             self.T = self.T_bc[Chronos.TheTime, -1]
-        print self.T,
         return Dispersion,S1
 
-    def MacCormick2(self, Dispersion, S1):
+    def MacCormick2(self, tup):
+        Dispersion = tup[0]
+        S1 = tup[1]
         dt = self.dt
         dx = self.dx
         SkipNode = False
@@ -693,7 +686,6 @@ class StreamNode(StreamChannel):
                 self.T = self.T_prev
         if self.T > 50 or self.T < 0:
             raise Exception("Unstable model")
-        print self.T
 
     def MixItUp(self,timestep=0):
         time = Chronos.TheTime

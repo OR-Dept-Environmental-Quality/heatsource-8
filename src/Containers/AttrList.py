@@ -168,18 +168,14 @@ class AttrList(list):
             raise Exception("Indexing by attribute is only possible when %s is constructed with an 'attr' keyword value" % self.__class__.__name__)
         # We are not a slice, so we return the indexed value
 
-        # This is the value of x and is used for convenience in the test functions below
-        v = lambda x:getattr(x, self.attr)
-
-
         if not isinstance(index, slice):
             # define a test function based on which way we are looking
             if look == 0: # get only if an attribute is equal
-                test = lambda x: v(x) == index
+                test = lambda x: getattr(x, self.attr) == index
             elif (look == 1 and self.orderdn) or (look == -1 and not self.orderdn): # We are looking for the next smaller value
-                test = lambda x:v(x) <= index
+                test = lambda x: getattr(x, self.attr) <= index
             elif (look == 1 and not self.orderdn) or (look == -1 and self.orderdn): # We are looking for the next larger value
-                test = lambda x:v(x) >= index
+                test = lambda x: getattr(x, self.attr) >= index
             else:
                 raise Exception("Problem in the attribute slicing. Exception called for traceback")
             # Now, we have a test which returns true if the value is appropriate. We use the
