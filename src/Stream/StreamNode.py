@@ -275,9 +275,9 @@ class StreamNode(StreamChannel):
              #TODO: Is LC_TotElv (below) used?
 #            LC_TotElev = self.Zone[Direction][i].VHeight + self.Zone[Direction][i].Elevation - self.Elevation
             if not i:
-                LC_Distance[i] = IniParams.TransSample * (i - 0.5) - self.Overhang[Direction]
+                LC_Distance[i] = IniParams.TransSample * (i + 1 - 0.5) - self.Overhang[Direction]
             else:
-                LC_Distance[i] = IniParams.TransSample * (i - 0.5)
+                LC_Distance[i] = IniParams.TransSample * (i + 1  - 0.5)
             if LC_Distance[i] < 0:
                 LC_Distance[i] = 0.00001
         #############################################################
@@ -308,6 +308,7 @@ class StreamNode(StreamChannel):
             math.exp(-0.0001184 * self.Zone[0][1].Elevation)
         Trans_Air = 0.0685 * math.cos((2 * math.pi / 365) * (JD + 10)) + 0.8
         #Calculate Diffuse Fraction
+
         self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time, -1] ** 2)
         if self.Flux["Direct"][0] == 0:
             Clearness_Index = 1
@@ -339,6 +340,8 @@ class StreamNode(StreamChannel):
             self.Flux["Direct"][2] = self.Flux["Direct"][1]
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - (self.Topo["W"] + self.Topo["S"] + self.Topo["E"]) / (90 * 3))
             Dummy1 = self.Flux["Direct"][2]
+            # I think the following should be counting backwards
+
             for i in xrange(4): #Calculate shade density and self.Flux["Direct"][3]
                 zone = self.Zone[Direction][i]
                 LC_ShadowLength = (zone.VHeight + zone.Elevation-self.Elevation) / math.tan(math.radians(Altitude)) #Vegetation Shadow Casting
@@ -361,6 +364,7 @@ class StreamNode(StreamChannel):
         #Account for bank shade
         if not Flag_Topo:
             for i in xrange(3,-1,-1): #VB Code goes backwards for some reason to Calculate bank shade and self.Flux["Direct"][4]
+                zone = self.Zone[Direction][i]
                 DEM_ShadowLength = (zone.Elevation - self.Elevation) / math.tan(math.radians(Altitude)) #Bank Shadow Casting
                 if DEM_ShadowLength >= LC_Distance[i]: #Bank Shade is Occurring
                     self.Flux["Direct"][4] = 0
@@ -393,6 +397,7 @@ class StreamNode(StreamChannel):
             Shade_Density[0] = 1 - math.exp(-Rip_Extinct[0] * Path[0])
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density[0])
 
+        #print self, Chronos.TheTime, self.Flux["Direct"][4]
 #        raise Exception("Debug Breakpoint")
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         #5 - Entering Stream
@@ -626,7 +631,7 @@ class StreamNode(StreamChannel):
             Heat["Evaporation"] = dt * self.Flux["Evaporation"]
             Heat["Convection"] = dt * self.Flux["Convection"]
             Heat["Total"] = dt * self.Flux["Total"]
-            print Heat["Total"]
+            #print Heat["Total"]
 
     def MacCormick1(self):
         dt = self.dt
