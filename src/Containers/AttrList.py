@@ -238,3 +238,41 @@ class PlaceList(AttrList):
     """
     def __init__(self, val=[], attr='x', orderdn=False):
         AttrList.__init__(self, val, attr, orderdn=orderdn)
+
+class AttrList2(dict):
+    def getClosestKey(self, val):
+        """
+        Return the key in dictionary whose value is
+        closest to exvalue.
+
+        If dictionary is empty, return None.
+        """
+
+        # Get a iterator over *both* keys and values.
+        diter = self.iteritems()
+        # Get the first (key, value) pair.
+        try:
+            u, z = diter.next()
+        except StopIteration:
+            # The dictionary was empty!
+            # You might want to do something else here
+            return
+
+        # Compute the closeness of the first value.
+        closest = abs(z - exvalue)
+        # Create a var to store the closest key
+        result = u
+        # Iterate through the rest of the dict.
+        for u, z in diter:
+            # Compute the closeness.
+            v = abs(z - exvalue)
+
+            # Check if it's closer than the closest.
+            if v < closest:
+                # If so, store the new closest.
+                closest = v
+                # And store the new closest key.
+                result = u
+
+        return result
+

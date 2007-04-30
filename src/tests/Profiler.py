@@ -26,6 +26,7 @@ Chronos.Start(start-dt, dt, stop, spin)
 def hydraulics():
     while Chronos.TheTime < Chronos.stop:
         map(lambda x:x.CalcHydraulics(), Reach)
+        map(lambda x:x.CalcHeat(), Reach)
         Chronos.Tick()
 
 def heat():
