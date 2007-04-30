@@ -3,6 +3,7 @@ import random
 from unittest import TestCase
 from Containers.DataPoint import DataPoint
 from Containers.AttrList import AttrList, TimeList, PlaceList
+from bisect import bisect_left, bisect_right
 
 class TestAttrList(TestCase):
     def setUp(self):
@@ -21,7 +22,7 @@ class TestAttrList(TestCase):
     def test_TimeList(self):
         for i in xrange(1,len(self.TL[:-1])):
             self.assertTrue(self.TL[i].t >= self.TL[i-1].t)
-        
+
 
         for i in xrange(1,len(self.PL[:-1])):
             self.assertTrue(self.PL[i].x >= self.PL[i-1].x)
@@ -35,16 +36,15 @@ class TestAttrList(TestCase):
         x = self.TL[3:5]
         w = self.TL[4,1]
         y = self.TL[:3,None]
-        z = self.TL[20:40,1]
-        self.assertTrue(isinstance(z,list))
+#        z = self.TL[20:40,1]
+#        self.assertTrue(isinstance(z,list))
         self.assertTrue(isinstance(v,float))
         self.assertTrue(isinstance(w,float))
-        self.assertTrue(isinstance(z,list))
+#        self.assertTrue(isinstance(z,list))
         self.assertTrue(isinstance(y,list))
         for lst in [x,y]:
             for i in lst:
                 self.assertTrue(isinstance(i,float))
-
     def test_ComplexGetItem(self):
         PL = PlaceList(orderdn=True)
         TL = TimeList()
@@ -57,12 +57,20 @@ class TestAttrList(TestCase):
         for i in xrange(14):
             PL.append(DataPoint(pval[i],place=pattr[i]))
             TL.append(DataPoint(tval[i],time=tattr[i]))
+        self.assertRaises(IndexError, PL.__getitem__,(87,0))
+
+        self.assertEqual(PL[87,1],5.0)
+        self.assertEqual(PL[87,-1],62.0)
+        self.assertEqual(TL[23,1],2.0)
+        self.assertEqual(TL[23,-1],92.0)
+        self.assertEqual(PL[88,0],62.0)
+        self.assertEqual(TL[22,0],92.0)
 
         # values after internal sorting
-        pval_ordered = [39.0, 45.0, 96.0, 62.0, 5.0, 91.0, 78.0, 72.0, 54.0, 61.0, 52.0, 78.0, 9.0, 68.0]
-        tval_ordered = [49.0, 100.0, 1.0, 92.0, 2.0, 61.0, 62.0, 66.0, 82.0, 38.0, 29.0, 38.0, 32.0, 23.0]
-        pattr_ordered = [97, 94, 89, 88, 85, 79, 78, 76, 75, 52, 50, 17, 13, 5]
-        tattr_ordered = [4, 9, 10, 22, 43, 47, 53, 56, 67, 73, 76, 87, 92, 98]
+        pval_ordered =  [39.0, 45.0,  96.0, 62.0, 5.0, 91.0, 78.0, 72.0, 54.0, 61.0, 52.0, 78.0, 9.0,  68.0]
+        tval_ordered =  [49.0, 100.0, 1.0,  92.0, 2.0, 61.0, 62.0, 66.0, 82.0, 38.0, 29.0, 38.0, 32.0, 23.0]
+        pattr_ordered = [97,   94,    89,   88,   85,  79,   78,   76,   75,   52,   50,   17,   13,   5]
+        tattr_ordered = [4,    9,     10,   22,   43,  47,   53,   56,   67,   73,   76,   87,   92,   98]
 
         pval.reverse() # values get reversed when ordering down
         for i in xrange(14):
@@ -95,18 +103,18 @@ class TestAttrList(TestCase):
         self.assertEqual(PL[78,0],PL[6])
 
         # Should order equivalantly
-        self.assertEqual(PL[95:3, -1], PL[3:95, -1])
-        self.assertEqual(TL[11:68, 1], TL[68:11,1])
-        self.assertEqual(TL[23:46,0], TL[23:46,0])
+#        self.assertEqual(PL[95:3, -1], PL[3:95, -1])
+#        self.assertEqual(TL[11:68, 1], TL[68:11,1])
+#        self.assertEqual(TL[23:46,0], TL[23:46,0])
 
 
-        self.assertEqual(PL[15:93, -1],pval_ordered[1:-2])
-        self.assertEqual(map(lambda x: x.x,PL[15:93, -1]), pattr_ordered[1:-2])
-        self.assertEqual(PL[15:93, 1], pval_ordered[2:-2])
-        self.assertEqual(map(lambda x: x.x, PL[15:93, 1]), pattr_ordered[2:-2])
+#        self.assertEqual(PL[15:93, -1],pval_ordered[1:-2])
+#        self.assertEqual(map(lambda x: x.x,PL[15:93, -1]), pattr_ordered[1:-2])
+#        self.assertEqual(PL[15:93, 1], pval_ordered[2:-2])
+#        self.assertEqual(map(lambda x: x.x, PL[15:93, 1]), pattr_ordered[2:-2])
 
-        self.assertEqual(PL[15:93, -1],pval_ordered[1:-2])
-        self.assertEqual(map(lambda x: x.x,PL[15:93, -1]), pattr_ordered[1:-2])
-        self.assertEqual(PL[15:93, 1], pval_ordered[2:-2])
-        self.assertEqual(map(lambda x: x.x, PL[15:93, 1]), pattr_ordered[2:-2])
+#        self.assertEqual(PL[15:93, -1],pval_ordered[1:-2])
+#        self.assertEqual(map(lambda x: x.x,PL[15:93, -1]), pattr_ordered[1:-2])
+#        self.assertEqual(PL[15:93, 1], pval_ordered[2:-2])
+#        self.assertEqual(map(lambda x: x.x, PL[15:93, 1]), pattr_ordered[2:-2])
 
