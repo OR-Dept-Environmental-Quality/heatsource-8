@@ -129,6 +129,7 @@ class HeatSourceInterface(DataSheet):
             self.T_bc.append(DataPoint(t_val,time))
             # Cloudiness boundary condition
             self.C_bc.append(DataPoint(cloud_col[row + I][0],time))
+            print self, time, self.C_bc[-1]
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetDataBlock(self, type):
@@ -383,7 +384,7 @@ class HeatSourceInterface(DataSheet):
                         node.Overhang[j] = [zdict["Overhang"]]
                 zone.VHeight.append(zdict["VHeight"])
                 zone.VDensity.append(zdict["VDensity"])
-                zone.Elevation.append(data[i][41+(j*4)+k])
+                zone.Elevation.append(data[i][42+(j*4)+k])
 
         # Theoretically, we now have lists for all of the values, so we need to average over the lists
         # We use our self.smartaverage() method, so that we take care of any values of None
