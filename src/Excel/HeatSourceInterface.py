@@ -129,7 +129,6 @@ class HeatSourceInterface(DataSheet):
             self.T_bc.append(DataPoint(t_val,time))
             # Cloudiness boundary condition
             self.C_bc.append(DataPoint(cloud_col[row + I][0],time))
-            print self, time, self.C_bc[-1]
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetDataBlock(self, type):

@@ -1,3 +1,4 @@
+from psyco.classes import __metaclass__
 
 class DataPoint(float):
     """General class defining a floating point number with optional location and time attributes

@@ -1,5 +1,5 @@
 from __future__ import division
-import math
+import math, psyco
 """Various mathematical routines and classes"""
 
 def NewtonRaphsonTangent(a, b, tol=1.0e-9, maxiter=500):
@@ -83,4 +83,4 @@ def NewtonRaphsonSecant(Q_est, W_b, z, n, S, D_est=0):
         Converge = abs(Fy/dFy)
         count += 1
     return D_est
-
+psyco.bind(NewtonRaphsonSecant)

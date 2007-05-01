@@ -1,6 +1,7 @@
 from itertools import dropwhile
 import datetime
 from ExcelDocument import ExcelDocument
+from psyco.classes import __metaclass__
 
 class DataSheet(ExcelDocument):
     """Class defining one single sheet of data within the greater Excel document

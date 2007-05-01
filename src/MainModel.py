@@ -48,7 +48,7 @@ class MainModel(object):
         Chronos.Start(start-dt, dt, stop, spin)
         ##########################################################
         dt_out = timedelta(minutes=60)
-        #self.Output = Output(dt_out, self.Reach, start)
+        self.Output = Output(dt_out, self.Reach, start)
 
     def Run(self):
         self.Reset()
@@ -59,13 +59,13 @@ class MainModel(object):
         try: #Wrap this in a try/except block to catch errors. Othewise, the model will continue running past them
 #            del self.Y[:]
             # Calculate the hydraulics
-            map(lambda x:x.CalcHydraulics(), self.Reach)
+            [x.CalcHydraulics() for x in self.Reach]
 #            [self.Y.append(getattr(node,self.PlotAttr)) for node in self.Reach]
             # Calculate the solar flux
-            map(lambda x:x.CalcHeat(), self.Reach)
+            [x.CalcHeat() for x in self.Reach]
 #            self.DPlot.onTimer(False)
-            #self.Output.Store(Chronos.TheTime)
-            l = map(lambda x:x.MacCormick1(),self.Reach)
+            self.Output.Store(Chronos.TheTime)
+            l = [x.MacCormick1() for x in self.Reach]
             for i in xrange(len(l)):
                 self.Reach[i].MacCormick2(l[i])
             print self.Reach[0].T, round(self.Reach[-1].T,2)

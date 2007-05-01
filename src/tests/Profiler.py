@@ -12,7 +12,14 @@ from Utils.TimeZones import Pacific
 ErrLog = Logger.getInstance()
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
 
-Reach = HeatSourceInterface("C:\\eclipse\\HeatSource\\Toketee_CCC.xls", ErrLog).Reach
+#try:
+#    import psyco
+#    psyco.log()
+#    psyco.profile()
+#except:
+#    pass
+
+Reach = HeatSourceInterface('C:\\eclipse\\HeatSource\\Toketee_CCC.xls', ErrLog).Reach
 ##########################################################
 # Create a Chronos iterator that controls all model time
 dt = timedelta(seconds=60)
@@ -25,20 +32,20 @@ Chronos.Start(start-dt, dt, stop, spin)
 
 def hydraulics():
     while Chronos.TheTime < Chronos.stop:
-        map(lambda x:x.CalcHydraulics(), Reach)
-        map(lambda x:x.CalcHeat(), Reach)
+        [x.CalcHydraulics() for x in Reach]
+        [x.CalcHeat() for x in Reach]
         Chronos.Tick()
 
 def heat():
-    map(lambda x:x.CalcHeat(), Reach)
+    [x.CalcHeat() for x in Reach]
 
 def finish():
-    l = map(lambda x:x.MacCormick1(), Reach)
+    l = [x.MacCormick1() for x in Reach]
     for i in xrange(len(l)):
         Reach[i].MacCormick2(l[i])
+
 
 #hydraulics()
 #Chronos.Tick()
 cProfile.run('hydraulics()')
-#cProfile.run('heat()')
 ##cProfile.run('finish')

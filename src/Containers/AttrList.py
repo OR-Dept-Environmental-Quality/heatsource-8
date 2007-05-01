@@ -1,4 +1,5 @@
 from __future__ import division
+from psyco.classes import __metaclass__
 from DataPoint import DataPoint
 from datetime import datetime
 from itertools import ifilter

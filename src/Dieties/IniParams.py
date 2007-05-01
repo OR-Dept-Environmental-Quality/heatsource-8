@@ -1,7 +1,7 @@
 from __future__ import division
-from Utils.SingletonMixin import Singleton
+from psyco.classes import psyobj
 
-class IniParamsDiety(Singleton):
+class IniParamsDiety(psyobj):
     """A class to hold user-defined data that is static throughout a model run
 
     This is often the data that is in the 9th column, rows 2-13, of most of the
@@ -42,4 +42,4 @@ class IniParamsDiety(Singleton):
             if key in kwargs.keys():
                 d[key] = kwargs[key]
             setattr(self,key,d[key])
-IniParams = IniParamsDiety.getInstance()
+IniParams = IniParamsDiety()

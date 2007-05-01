@@ -34,6 +34,7 @@ class Zonator(EightFoldPath):
                 for i in xrange(len(arg)):
                     if not isinstance(arg[i],VegZone):
                         raise HSClassError("Only VegZone instances can be added, not %s" % repr(arg))
+            elif isinstance(arg,VegZone): pass
             else:
                 raise HSClassError("Arguments must be sequence of VegZone instances")
 

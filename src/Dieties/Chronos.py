@@ -1,9 +1,9 @@
+from psyco.classes import psyobj
 from datetime import datetime, timedelta
 import time, math
-from Utils.SingletonMixin import Singleton
 from Utils.TimeZones import Eastern,Central,Mountain,Pacific,utc
 
-class ChronosDiety(Singleton):
+class ChronosDiety(object):
     """This class provides a clock to be used in the model timestepping.
 
     This is a class that is the God of Time, and thus seen from The Model as
@@ -118,12 +118,12 @@ class ChronosDiety(Singleton):
         # The first one, using dec_day, is taken from literature I found:
         # julian_day = math.floor(365.25*(y+4716.0)) + math.floor(30.6001*(m+1)) + dec_day - 1524.5;
         # The second is taken from the VB code
-        julian_day = math.floor(365.25*(y+4716.0)) + math.floor(30.6001*(m+1)) + d - 1524.5;
+        julian_day = int(365.25*(y+4716.0)) + int(30.6001*(m+1)) + d - 1524.5;
 
         # This value should only be added if we fall after a certain date
         if julian_day > 2299160.0:
-            a = math.floor(y/100)
-            b = (2 - a + math.floor(a/4))
+            a = int(y/100)
+            b = (2 - a + int(a/4))
             julian_day += b
 
         return round(julian_day,5) #Python numerics return to about 10 places, Naval Observatory goes to 5
@@ -171,4 +171,4 @@ class ChronosDiety(Singleton):
                 raise AttributeError(detail)
         return y,m,d,H,M,S,tz
 
-Chronos = ChronosDiety.getInstance()
+Chronos = ChronosDiety()

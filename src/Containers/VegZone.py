@@ -1,4 +1,3 @@
-
 class VegZone(object):
     """Container to hold information about vegetation zones
 

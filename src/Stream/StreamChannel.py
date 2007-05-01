@@ -1,7 +1,7 @@
 from __future__ import division
+from psyco.classes import psyobj
 import math, decimal
 from warnings import warn
-from itertools import imap
 from Utils.Maths import NewtonRaphsonTangent, NewtonRaphsonSecant
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
