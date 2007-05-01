@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 import time, sys, wx, random
 
 from Excel.HeatSourceInterface import HeatSourceInterface
-from Dieties.Helios import Helios
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
 from Utils.DynaPlot import DynaPlot, TIMER_ID
@@ -51,11 +50,11 @@ class MainModel(object):
         self.Output = Output(dt_out, self.Reach, start)
 
     def Run(self):
+        self.Log("Starting")
         self.Reset()
         self.timer.Start(100)
 
     def TimeStep(self):
-        print Chronos.Tick(),
         try: #Wrap this in a try/except block to catch errors. Othewise, the model will continue running past them
 #            del self.Y[:]
             # Calculate the hydraulics
@@ -64,11 +63,9 @@ class MainModel(object):
             # Calculate the solar flux
             [x.CalcHeat() for x in self.Reach]
 #            self.DPlot.onTimer(False)
+            [x.MacCormick2() for x in self.Reach]
             self.Output.Store(Chronos.TheTime)
-            l = [x.MacCormick1() for x in self.Reach]
-            for i in xrange(len(l)):
-                self.Reach[i].MacCormick2(l[i])
-            print self.Reach[0].T, round(self.Reach[-1].T,2)
+            Chronos.Tick()
             return True
         except:
             self.Stop()

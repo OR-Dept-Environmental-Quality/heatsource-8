@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import time, math
 from Utils.TimeZones import Eastern,Central,Mountain,Pacific,utc
 
-class ChronosDiety(object):
+class ChronosDiety(psyobj):
     """This class provides a clock to be used in the model timestepping.
 
     This is a class that is the God of Time, and thus seen from The Model as
@@ -40,10 +40,14 @@ class ChronosDiety(object):
         self.__spin = timedelta(days=spin)
         self.__current = self.__start - self.__spin if self.__spin else self.__start
         self.__dayone = datetime(self.__start.year,1,1,tzinfo=tz)
+        self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
+        self.__jd = None # Placeholder for current julian day
+        self.TheTime = self.__current
 
     def Tick(self):
         self.__current += self.__dt
-        return self.__current
+        self.TheTime = self.__current
+        return self.TheTime
     def __iter__(self):
         if not self.__start or not self.__dt:
             raise Exception("Must call %s with the Start() method before using." % self.__class__.__name__)
@@ -52,7 +56,7 @@ class ChronosDiety(object):
         # the current time is current until it's updated in the outer world.
         while self.__current <= self.__stop:
             yield self.__current
-            self.__current += self.__dt
+            self.Tick()
     def __len__(self): return len([i for i in self])
     def GetStart(self): return self.__start
     def SetStart(self, start):
@@ -81,11 +85,13 @@ class ChronosDiety(object):
                 self.__stop = datetime(*time.strptime(stop.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[:6])
             except AttributeError:
                 raise TypeError("Stop time must be a PyTime, timedelta or a datetime object, not %s" % start.__class__.__time__)
-    def GetCurrent(self):
-        if self.__current: return self.__current
-        else: return 0
-    def SetCurrent(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
-    def GetJD(self): return self.FracJD()
+    def GetJD(self):
+        if self.__thisday == self.__current:
+            return self.__jd
+        else:
+            self.__thisday = self.__current
+            self.__jd = self.FracJD()
+            return self.__jd
     def SetJD(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
     def GetJDC(self): return self.FracJDC()
     def SetJDC(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
@@ -97,7 +103,6 @@ class ChronosDiety(object):
     start = property(GetStart, SetStart)
     dt = property(GetDT, SetDT)
     stop = property(GetStop, SetStop)
-    TheTime = property(GetCurrent, SetCurrent)
     JD = property(GetJD, SetJD)
     JDC = property(GetJDC, SetJDC)
     JDay = property(GetJDay, SetJDay)

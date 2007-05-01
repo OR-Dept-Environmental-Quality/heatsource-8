@@ -12,7 +12,7 @@ class Output(object):
                       "solar6": None}
 
         for key in self.files.iterkeys():
-            self.files[key] = open(IniParams.Output_directory + key + ".txt", 'w')
+            self.files[key] = open(IniParams.OutputDirectory + key + ".txt", 'w')
             self.files[key].write("Datetime\t")
             for node in self.reach:
                 self.files[key].write(`node.km` + "\t")

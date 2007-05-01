@@ -8,7 +8,7 @@ from Containers.VegZone import VegZone
 from Containers.Zonator import Zonator
 from Containers.AttrList import TimeList
 from StreamChannel import StreamChannel
-from Dieties.Helios import Helios
+from Dieties.Helios import CalcSolarPosition
 from Dieties.Chronos import Chronos
 from Utils.Logger import Logger
 
@@ -42,24 +42,12 @@ class StreamNode(StreamChannel):
         self.Topo = {"E": None,
                      "S": None,
                      "W": None}
-        self.Log = Logger.getInstance()
+        self.Log = Logger
 
         # Make Overhang a dictionary (one value for each direction starting at NE (or SW if in southern hemisphere))
         self.Overhang = {}
         for i in xrange(7):
             self.Overhang[i] = 0  # Overhang is zero unless otherwise set
-
-#        # This is a Zonator instance, with 7 directions, each of which holds 5 VegZone instances
-#        # with values for the sampled zones in each directions. We build a blank Zonator
-#        # here so that the HeatSourceInterface.BuildStreamNode() method can add values without
-#        # needing to build anything
-#        dir = [] # List to save the seven directions
-#        for Direction in xrange(7):
-#            z = () #Tuple to store the zones 0-4
-#            for Zone in xrange(5):
-#                z += VegZone(),
-#            dir.append(z) # append to the proper direction
-#        self.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
 
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
@@ -207,17 +195,20 @@ class StreamNode(StreamChannel):
         self.CalcLongwaveFlux()
         self.CalcEvapConvFlux()
         self.RecordHeatData(DayTime)
-        self.MacCormick1()
+        self.MDispersion,self.MS1 = self.MacCormick1()
 
     def CalcSolarFlux(self):
         #Like the others, taken from VB code unless otherwise noted
         #TODO: This is a ridiculously long method. It should be cleaned up.
         #======================================================
         # Get the sun's altitude and azimuth:
-        Azimuth, Altitude, Zenith = Helios.CalcSolarPosition(self.Latitude, self.Longitude)
+        C = Chronos
+        time = C.TheTime
+        JD = C.JDay
+        JDC = C.JDC
+        offset = C.TZOffset(time)
+        Azimuth, Altitude, Zenith = CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
         # Helios calculates the julian date, so we lazily snag that calculation.
-        time = Chronos.TheTime
-        JD = Chronos.JDay
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces
         pi,exp,log10,log,sqrt = math.pi,math.exp,math.log10,math.log,math.sqrt
         sin,cos,tan,atan,radians = math.sin,math.cos,math.tan,math.atan,math.radians
@@ -231,7 +222,7 @@ class StreamNode(StreamChannel):
 
         #########################################################
         ## A bunch of lists that the original VB code held things in.
-        ## This could be cleaned up, but I'm too lazy
+        ## This could be cleaned up in the underlying implementation, but I'm too lazy
         self.LC_Distance = [0]*4
         Rip_Extinct = [0]*4
         Path = [0]*4
@@ -671,10 +662,10 @@ class StreamNode(StreamChannel):
             self.T = self.T_bc[Chronos.TheTime, -1]
         return Dispersion,S1
 
-    def MacCormick2(self, tup):
+    def MacCormick2(self):
         sqrt = math.sqrt
-        Dispersion = tup[0]
-        S1 = tup[1]
+        Dispersion = self.MDispersion
+        S1 = self.MS1
         dt = self.dt
         dx = self.dx
         SkipNode = False

@@ -29,8 +29,8 @@ class EightFoldPath(psyobj):
     def __getitem__(self,index):
         try: return self.paths[self.dirs[index]]
         except TypeError: return self.paths[index]
-#        if isinstance(index,str): return self.paths[index]
-#        elif isinstance(index,int): return self.paths[self.dirs[index]]
+#        if isinstance(index,int): return self.paths[self.dirs[index]]
+#        elif isinstance(index,str): return self.paths[index]
     def items(self): return self.paths.items()
     def iteritems(self):
         for k,v in self.paths.iteritems(): yield k,v

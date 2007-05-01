@@ -1,7 +1,6 @@
-from SingletonMixin import Singleton
 import time
 
-class Logger(Singleton):
+class LoggerDiety(object):
     def __init__(self):
         self._last = None
         self._file = None
@@ -13,3 +12,5 @@ class Logger(Singleton):
             t = time.strftime("%H:%M:%S",time.localtime(time.time()))
             self._file.write("%s-> %s\n"% (t,message))
             self._last = message
+
+Logger = LoggerDiety()

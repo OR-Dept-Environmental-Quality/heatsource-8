@@ -44,7 +44,7 @@ class HSFrame(sc.SizedFrame):
 
         # row 1
         # Set up a stdout/stderr logger
-        self.ErrLog = Logger.getInstance()
+        self.ErrLog = Logger
         # Then create a wxTextCtrl to write to
         ErrLog = wxLogger(pane, -1)
         ErrLog.SetSizerProps(expand=True, proportion=1)
@@ -198,6 +198,8 @@ class HSApp(wx.App):
         return True
 
 if __name__ == "__main__":
+    import psyco
+    psyco.full()
     app = HSApp(False)
 #    sys.stderr = Logger.getInstance()
     app.MainLoop()
