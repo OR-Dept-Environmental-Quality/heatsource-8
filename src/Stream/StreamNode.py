@@ -1,6 +1,6 @@
 from __future__ import division
 from psyco.classes import __metaclass__
-import math, wx, #heatsource
+import math, wx, heatsource
 from warnings import warn
 from scipy.optimize.minpack import newton
 from Dieties.IniParams import IniParams
@@ -28,7 +28,6 @@ class StreamNode(StreamChannel):
              "Delta_T", # Current temperature calculated from only local fluxes
              "T", "T_prev", # Current and previous stream temperature
              "Flux" # Dictionary to hold heat flux values
-             "Evap_Rate"  #Evaportion in m/s
              ]
         # Set all the attributes to bare lists, or set from the constructor
         for attr in s:
@@ -39,8 +38,7 @@ class StreamNode(StreamChannel):
             setattr(self, attr, TimeList())
         self.Flux = {"Direct":  [0]*8,
                      "Diffuse": [0]*8,
-                     "Solar":   [0]*8,
-                     "Solar_daily_sum": [0]*5}
+                     "Solar":   [0]*8}
         self.Topo = {"E": None,
                      "S": None,
                      "W": None}
@@ -210,22 +208,21 @@ class StreamNode(StreamChannel):
         JD = C.JDay
         JDC = C.JDC
         offset = C.TZOffset(time)
-#        print self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
-        Azimuth,Altitude,Zenith = Dieties.Helios.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
-#        raise Exception("break")
+        print self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
+        print Dieties.Helios.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
+        raise Exception("break")
         # Helios calculates the julian date, so we lazily snag that calculation.
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces
         pi,exp,log10,log,sqrt = math.pi,math.exp,math.log10,math.log,math.sqrt
         sin,cos,tan,atan,radians = math.sin,math.cos,math.tan,math.atan,math.radians
-        # If it's night, we get out quick.  TODO: would it save some run time to do this only once per night?
-        if Altitude <= 0: #Nighttime
+        # If it's night, we get out quick.
+        if Altitude <= 0 and self.Flux["Solar"][1]: #Nighttime
             Altitude = 0
             self.Flux["Direct"] = [0]*8
             self.Flux["Diffuse"] = [0]*8
             self.Flux["Solar"] = [0]*8
-            if Chronos.TheTime.hour == 1:
-                self.Flux["Solar_daily_sum"] = [0]*5   #reset for the new day
             return False #Nothing else to do, so ignore rest of method
+        elif Altitude <= 0: return
 
         #########################################################
         ## A bunch of lists that the original VB code held things in.
@@ -465,10 +462,6 @@ class StreamNode(StreamChannel):
         self.Flux["Solar"][5] = self.Flux["Diffuse"][5] + self.Flux["Direct"][5]
         self.Flux["Solar"][6] = self.Flux["Diffuse"][6] + self.Flux["Direct"][6]
         self.Flux["Solar"][7] = self.Flux["Diffuse"][7] + self.Flux["Direct"][7]
-        self.Flux["Solar_daily_sum"][1] += self.Flux["Solar"][1]
-        self.Flux["Solar_daily_sum"][4] += self.Flux["Solar"][4]
-
-
         return True
 
     def CalcConductionFlux(self):
@@ -589,17 +582,17 @@ class StreamNode(StreamChannel):
             if NetRadiation < 0:
                 NetRadiation = 0 #J/m2/s
             Ea = Wind_Function * (Sat_Vapor - Air_Vapor)  #m/s
-            self.Evap_Rate = ((NetRadiation * Delta / (P * LHV)) + Ea * Gamma) / (Delta + Gamma)
-            self.Flux["Evaporation"] = -self.Evap_Rate * LHV * P #W/m2
+            Evap_Rate = ((NetRadiation * Delta / (P * LHV)) + Ea * Gamma) / (Delta + Gamma)
+            self.Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
             #Calculate Convection FLUX
             Bowen = Gamma * (self.T_prev - Air_T) / (Sat_Vapor - Air_Vapor)
             self.Flux["Convection"] = self.Flux["Evaporation"] * Bowen
         else:
             #===================================================
             #Calculate Evaporation FLUX
-            self.Evap_Rate = Wind_Function * (Sat_Vapor - Air_Vapor)  #m/s
+            Evap_Rate = Wind_Function * (Sat_Vapor - Air_Vapor)  #m/s
             P = 998.2 # kg/m3
-            self.Flux["Evaporation"] = -self.Evap_Rate * LHV * P #W/m2
+            self.Flux["Evaporation"] = -Evap_Rate * LHV * P #W/m2
             #Calculate Convection FLUX
             if (Sat_Vapor - Air_Vapor) <> 0:
                 Bowen = 0.61 * (Pressure / 1000) * (self.T_prev - Air_T) / (Sat_Vapor - Air_Vapor)
@@ -626,22 +619,6 @@ class StreamNode(StreamChannel):
             self.Flux["Solar"][4] = 0
             self.Flux["Solar"][6] = 0
             self.E = 0
-
-        if False:#Chronos.TheTime > Chronos.start:
-            #Calculate Heat by process (J/m2 per day)
-            Heat["Solar"][1] = Heat["Solar"][1] + dt * self.Flux["Solar"][1]
-            Heat["Solar"][2] = Heat["Solar"][2] + dt * self.Flux["Solar"][2]
-            Heat["Solar"][4] = Heat["Solar"][4] + dt * self.Flux["Solar"][4]
-            Heat["Solar"][6] = Heat["Solar"][6] + dt * self.Flux["Solar"][6]
-            Heat["Conduction"] = dt * self.Flux["Conduction"]
-            Heat["Longwave"] = dt * self.Flux["Longwave"]
-            Heat["LW_Atm"] = dt * self.Flux["LW_Atm"]
-            Heat["LW_LC"] = dt * self.Flux["LW_Veg"]
-            Heat["LW_BR"] = dt * self.Flux["LW_Stream"]
-            Heat["Evaporation"] = dt * self.Flux["Evaporation"]
-            Heat["Convection"] = dt * self.Flux["Convection"]
-            Heat["Total"] = dt * self.Flux["Total"]
-            #print Heat["Total"]
 
     def MacCormick1(self):
         sqrt = math.sqrt
