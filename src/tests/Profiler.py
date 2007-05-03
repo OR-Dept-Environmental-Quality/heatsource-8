@@ -12,13 +12,13 @@ from Utils.TimeZones import Pacific
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
 
-try:
-    import psyco
-    psyco.full()
-except:
-    pass
+#try:
+#    import psyco
+#    psyco.full()
+#except:
+#    pass
 
-Reach = HeatSourceInterface('C:\\eclipse\\HeatSource\\Toketee_CCC.xls', ErrLog).Reach
+Reach = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC.xls", ErrLog).Reach
 ErrLog("Starting")
 ##########################################################
 # Create a Chronos iterator that controls all model time
@@ -38,6 +38,6 @@ def hydraulics():
         Chronos.Tick()
 
 
-#hydraulics()
-cProfile.run('hydraulics()')
+hydraulics()
+#cProfile.run('hydraulics()')
 ErrLog("Finished")

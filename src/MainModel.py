@@ -40,7 +40,7 @@ class MainModel(object):
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams.dt)
-        start = Chronos.MakeDatetime(IniParams.Date)+timedelta(hours=5,minutes=38)
+        start = Chronos.MakeDatetime(IniParams.Date)+timedelta(hours=0,minutes=0)
         stop = start + timedelta(days=IniParams.SimPeriod)
         spin = 0 # IniParams.FlushDays # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
@@ -65,7 +65,7 @@ class MainModel(object):
 #            self.DPlot.onTimer(False)
             [x.MacCormick2() for x in self.Reach]
             self.Output.Store(Chronos.TheTime)
-            Chronos.Tick()
+            print Chronos.Tick()
             return True
         except:
             self.Stop()

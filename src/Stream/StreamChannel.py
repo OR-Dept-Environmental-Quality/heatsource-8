@@ -1,5 +1,5 @@
 from __future__ import division
-from psyco.classes import psyobj
+#from psyco.classes import psyobj
 import math, decimal
 from warnings import warn
 #import heatsource

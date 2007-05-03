@@ -27,8 +27,8 @@ from Excel.HeatSourceInterface import HeatSourceInterface
 # This will run the entire setup. What you have left- assuming I don't
 # make it fail, will be a fully live instance
 
-HS = HeatSourceInterface(datadir+"HS7_Jackson_CCC.xls", gauge=ProgressBar())
-#HS = HeatSourceInterface(datadir+"Toketee_CCC.xls", gauge=ProgressBar())
+#HS = HeatSourceInterface(datadir+"HS7_Jackson_CCC.xls", gauge=ProgressBar())
+HS = HeatSourceInterface(datadir+"HS7_NUmpqua3_Toketee_CCC_solar.xls", gauge=ProgressBar())
 
 ############################################
 
@@ -47,6 +47,8 @@ filename4 = outputdir+"nodes.out"
 nodes_out = open(filename4, 'w') # Open the file writable
 filename5 = outputdir+"nodes2.out"
 nodes_out2 = open(filename5, 'w') # Open the file writable
+filename6 = outputdir+"veg.out"
+veg = open(filename6, 'w') # Open the file writable
 
 
 # Note that the open() function returns a class instance that is actually a file object.
@@ -161,7 +163,7 @@ for node in HS.Reach:
         nodes_out2.write("\n")
     nodes_out2.write(`node.km` + "\t")  # Print the string interpreted value, then a tab
     for name in header:
-        nodes_out2.write(`GetValue(node,name)` + "\t") 
+        nodes_out2.write(`GetValue(node,name)` + "\t")
     nodes_out2.write("\n") # Then print an empty string, which adds a newline to the end of this StreamNode's row
 #sys.exit()
 
@@ -203,7 +205,7 @@ for i in node1.Wind:
 #    for i in node.Humidity:
     g.write("%s," % i.t.isoformat(' ')[:-6])
     for node in cont_node_list:
-        g.write("%s,%s,%s,%s," % (node.Wind[i.t, 0], node.Humidity[i.t, 0], node.T_air[i.t, 0], node.T_stream[i.t, 0]))
+        g.write("%s,%s,%s," % (node.Wind[i.t, 0], node.Humidity[i.t, 0], node.T_air[i.t, 0]))
     g.write("\n")
 
 #print headers for node file
@@ -230,6 +232,17 @@ for node in HS.Reach:
 #    sys.exit()
     nodes_out.write("\n")
 
+for node in HS.Reach:
+    veg.write("%s\t" % node.km)
+    for Direction in node.Zone.dirs:
+        for i in xrange(4):
+            zone = node.Zone[Direction][i]
+            veg.write("%s\t" % zone.Elevation)
+    for Direction in node.Zone.dirs:
+        for i in xrange(4):
+            zone = node.Zone[Direction][i]
+            veg.write("%s\t%s\t" % (zone.VDensity, zone.VHeight))
+    veg.write("\n")
 
 # Started for tributary inputs but need to wait until operational!
 #trib_node_list = []
@@ -273,4 +286,5 @@ g.close()
 h.close()
 nodes_out.close()
 nodes_out2.close()
+veg.close()
 del HS

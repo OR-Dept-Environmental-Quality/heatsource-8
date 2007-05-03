@@ -128,9 +128,9 @@ class HSFrame(sc.SizedFrame):
 
         ################################
         ## debugging conveniences
-#        self.FileName = "D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls"
-#        self.FileName = "D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC.xls"
-        self.FileName = "C:\\eclipse\\HeatSource\\Toketee_CCC.xls"
+#       self.FileName = "D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls"
+        self.FileName = "D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC_BC.xls"
+#        self.FileName = "C:\\eclipse\\HeatSource\\Toketee_CCC.xls"
 #        self.FileName = "C:\\eclipse\\HeatSource\\Jackson_CCC.xls"
         self.OnLoadFile(True)
         self.OnStartStop(True)
@@ -198,8 +198,7 @@ class HSApp(wx.App):
         return True
 
 if __name__ == "__main__":
-    import psyco
-    psyco.full()
+    #psyco.full()
     app = HSApp(False)
 #    sys.stderr = Logger.getInstance()
     app.MainLoop()

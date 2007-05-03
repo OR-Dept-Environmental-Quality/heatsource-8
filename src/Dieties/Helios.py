@@ -1,7 +1,7 @@
 from __future__ import division
-import math,psyco
+import math#,psyco
 
-#class HeliosDiety(psyobj):
+#class HeliosDiety(object):
 #    """The God personification of The Sun"""
 def CalcSolarPosition(lat,lon,hour,minute,second,offset,JDC):
     """Calculates relative position of sun"""
@@ -116,5 +116,5 @@ def CalcSolarPosition(lat,lon,hour,minute,second,offset,JDC):
     Altitude = 90 - Zenith
     return Azimuth, Altitude, Zenith
 
-psyco.bind(CalcSolarPosition)
+#psyco.bind(CalcSolarPosition)
 

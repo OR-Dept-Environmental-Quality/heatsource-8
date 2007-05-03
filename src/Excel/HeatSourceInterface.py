@@ -377,6 +377,8 @@ class HeatSourceInterface(DataSheet):
             for j,k,zone in node.GetZones():
                 # Get the dictionary from the LC code from the ith row at the [14+(j*4)+k]th column
                 zdict = LC[data[i][14+(j*4)+k]]
+                if zdict["VDensity"] != 0:
+                    pass
                 if k == 0: #If we're at the first zone of a given direction, set the StreamNode's Overhang for that direction
                     try: node.Overhang[j].append(zdict["Overhang"])
                     except AttributeError:

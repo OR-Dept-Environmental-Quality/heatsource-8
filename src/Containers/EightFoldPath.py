@@ -1,4 +1,4 @@
-from psyco.classes import psyobj
+#from psyco.classes import psyobj
 """
 EightFoldPath is a mixin class that allows simple tracking of
 attributes in a cardinal direction manner. Using this, one can
@@ -6,7 +6,7 @@ create an object such that object.N is an attribute that we can think
 of as 'north'
 """
 
-class EightFoldPath(psyobj):
+class EightFoldPath(object):
     """Base class that is aware of the cardinal directions"""
     def __init__(self, dirs=None, north=True):
         # In the Northern Hemisphere, North is not a valid sun angle

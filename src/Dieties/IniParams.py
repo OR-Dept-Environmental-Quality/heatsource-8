@@ -1,7 +1,7 @@
 from __future__ import division
-from psyco.classes import psyobj
+#from psyco.classes import psyobj
 
-class IniParamsDiety(psyobj):
+class IniParamsDiety(object):
     """A class to hold user-defined data that is static throughout a model run
 
     This is often the data that is in the 9th column, rows 2-13, of most of the
@@ -36,7 +36,7 @@ class IniParamsDiety(psyobj):
              'Penman': False, # IU1 and IT1. Here, True:Penman Combination method, False: Jobson Wind Method
              'DryChannel': False, # Flag in original code to tell us whether we accept dry channels?
              'ChannelWidth': True, # Flag meaning we know that our channel widths are over bounding.
-             'OutputDirectory':"C:\\Temp\\HeatSource"
+             'OutputDirectory':"C:\\Temp\\HeatSource\\"
              }
         # If any of these are in the constructor, replace the values with them.
         for key in d.keys():

@@ -1,9 +1,9 @@
-from psyco.classes import psyobj
+#from psyco.classes import psyobj
 from datetime import datetime, timedelta
 import time, math
 from Utils.TimeZones import Eastern,Central,Mountain,Pacific,utc
 
-class ChronosDiety(psyobj):
+class ChronosDiety(object):
     """This class provides a clock to be used in the model timestepping.
 
     This is a class that is the God of Time, and thus seen from The Model as
