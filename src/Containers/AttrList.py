@@ -115,6 +115,8 @@ class AttrList(list):
         self.keylist = []
         # lambda to return the named attribute
         self.key = lambda x: getattr(x, attr)
+        self.lastseek = None #Place to cache the last seek so we don't have to reseek.
+        self.lastkey = None #Ditto for the last key
     def sort(self):
         """Sort our contents by the desired attribute and direction, setting references to prev/next items
 
@@ -178,65 +180,6 @@ class AttrList(list):
         if self.orderdn: key = len(lst)-(key+1) # Place in a reversed list
         return self[key]
 
-#    def __getitem__(self,args):
-#        # If we are given a slice or an integer, we return the list bounds.
-#        if isinstance(args,int) or isinstance(args,slice):
-#            return super(AttrList, self).__getitem__(args)
-#        # If we are given a tuple, then the first item should be an integer, float or slice,
-#        # and the second item should be true or false, saying whether we want to
-#        # index by attribute or not (true or false)
-#        look = args[1]
-#        index = args[0]
-#        if index is None: raise IndexError("Cannot index %s with None."%self.__class__.__name__)
-#
-#        if look is None: return super(AttrList,self).__getitem__(args[0]) # index by value
-#        if not self.attr: #the attr keyword is optional, make sure we have it defined
-#            raise Exception("Indexing by attribute is only possible when %s is constructed with an 'attr' keyword value" % self.__class__.__name__)
-#        # We are not a slice, so we return the indexed value
-#
-#        if not isinstance(index, slice):
-#            # define a test function based on which way we are looking
-#            if look == 0: # get only if an attribute is equal
-#                test = lambda x: getattr(x, self.attr) == index
-#            elif (look == 1 and self.orderdn) or (look == -1 and not self.orderdn): # We are looking for the next smaller value
-#                test = lambda x: getattr(x, self.attr) <= index
-#            elif (look == 1 and not self.orderdn) or (look == -1 and self.orderdn): # We are looking for the next larger value
-#                test = lambda x: getattr(x, self.attr) >= index
-#            else:
-#                raise Exception("Problem in the attribute slicing. Exception called for traceback")
-#            # Now, we have a test which returns true if the value is appropriate. We use the
-#            # "vectorized" version of a search in takewhile, but we only return the first value
-#            # from the iterator.
-#            try:
-#                # ifilter() runs the test on self and returns all the values that
-#                # test positive.
-#                # If we are looking backward, we need to grab from the end of the list.
-#                # otherwise, we grab from the front.
-#                ind = -1 if look == -1 else 0
-#                return list(ifilter(test,self))[ind]
-#            except IndexError:
-#                raise IndexError("No value possible for attribute %s: %s." %(self.attr, index))
-#
-#
-#        else: # We are working with a slice, so we need to do a bit more work.
-#            # First, get a minimum and maximum value to work with, since a slice can have None
-#            # for these and go to beginning or end.
-#            l = map(lambda x:getattr(x,self.attr),self)
-#            min = index.start or min(l)
-#            max = index.stop or max(l)
-#            if min > max: min,max = max,min
-#            # Now, if we are ordered descending, these are switched.
-#            # Define a test function an create a list of included values
-#            l = list(ifilter(lambda x: v(x) >= min and v(x) < max,self))
-#            # Now we define our test function.
-#            if look == 0 or look == 1: # Normal slice, next INNER object if v(x) != min
-#                return l # the list is good enough in this case
-#            else: # Here we have to do some magic, because we have to find the next larger or smaller object.
-#                if v(l[0]) == min: return l # the lowest attribute is exact. Return.
-#                i = self.index(l[0]) # Otherwise, get the list index from self of the lowest value in the temporary list.
-#                if not i: return l # if that index is zero, then we've grabbed the list from the start, so return.
-#                l.insert(0, self[i-1]) # otherwise, insert this object at the beginning
-#                return l # then return the list.
     def Items(self):
         """iterator for the items (as key/value pairs) in self"""
         # Working outside to in, this method returns an iterator

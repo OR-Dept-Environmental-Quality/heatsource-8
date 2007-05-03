@@ -83,9 +83,7 @@ def CalcSolarPosition(lat,lon,hour,minute,second,offset,JDC):
     Dummy = cos(radians(lat)) * sin(radians(Zenith))
     if abs(Dummy) > 0.001:
         Azimuth = (sin(radians(lat)) * cos(radians(Zenith)) - sin(radians(Declination))) / Dummy
-        # TODO: Find out what this is supposed to do!!
-        # We test to see if it's greater than one, then if so, we test to see if it's less than zero...
-        # This makes no logical sense.
+#        return Azimuth, lat, Zenith, Declination, Dummy, radians(1)
         if abs(Azimuth) > 1:
             if Azimuth < 0:
                 Azimuth = -1

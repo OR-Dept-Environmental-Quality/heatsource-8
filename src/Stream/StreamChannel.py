@@ -2,7 +2,8 @@ from __future__ import division
 from psyco.classes import psyobj
 import math, decimal
 from warnings import warn
-from Utils.Maths import NewtonRaphsonSecant
+#import heatsource
+import Utils.Maths as Maths
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
 
@@ -58,6 +59,7 @@ class StreamChannel(object):
                     ]
         for attr in self.slots:
             setattr(self,attr,None)
+        self.NewtonRaphsonSecant = Maths.NewtonRaphsonSecant
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
     def GetInputs(self):
@@ -190,7 +192,9 @@ class StreamChannel(object):
         else:
             if not self.S: raise Exception("Control depth must be given with zero slope")
             Q_est = Q_est or self.Q
-            dw = NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
+            dw = self.NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
+#            dw2 = heatsource.NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
+#            print self, dw, dw2
 
         self.d_w = dw
         self.A = self.d_w * (self.W_b + self.z*self.d_w)
@@ -214,6 +218,7 @@ class StreamChannel(object):
 
         # Check the celerity to ensure stability. These tests are from the VB code.
         if dt >= (2 * K * (1 - X)) or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
+            print self.W_w, self.Q
             raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
 
         # These calculations are from Chow's "Applied Hydrology"
