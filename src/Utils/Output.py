@@ -35,8 +35,10 @@ class Output(object):
 
         for key in self.files.iterkeys():
             self.files[key][0] = open(IniParams.OutputDirectory + key, 'w')
-            self.files[key][0].write("Heat Source Hourly Output File:")
+            self.files[key][0].write("Heat Source Hourly Output File:  ")
             self.files[key][0].write(self.files[key][1])
+            today = time.localtime()
+            self.files[key][0].write("     File created on %s/%s/%s" % (today[1], today[2], today[0]))
             self.files[key][0].write("\n\n")
             self.files[key][0].write("Datetime".ljust(14))
             for node in self.reach:
