@@ -162,23 +162,30 @@ class AttrList(list):
         self.sort()
     def __getitem__(self,args):
         # If we are given a slice or an integer, we return the list bounds.
-        if isinstance(args,int) or isinstance(args,slice):
-            return super(AttrList, self).__getitem__(args)
-        elif args[1] is None:
+        try: return super(AttrList, self).__getitem__(args)
+        except TypeError:
+            return self.Seek(args)
+    def Seek(self,args):
+        if args[1] is None:
             return super(AttrList, self).__getitem__(args[0])
-        look = args[1]
-        index = args[0]
-        lst = [i for i in self.keylist]
-        if look == 0:
-            try:
-                return self[lst.index(index)]
-            except:
-                raise IndexError("No value with exact index where %s=%s. Try a forward or backward search" % (self.attr,index))
-        if self.orderdn: lst.sort() # Resort ascending
-        key = bisect(lst, index)
-        key -= self.orderdn == (look == True)
-        if self.orderdn: key = len(lst)-(key+1) # Place in a reversed list
-        return self[key]
+        elif self.lastseek == args:
+            return self[self.lastkey]
+        else:
+            self.lastseek = args
+            look = args[1]
+            index = args[0]
+            lst = [i for i in self.keylist]
+            if look == 0:
+                try:
+                    return self[lst.index(index)]
+                except:
+                    raise IndexError("No value with exact index where %s=%s. Try a forward or backward search" % (self.attr,index))
+            if self.orderdn: lst.sort() # Resort ascending
+            key = bisect(lst, index)
+            key -= self.orderdn == (look == True)
+            if self.orderdn: key = len(lst)-(key+1) # Place in a reversed list
+            self.lastkey = key
+            return self[key]
 
     def Items(self):
         """iterator for the items (as key/value pairs) in self"""

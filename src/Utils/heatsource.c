@@ -18,38 +18,38 @@ static char heatsource_CalcSolarPosition__doc__[] =
 static PyObject *
 heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 {
-	float lat;
-	float lon;
-	float hour;
-	float min;
-	float sec;
-	float offset;
-	float JDC;
-	float Dummy; float Dummy1; float Dummy2; float Dummy3; float Dummy4; float Dummy5;
+	double lat;
+	double lon;
+	double hour;
+	double min;
+	double sec;
+	double offset;
+	double JDC;
+	double Dummy; double Dummy1; double Dummy2; double Dummy3; double Dummy4; double Dummy5;
 	/* temporary values calculated */
-	float MeanObliquity; /* Average obliquity (degrees) */
-	float Obliquity; /* Corrected obliquity (degrees) */
-    float Eccentricity; /* Eccentricity of earth's orbit (unitless) */
-    float GeoMeanLongSun; /*Geometric mean of the longitude of the sun*/
-	float GeoMeanAnomalySun; /* Geometric mean of anomaly of the sun */
-    float SunEqofCenter; /* Equation of the center of the sun (degrees)*/
-    float SunApparentLong; /*Apparent longitude of the sun (degrees) */
-    float Declination; /*Solar declination (degrees)*/
-	float SunRadVector; /*    #Distance to the sun in AU */
-	float Et; /* Equation of time (minutes)*/
-	float SolarTime; /*Solar Time (minutes)*/
-	float HourAngle;
-	float Zenith; /*Solar Zenith Corrected for Refraction (degrees)*/
-	float Azimuth; /* Solar azimuth in degrees */
-	float Altitude; /*Solar Altitude Corrected for Refraction (degrees)*/
-	float RefractionCorrection;
-	float AtmElevation;
-	float pi = 3.1415926535897931;
-	float toRadians = pi/180.0;
-	float toDegrees = 180.0/pi;
+	double MeanObliquity; /* Average obliquity (degrees) */
+	double Obliquity; /* Corrected obliquity (degrees) */
+    double Eccentricity; /* Eccentricity of earth's orbit (unitless) */
+    double GeoMeanLongSun; /*Geometric mean of the longitude of the sun*/
+	double GeoMeanAnomalySun; /* Geometric mean of anomaly of the sun */
+    double SunEqofCenter; /* Equation of the center of the sun (degrees)*/
+    double SunApparentLong; /*Apparent longitude of the sun (degrees) */
+    double Declination; /*Solar declination (degrees)*/
+	double SunRadVector; /*    #Distance to the sun in AU */
+	double Et; /* Equation of time (minutes)*/
+	double SolarTime; /*Solar Time (minutes)*/
+	double HourAngle;
+	double Zenith; /*Solar Zenith Corrected for Refraction (degrees)*/
+	double Azimuth; /* Solar azimuth in degrees */
+	double Altitude; /*Solar Altitude Corrected for Refraction (degrees)*/
+	double RefractionCorrection;
+	double AtmElevation;
+	double pi = 3.1415926535897931;
+	double toRadians = pi/180.0;
+	double toDegrees = 180.0/pi;
 
 
-	if (!PyArg_ParseTuple(args, "fffffff", &lat, &lon, &hour, &min, &sec, &offset, &JDC))
+	if (!PyArg_ParseTuple(args, "ddddddd", &lat, &lon, &hour, &min, &sec, &offset, &JDC))
 		return NULL;
 
     MeanObliquity = 23.0 + (26.0 + ((21.448 - JDC * (46.815 + JDC * (0.00059 - JDC * 0.001813))) / 60.0)) / 60.0;
@@ -85,36 +85,33 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 
     SolarTime = (hour*60.0) + min + (sec/60.0) + (Et - 4.0 * -lon + (offset*60.0));
 
-    while (SolarTime > 1440) { SolarTime -= 1440;}
-    HourAngle = SolarTime / 4 - 180;
-    if (HourAngle < -180) { HourAngle += 360;}
+    while (SolarTime > 1440.0) { SolarTime -= 1440.0;}
+    HourAngle = SolarTime / 4.0 - 180.0;
+    if (HourAngle < -180.0) { HourAngle += 360.0;}
 
     Dummy = sin(toRadians*lat) * sin(toRadians*Declination) + cos(toRadians*lat) * cos(toRadians*Declination) * cos(toRadians*HourAngle);
-    if (Dummy > 1) { Dummy = 1; }
-    else if (Dummy < -1) { Dummy = -1; }
+    if (Dummy > 1.0) { Dummy = 1.0; }
+    else if (Dummy < -1.0) { Dummy = -1.0; }
 
     Zenith = toDegrees*(acos(Dummy));
     Dummy = cos(toRadians*lat) * sin(toRadians*Zenith);
-    if (abs(Dummy) > 0.001)
+    if (fabs(Dummy) >= 0.000999f)
     {
         Azimuth = (sin(toRadians*lat) * cos(toRadians*Zenith) - sin(toRadians*Declination)) / Dummy;
-    }
-		return Py_BuildValue("ffffff",Azimuth,lat,Zenith,Declination,Dummy,toRadians);
-
-/*
-        if (abs(Azimuth) > 1)
+        if (fabs(Azimuth) > 1.0)
         {
-            if (Azimuth < 0) { Azimuth = -1; }
-            else { Azimuth = 1; }
+            if (Azimuth < 0) { Azimuth = -1.0; }
+            else { Azimuth = 1.0; }
         }
+
         Azimuth = 180 - toDegrees*(acos(Azimuth));
-        if (HourAngle > 0) { Azimuth *= -1; }
+        if (HourAngle > 0) { Azimuth *= -1.0; }
     } else
     {
-        if (lat > 0) { Azimuth = 180; }
-        else { Azimuth = 0; }
+        if (lat > 0) { Azimuth = 180.0; }
+        else { Azimuth = 0.0; }
     }
-    if (Azimuth < 0) { Azimuth += 360; }
+    if (Azimuth < 0) { Azimuth += 360.0; }
 
     AtmElevation = 90 - Zenith;
     if (AtmElevation > 85) { RefractionCorrection = 0;}
@@ -130,56 +127,62 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
     Altitude = 90 - Zenith;
 
 	return Py_BuildValue("fff",Azimuth,Altitude,Zenith);
-*/}
-static char heatsource_NewtonRaphsonSecant__doc__[] =
-"Copy of the method used in the HeatSource VB code"
+}
+static char heatsource_GetStreamGeometry__doc__[] =
+"Return a stream's geometry\n\nGiven the known parameters for bottom width, Z factor, Manning\'s n and slope\nas well as the estimated Discharge, this function returns the\nwetted depth (found in a Newton-Raphson iteration or as optional D_est keyword),\narea, wetted perimeter, hydraulic radius, wetted width and velocity."
 ;
 
 static PyObject *
-heatsource_NewtonRaphsonSecant(PyObject *self, PyObject *args)
+heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
 {
-	float Q_est;
-	float W_b;
-	float z;
-	float n;
-	float S;
-    float Converge = 10.0;
-    float dy = 0.01;
+	double Q_est;
+	double W_b;
+	double z;
+	double n;
+	double S;
+    double Converge = 10.0;
+    double dy = 0.01;
     int count = 0;
-	float D_est = 10;
-	float Fy;
-	float Fyy;
-	float dFy;
-	float thed;
-	if (!PyArg_ParseTuple(args, "fffff", &Q_est, &W_b, &z, &n, &S))
+	double Fy;
+	double Fyy;
+	double dFy;
+	double thed;
+	double power = 2.0/3.0;
+	double D_est = 0.0;
+	if (!PyArg_ParseTuple(args, "dddddd", &Q_est, &W_b, &z, &n, &S, &D_est))
 		return NULL;
-
-    while (Converge > 1e-8)
+	if (D_est == 0.0)
 	{
-        Fy = (D_est * (W_b + z * D_est)) * pow((D_est * (W_b + z * D_est))/ (W_b + 2 * D_est * sqrt(1+ pow(z,2))),(2/3)) - (n * Q_est) / sqrt(S);
-        thed = D_est + dy;
-        Fyy = (thed * (W_b + z * thed)) * pow((thed * (W_b + z * thed))/ (W_b + 2 * thed * sqrt(1+ pow(z,2))),(2/3)) - (n * Q_est) / sqrt(S);
-        dFy = (Fyy - Fy) / dy;
-        if (dFy <= 0) {dFy = 0.99;}
-        thed = D_est - Fy / dFy;
-        D_est = thed;
-        if ((D_est < 0) || (D_est > 5000) || (count > 10000))
-        {
-        	D_est = (float)rand();
-        	Converge = 0;
-        	count = 0;
-        }
-        Converge = abs(Fy/dFy);
-        count += 1;
+	    while (Converge > 1e-8)
+		{
+	        Fy = (D_est * (W_b + z * D_est)) * pow(((D_est * (W_b + z * D_est)) / (W_b + 2 * D_est * sqrt(1+ pow(z,2)))),power) - ((n * Q_est) / sqrt(S));
+	        thed = D_est + dy;
+	        Fyy = (thed * (W_b + z * thed)) * pow((thed * (W_b + z * thed))/ (W_b + 2 * thed * sqrt(1+ pow(z,2))),power) - (n * Q_est) / sqrt(S);
+	        dFy = (Fyy - Fy) / dy;
+	        if (dFy <= 0) {dFy = 0.99;}
+	        D_est -= Fy / dFy;
+	/*        if ((D_est < 0) || (D_est > 5000) || (count > 10000))
+	        {
+	        	D_est = (double)rand();
+	        	Converge = 0;
+	        	count = 0;
+	        }
+	*/        Converge = fabs(Fy/dFy);
+	        count += 1;
+		}
 	}
-    return Py_BuildValue("f",D_est);
+	double A = (D_est * (W_b + z * D_est));
+	double Pw = (W_b + 2 * D_est * sqrt(1+ pow(z,2)));
+	double Rh = A/Pw;
+	double Ww = W_b + 2 * z * D_est;
+	double U = Q_est / A;
+    return Py_BuildValue("ffffff",D_est,A,Pw,Rh,Ww,U);
 }
 /* List of methods defined in the module */
 
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
-		{"NewtonRaphsonSecant", (PyCFunction) heatsource_NewtonRaphsonSecant, METH_VARARGS,  heatsource_NewtonRaphsonSecant__doc__},
-
+		{"GetStreamGeometry", (PyCFunction) heatsource_GetStreamGeometry, METH_VARARGS,  heatsource_GetStreamGeometry__doc__},
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };
 

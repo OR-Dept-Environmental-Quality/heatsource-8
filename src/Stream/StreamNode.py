@@ -1,6 +1,6 @@
 from __future__ import division
 #from psyco.classes import __metaclass__
-import math, wx #, heatsource
+import math, wx, heatsource
 from warnings import warn
 from scipy.optimize.minpack import newton
 from Dieties.IniParams import IniParams
@@ -8,7 +8,6 @@ from Containers.VegZone import VegZone
 from Containers.Zonator import Zonator
 from Containers.AttrList import TimeList
 from StreamChannel import StreamChannel
-import Dieties.Helios
 from Dieties.Chronos import Chronos
 from Utils.Logger import Logger
 
@@ -45,7 +44,7 @@ class StreamNode(StreamChannel):
                      "S": None,
                      "W": None}
         self.Log = Logger
-        #self.CalcSolarPosition = heatsource.CalcSolarPosition
+        self.CalcSolarPosition = heatsource.CalcSolarPosition
 
         # Make Overhang a dictionary (one value for each direction starting at NE (or SW if in southern hemisphere))
         self.Overhang = {}
@@ -211,7 +210,7 @@ class StreamNode(StreamChannel):
         JDC = C.JDC
         offset = C.TZOffset(time)
 #        print self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
-        Azimuth,Altitude,Zenith = Dieties.Helios.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
+        Azimuth,Altitude,Zenith = self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
 #        raise Exception("break")
         # Helios calculates the julian date, so we lazily snag that calculation.
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces

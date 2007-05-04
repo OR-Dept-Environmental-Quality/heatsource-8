@@ -2,8 +2,7 @@ from __future__ import division
 #from psyco.classes import psyobj
 import math, decimal
 from warnings import warn
-#import heatsource
-import Utils.Maths as Maths
+import heatsource
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
 
@@ -59,7 +58,7 @@ class StreamChannel(object):
                     ]
         for attr in self.slots:
             setattr(self,attr,None)
-        self.NewtonRaphsonSecant = Maths.NewtonRaphsonSecant
+        self.GetStreamGeometry = heatsource.GetStreamGeometry
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
     def GetInputs(self):
@@ -125,10 +124,10 @@ class StreamChannel(object):
         if Q < 0.0071: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
-            return
-        # That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-        self.CalcGeometry()
-        self.CalcHyporheic()
+        else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
+            D_est = self.d_cont or 0
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est)
+            self.CalcHyporheic()
 
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
@@ -178,30 +177,6 @@ class StreamChannel(object):
         if Q3 is None: raise Exception("Channel %s has no previous discharge calculation" % self)
 
         return Q1,Q2,Q3
-
-    def CalcGeometry(self, Q_est=None):
-        """Calculate all morphological characteristics that are flow dependent
-
-        This method takes a discharge value, Q_est, and uses GetWettedDepth() to get
-        a depth value that is then used to calculate all depth dependent channel
-        characteristics.
-        """
-        if self.d_cont:
-            dw = self.d_cont
-            Q_est = self.Q
-        else:
-            if not self.S: raise Exception("Control depth must be given with zero slope")
-            Q_est = Q_est or self.Q
-            dw = self.NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
-#            dw2 = heatsource.NewtonRaphsonSecant(Q_est, self.W_b, self.z, self.n, self.S)
-#            print self, dw, dw2
-
-        self.d_w = dw
-        self.A = self.d_w * (self.W_b + self.z*self.d_w)
-        self.P_w = self.W_b + 2 * self.d_w * math.sqrt(1+self.z**2)
-        self.R_h = self.A/self.P_w
-        self.W_w = self.W_b + 2 * self.z * self.d_w
-        self.U = Q_est / self.A
 
     def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients
