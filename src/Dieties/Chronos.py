@@ -51,9 +51,6 @@ class ChronosDiety(object):
     def __iter__(self):
         if not self.__start or not self.__dt:
             raise Exception("Must call %s with the Start() method before using." % self.__class__.__name__)
-        # We set current to one behind the starttime, because we
-        # increment BEFORE we yield the iterator value, that way
-        # the current time is current until it's updated in the outer world.
         while self.__current <= self.__stop:
             yield self.__current
             self.Tick()
