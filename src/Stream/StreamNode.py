@@ -167,13 +167,13 @@ class StreamNode(StreamChannel):
         #TODO: This is a ridiculously long method. It should be cleaned up.
         #======================================================
         # Get the sun's altitude and azimuth:
-#        print self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
+        #Are the below in radians or degress?
         Azimuth,Altitude,Zenith = self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
 #        raise Exception("break")
         AzimuthBreaks = [0,67.5,112.5,157.5,202.5,247.5,292.5]
         Direction = bisect.bisect(AzimuthBreaks,Azimuth)-1
-        FullSunAngle, TopoShadeAngle, RipExtinction = self.ShaderList[Direction]
-        print self.km, FullSunAngle, TopoShadeAngle, RipExtinction
+        FullSunAngle, TopoShadeAngle, RipExtinction = self.ShaderList[Direction]  #The angles are in radians, right?
+        #print self.km, FullSunAngle, TopoShadeAngle, RipExtinction
         SampleDist = IniParams["TransSample"]
         Shade_Density = [0]*4
         # Helios calculates the julian date, so we lazily snag that calculation.
@@ -238,8 +238,8 @@ class StreamNode(StreamChannel):
         ########################################################
         #======================================================
         #3 - Above Stream Surface (Above Bank Shade)
-        if self.km == 0.15:
-            print time, Altitude, TopoShadeAngle, FullSunAngle, Direction
+#        if self.km == 0.15:
+#            print time, Altitude, TopoShadeAngle, FullSunAngle, Direction
         if Altitude <= TopoShadeAngle:    #>Topographic Shade IS Occurring<
             self.Flux["Direct"][2] = 0
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * self.TopoAll / (90 * 3)
@@ -252,7 +252,7 @@ class StreamNode(StreamChannel):
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoAll / (90 * 3))
             Dummy1 = self.Flux["Direct"][2]
             for rip in RipExtinction:
-                Dummy1 *= (1-(1-rip * (SampleDist/cos(radians(Altitude)))))
+                Dummy1 *= (1-(1-exp(-1*rip * (SampleDist/cos(radians(Altitude))))))   #I changed to match VB
             self.Flux["Direct"][3] = Dummy1
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
             self.Flux["Direct"][4] = self.Flux["Direct"][3]

@@ -301,7 +301,7 @@ class HeatSourceInterface(DataSheet):
                 'W_b': 11,
                 'd_bf': 12,
                 'z': 15,
-                'Conductivity': 17, # This value needs to be divided by 1000
+                'Conductivity': 17,
                 'ParticleSize': 18,
                 'Embeddedness': 19,
                 'Q_cont': 22,
@@ -404,7 +404,7 @@ class HeatSourceInterface(DataSheet):
                         tempdir[j][k][3].append(zdict["Overhang"])
                     tempdir[j][k][0].append(zdict["VHeight"])
                     tempdir[j][k][1].append(zdict["VDensity"])
-                    tempdir[j][k][2].append(data[i][42+(j*4)+k])
+                    tempdir[j][k][2].append(data[i][42+(j*4)+k])   #Is this the elevation?
 
         # Theoretically, we now have lists for all of the values, so we need to average over the lists
         # We use our self.smartaverage() method, so that we take care of any values of None
@@ -429,7 +429,7 @@ class HeatSourceInterface(DataSheet):
 
         for i in xrange(7):
             T_Full = [] # lowest angle necessary for full sun
-            T_None = [math.radians(ElevationList[i])] # Highest angle necessary for full shade
+            T_None = [ElevationList[i]] # Highest angle necessary for full shade
             rip = ()
             for j in xrange(4):
                 # First, get the averages for each zone in each direction
@@ -453,26 +453,32 @@ class HeatSourceInterface(DataSheet):
                     if Vdens == 1: RE = 1 # cannot take log of 0
                     else: raise
                 # Calculate the node distance
-                LC_Distance = IniParams["TransSample"] * (j - 0.5)
+                LC_Distance = IniParams["TransSample"] * (j + 0.5) #This is "+ 0.5" because j starts at 0.
                 if not j: LC_Distance -= Overhang
                 if LC_Distance < 0:
                     LC_Distance = 0.00001
                 # Calculate the minimum sun angle needed for full sun
-                T_Full.append(math.atan(math.radians(VH/LC_Distance)))
+                #T_Full.append(math.atan(math.radians(VH/LC_Distance)))  I think this should be ...
+                T_Full.append(math.degrees(math.atan(VH/LC_Distance)))
+                print node, i, j, VH, LC_Distance
                 # Now get the maximum of bank shade and topographic shade for this
                 # direction
-                T_None.append(math.atan(math.radians(SH/LC_Distance)))
+                T_None.append(math.degrees(math.atan(SH/LC_Distance)))
                 ##########################################################
                 # Now we calculate the view to sky value
                 Dummy1 = Vheight + (Elev - node.Elevation)
-                Dummy2 = IniParams["TransSample"] * (j - 0.5) - Overhang
+                Dummy2 = IniParams["TransSample"] * (j + 0.5) - Overhang  #This is "+ 0.5" because j starts at 0.
                 #TODO: The following seems to be already in degrees, so why are we multiplying by 180/pi
                 LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)
                 if not j or LC_Angle_Max < LC_Angle:
                     LC_Angle_Max = LC_Angle
                 if j == 3: VTS_Total + LC_Angle_Max # Add angle at end of each zone calculation
                 rip += RE,
-            node.ShaderList += (max(T_Full), max(T_None), rip),
+            if max(T_Full) > max(T_None):  #Most often what we would expect.
+                node.ShaderList += (max(T_Full), max(T_None), rip),
+            else: #This might happen when topographic shading from far away (i.e. not bank shading) is limiting sunlight
+                node.ShaderList += (max(T_None), max(T_None), rip),
+            print node, max(T_Full), max(T_None)
         node.ViewToSky = 1 - VTS_Total / (7 * 90)
 
 
@@ -517,7 +523,7 @@ class HeatSourceInterface(DataSheet):
         # timestep, since the values don't change. Thus, we just set horizontal conductivity
         # and porosity once here, and remove the other attributes.
         # TODO: Research this mathematics further
-        Dummy1 = node.Conductivity * (1 - node.Embeddedness) #Ratio Conductivity of dominant sunstrate
+        Dummy1 = node.Conductivity / 1000 * (1 - node.Embeddedness) #Ratio Conductivity of dominant sunstrate, convert conductivity into m/s
         Dummy2 = 0.00002 * node.Embeddedness  #Ratio Conductivity of sand - low range
         node.K_h = (Dummy1 + Dummy2) #True horzontal cond. (m/s)
         Dummy1 = node.ParticleSize * (1 - node.Embeddedness) #Ratio Size of dominant substrate

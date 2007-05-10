@@ -41,10 +41,10 @@ class Output(object):
             self.files[key][0].write("     File created on %s/%s/%s" % (today[1], today[2], today[0]))
             self.files[key][0].write("\n\n")
             self.files[key][0].write("Datetime".ljust(14))
-            for node in self.reach:
-                aaa = "%0.3f" % node.km
+            for node in sorted(self.reach.iterkeys(),reverse=True):
+                aaa = "%0.3f" % node
                 self.files[key][0].write(aaa.ljust(14))
-                if node == self.reach[-1]:
+                if node == 0:
                     self.files[key][0].write("\n")
 
 
@@ -56,7 +56,7 @@ class Output(object):
         if TheTime < self.write_time:
             return
         elif TheTime >= self.write_time:
-            for node in self.reach:
+            for node in sorted(self.reach.itervalues(),reverse=True):
                 variables = {
                     "Heat_Cond.txt": node.Flux["Conduction"],
                     "Heat_Conv.txt": node.Flux["Convection"],
@@ -69,7 +69,7 @@ class Output(object):
                     "Hyd_DM.txt": node.d_w,
                     "Hyd_Flow.txt": node.Q,
                     "Hyd_Froude.txt": -999,    #TODO: check to see if calculated
-                    "Hyd_Hyp.txt": -999,     #TODO: check to see if calculated
+                    "Hyd_Hyp.txt": node.Q_hyp,
                     "Hyd_Vel.txt": node.U,
                     "Hyd_WT.txt": node.W_w,
                     "Rate_Evap.txt": node.Evap_Rate,
@@ -79,15 +79,27 @@ class Output(object):
                 self.append(TheTime, variables, node)
             self.write_time += self.dt_out
             if TheTime.hour > self.write_time.hour:  #new day, print daily outputs
-                for node in self.reach:
+                for node in sorted(self.reach.itervalues(),reverse=True):
                     variables = {
                         "Shade.txt": (node.Flux["Solar_daily_sum"][1] - node.Flux["Solar_daily_sum"][4]) / node.Flux["Solar_daily_sum"][1],
                         "VTS.txt": node.ViewToSky
                     }
                     self.append(TheTime, variables, node)
 
+    def append(self, TheTime, variables, node):
+        last = min(self.reach.keys())
+        first = max(self.reach.keys())
+        for key in variables.iterkeys():
+            if node.km == first:
+                Excel_time = "%0.6f" % (TheTime.toordinal() - 693594 + (TheTime.hour +  (TheTime.minute + TheTime.second / 60) / 60 ) / 24)
+                self.files[key][0].write(Excel_time.ljust(14))
+            dataf = "%0.3f" % variables[key]
+            self.files[key][0].write(dataf.ljust(14))
+            if node.km == last:
+                self.files[key][0].write("\n")
+            self.files[key][0].flush()
 
-#    def dailyout(self):
+            #    def dailyout(self):
 #        lastnode = self.reach[-1]
 #        for node in self.reach:
 #
@@ -102,15 +114,4 @@ class Output(object):
 #                    self.files[key].write("\n")
 #                self.files[key].flush()
 
-
-    def append(self, TheTime, variables, node):
-        for key in variables.iterkeys():
-            if node == self.reach[0]:
-                Excel_time = "%0.6f" % (TheTime.toordinal() - 693594 + (TheTime.hour +  (TheTime.minute + TheTime.second / 60) / 60 ) / 24)
-                self.files[key][0].write(Excel_time.ljust(14))
-            dataf = "%0.3f" % variables[key]
-            self.files[key][0].write(dataf.ljust(14))
-            if node == self.reach[-1]:
-                self.files[key][0].write("\n")
-            self.files[key][0].flush()
 
