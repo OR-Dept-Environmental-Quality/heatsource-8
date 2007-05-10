@@ -39,10 +39,10 @@ class MainModel(object):
     def Reset(self):
         ##########################################################
         # Create a Chronos iterator that controls all model time
-        dt = timedelta(seconds=IniParams.dt)
-        start = Chronos.MakeDatetime(IniParams.Date)+timedelta(hours=0,minutes=0)
-        stop = start + timedelta(days=IniParams.SimPeriod)
-        spin = 0 # IniParams.FlushDays # Spin up period
+        dt = timedelta(seconds=IniParams["dt"])
+        start = Chronos.MakeDatetime(IniParams["Date"])+timedelta(hours=0,minutes=0)
+        stop = start + timedelta(days=IniParams["SimPeriod"])
+        spin = 0 # IniParams["FlushDays # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start-dt, dt, stop, spin)
         ##########################################################

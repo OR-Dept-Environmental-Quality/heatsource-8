@@ -1,16 +1,6 @@
-from __future__ import division
-#from psyco.classes import psyobj
-
-class IniParamsDiety(object):
-    """A class to hold user-defined data that is static throughout a model run
-
-    This is often the data that is in the 9th column, rows 2-13, of most of the
-    original Excel Heat Source pages. However, it is a generalized class that
-    is useful for holding other user-defined/static data as well. This class is
-    a Singleton class, meaning that there is only one live instance of it at any
-    time."""
-    def __init__(self,**kwargs):
-        d = {'Name': None,
+#IniParams is a simple dictionary, since we need nothing more than this. This way,
+# it can be more easily read in from a user-defined file.
+IniParams = {'Name': None,
              'Date': None,
              'dt': None, # This time should be in seconds.
              'dx': None, # This should be in meters
@@ -38,9 +28,3 @@ class IniParamsDiety(object):
              'ChannelWidth': True, # Flag meaning we know that our channel widths are over bounding.
              'OutputDirectory':"C:\\Temp\\HeatSource\\"
              }
-        # If any of these are in the constructor, replace the values with them.
-        for key in d.keys():
-            if key in kwargs.keys():
-                d[key] = kwargs[key]
-            setattr(self,key,d[key])
-IniParams = IniParamsDiety()

@@ -1,15 +1,12 @@
 from __future__ import division
 from itertools import imap, dropwhile
-import math, time, operator
+import math, time, operator, bisect
 from datetime import datetime, timedelta
 from DataSheet import DataSheet
 from Stream.StreamNode import StreamNode
 
-from Containers.VegZone import VegZone
-from Containers.Zonator import Zonator
+from Stream.Zonator import Zonator
 from Dieties.IniParams import IniParams
-from Containers.AttrList import PlaceList, TimeList
-from Containers.DataPoint import DataPoint
 from Dieties.Chronos import Chronos
 
 #Flag_HS values:
@@ -29,31 +26,31 @@ class HeatSourceInterface(DataSheet):
         self.Close() # Close the file and quit Excel process
 
     def __initialize(self, gauge):
-        self.Reach = PlaceList(attr='km', orderdn=True)
+        self.Reach = {}
         # Build a quick progress bar
         self.PB = gauge
 
-        # Make empty timelists for the boundary conditions
-        self.Q_bc = TimeList()
-        self.T_bc = TimeList()
-        self.C_bc = TimeList()
+        # Make empty Dictionaries for the boundary conditions
+        self.Q_bc = {}
+        self.T_bc = {}
+        self.C_bc = {}
         #######################################################
         # Grab the initialization parameters from the Excel file.
         # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
         self.SetSheet("TTools Data")
         IP = IniParams
-        IP.Name = self.GetValue("I2")
-        IP.Date = self.GetValue("I3")
-        IP.dt = self.GetValue("I4")*60
-        IP.dx = self.GetValue("I5")
-        IP.Length = self.GetValue("I6")
-        IP.LongSample = self.GetValue("I7")
-        IP.TransSample = self.GetValue("I8")
-        IP.InflowSites = int(self.GetValue("I9"))
-        IP.ContSites = int(self.GetValue("I10"))
-        IP.FlushDays = self.GetValue("I11")
-        IP.TimeZone = self.GetValue("I12")
-        IP.SimPeriod = self.GetValue("I13")
+        IP["Name"] = self.GetValue("I2")
+        IP["Date"] = self.GetValue("I3")
+        IP["dt"] = self.GetValue("I4")*60
+        IP["dx"] = self.GetValue("I5")
+        IP["Length"] = self.GetValue("I6")
+        IP["LongSample"] = self.GetValue("I7")
+        IP["TransSample"] = self.GetValue("I8")
+        IP["InflowSites"] = int(self.GetValue("I9"))
+        IP["ContSites"] = int(self.GetValue("I10"))
+        IP["FlushDays"] = self.GetValue("I11")
+        IP["TimeZone"] = self.GetValue("I12")
+        IP["SimPeriod"] = self.GetValue("I13")
         ######################################################
 
         # Page names- maybe a useless tuple, we'll see
@@ -69,8 +66,7 @@ class HeatSourceInterface(DataSheet):
 
         # from VB: Apparently, only one day is simulated for the shadelator
         # TODO: Check if we need to run for only one day during shadelator-only run.
-        Days = IniParams.SimPeriod
-        self.Hours = int(IniParams.SimPeriod * 24)
+        self.Hours = int(IniParams["SimPeriod"] * 24)
 
         # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
@@ -90,19 +86,28 @@ class HeatSourceInterface(DataSheet):
 #        self.GetInflowData()
         self.GetContinuousData()
         self.SetAtmosphericData()
+        self.PB("Initializing StreamNodes")
+        [x.Initialize() for x in self.Reach.itervalues()]
+        # Now we manually set each nodes next and previous kilometer values
+        l = self.Reach.keys()
+        l.sort(reverse=True) # Sort descending, because streams are numbered from the mouth up
+        for i in xrange(len(l)):
+            key = l[i] # The current node's key
+            # Then, set pointers to the next and previous nodes
+            if i == 0: pass
+            else: self.Reach[key].prev_km = self.Reach[l[i-1]] # At first node, there's no previous
+            try:
+                self.Reach[key].next_km = self.Reach[l[i+1]]
+            except IndexError: pass # At final node, there's no next
 
-        n = 1
-        for i in self.Reach:
-            self.PB("Initializing StreamNodes",n,len(self.Reach))
-            i.Initialize()
-            n+=1
+
 # TODO: Uncomment this after debugging
 #        self.SetupSheets2()
 
         del self.PB
 
     def SetAtmosphericData(self):
-        for node in self.Reach:
+        for node in self.Reach.itervalues():
             if not node.T_air:
                 node.Wind, node.Humidity, node.T_air = self.AtmosphericData
             else:
@@ -111,24 +116,28 @@ class HeatSourceInterface(DataSheet):
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
         # Get the columns, which is faster than accessing cells
+        C = Chronos
+        dt = IniParams["dt"]
         col = 7
         row = 16
         time_col = self[:,col-1,"Continuous Data"]
         flow_col = self[:,col,"Continuous Data"]
         temp_col = self[:,col+1,"Continuous Data"]
         cloud_col = self[:,col+2,"Continuous Data"]
+
         for I in xrange(self.Hours):
-            time = Chronos.MakeDatetime(time_col[16+I][0])
+            # Here,
+            time = C.MakeDatetime(time_col[16+I][0])
             # Get the flow boundary condition
             val = flow_col[row + I][0] # We get the 0th index because each column is actually a 1-length row
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
-            self.Q_bc.append(DataPoint(val,time))
+            self.Q_bc[time] = val
             # Temperature boundary condition
             t_val = temp_col[row + I][0]
             if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
-            self.T_bc.append(DataPoint(t_val,time))
+            self.T_bc[time] = t_val
             # Cloudiness boundary condition
-            self.C_bc.append(DataPoint(cloud_col[row + I][0],time))
+            self.C_bc[time] = cloud_col[row + I][0]
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetDataBlock(self, type):
@@ -137,8 +146,8 @@ class HeatSourceInterface(DataSheet):
         Gets a block of continuous data from a sheet, for a
         number of sites, each with mod different data columns"""
                                   #  (col, sites * datums per site, time column)
-        cols = {"Flow Data":         (14, IniParams.InflowSites * 2, 13),
-                "Continuous Data":   (11, IniParams.ContSites * 4, 6)
+        cols = {"Flow Data":         (14, IniParams["InflowSites"] * 2, 13),
+                "Continuous Data":   (11, IniParams["ContSites"] * 4, 6)
                 }
         # Make a list of the times
         time_col = self[:,cols[type][2],type]
@@ -164,11 +173,11 @@ class HeatSourceInterface(DataSheet):
 
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
-        for site in xrange(IniParams.InflowSites):
+        for site in xrange(IniParams["InflowSites"]):
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
-            node = self.Reach[self.GetValue((site + 17, 11),"Flow Data"),1]
+            node = self.Reach[self.GetValue((site + 17, 11),"Flow Data")]
             for hour in xrange(self.Hours):
                 # Now we make a DataPoint object with the flow and temp, where flow is in the
                 # column 0+sitenum*2 and temp is in the column 1+sitenum*2 where sitenum is the
@@ -176,20 +185,24 @@ class HeatSourceInterface(DataSheet):
                 # 0 and 1. We set the time in this DataPoint to the corresponding hour from the
                 # timelist built above, and we append the datapoint to the Q_tribs or T_tribs
                 # TimeList instance in the node.
-                node.Q_tribs.append(DataPoint(data[hour][site*2], time=timelist[hour]))
-                node.T_tribs.append(DataPoint(data[hour][1+site*2], time=timelist[hour]))
-            self.PB("Reading Inflow data", site, IniParams.InflowSites)
+                node.Q_tribs[timelist[hour]] = data[hour][site*2]
+                node.T_tribs[timelist[hour]] = data[hour][1+site*2]
+            self.PB("Reading Inflow data", site, IniParams["InflowSites"])
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
         data, timelist = self.GetDataBlock("Continuous Data")
 
-        for site in xrange(IniParams.ContSites):
-            node = self.Reach[self.GetValue((site + 17, 4),"Continuous Data"),1] # Index by kilometer
+        for site in xrange(IniParams["ContSites"]):
+            l = self.Reach.keys()
+            l.sort()
+            km = self.GetValue((site + 17, 4),"Continuous Data")
+            key = bisect.bisect(l,km)
+            node = self.Reach[l[key]] # Index by kilometer
             for hour in xrange(self.Hours):
-                node.Wind.append(DataPoint(data[hour][site*4],time=timelist[hour]))
-                node.Humidity.append(DataPoint(data[hour][1+site*4],time=timelist[hour]))
-                node.T_air.append(DataPoint(data[hour][2+site*4], time=timelist[hour]))
+                node.Wind[timelist[hour]] = data[hour][site*4]
+                node.Humidity[timelist[hour]] = data[hour][1+site*4]
+                node.T_air[timelist[hour]] = data[hour][2+site*4]
                 #TODO: Uncomment this if necessary, delete it if not. T_stream should be renamed
 #                try:
 #                    node.T_stream.append(DataPoint(data[hour][3+site*4], time=timelist[hour]))
@@ -202,7 +215,7 @@ class HeatSourceInterface(DataSheet):
             # The VB code essentially uses the last continuous node's
             if not site:
                 self.AtmosphericData = [node.Wind, node.Humidity, node.T_air]
-            self.PB("Reading continuous data", site, IniParams.ContSites)
+            self.PB("Reading continuous data", site, IniParams["ContSites"])
 
     def ScanMorphology(self):
         """Scan morphology variables for null of nonnumeric values"""
@@ -241,12 +254,12 @@ class HeatSourceInterface(DataSheet):
         ####################
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
-        if (IniParams.dx%IniParams.LongSample
-            or IniParams.dx<IniParams.LongSample):
+        if (IniParams["dx"]%IniParams["LongSample"]
+            or IniParams["dx"]<IniParams["LongSample"]):
             raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
-        long = IniParams.LongSample
-        dx = IniParams.dx
-        length = IniParams.Length
+        long = IniParams["LongSample"]
+        dx = IniParams["dx"]
+        length = IniParams["Length"]
         multiple = int(dx/long) #We have this many samples per distance step
         datapoints = self.Num_Q_Var-1 # We subtract one because the first datapoint is a boundary node.
         row = 18 # Current row (Skipping the boundary node row)
@@ -254,17 +267,18 @@ class HeatSourceInterface(DataSheet):
         # The first node is a boundary node. Because the discharge, etc. are not calculated, but given
         # as boundary conditions, we want this node to be simply the values of the first longitudinal
         # sample, or row 17 of the Excel spreadsheet.
-        self.Reach.append(self.GetNode(17,1)) #append the boundary condition node, row 17
-        # Place the boundary conditions in this first streamnode
-        for cond in ["Q_bc","T_bc"]:
-            setattr(self.Reach[0],cond,getattr(self,cond))
+        node = self.GetNode(17,1)
+        node.Q_bc = self.Q_bc # Boundary conditions
+        node.T_bc = self.T_bc
+        node.dx = IniParams["LongSample"] # Set it to the length of the sample rate
+        self.Reach[node.km] = node#append the boundary condition node, row 17
         # We also need to reset the dx of the first node, since it's of a shorter length:
-        self.Reach[0].dx = IniParams.LongSample # Set it to the length of the sample rate
         # Now, the meat. Most of the nodes will be developed as some multiple of the longitudinal
         # sample rate. Here, we figure out what that multiple is and append stream nodes for all
         # of the samples.
         for i in range(0, datapoints, multiple):
-            self.Reach.append(self.GetNode(row+i,multiple))
+            node = self.GetNode(row+i,multiple)
+            self.Reach[node.km] = node
             self.PB("Building Stream Nodes", i, datapoints)
         row += i+multiple
 
@@ -272,7 +286,9 @@ class HeatSourceInterface(DataSheet):
         # we reset the multiple and if there's a remainder, we reset the last nodes dx
         multiple = datapoints%multiple
         if multiple: # If so, we have to calculate how many extra datapoints there are
-            self.Reach[-1].dx = long*multiple
+            l = self.Reach.keys()
+            l.sort()
+            self.Reach[l[-1]].dx = long*multiple
 
 
     def GetNode(self, row, multiple):
@@ -296,18 +312,14 @@ class HeatSourceInterface(DataSheet):
                 'Q_out': 6}
         ttools = {'Longitude': 5,
                   'Latitude': 6,
-                  'Elevation': 7,
-                  'Aspect': 9,
-                  'Topo_W': 10,
-                  'Topo_S': 11,
-                  'Topo_E': 12}
-        pages = {'Morphology Data': morph, 'TTools Data': ttools, 'Flow Data': flow}
+                  'Aspect': 9}
+        pages = (('Morphology Data',morph),('Flow Data', flow), ('TTools Data',ttools))
         # This is the node
         node = StreamNode()
         # Figuring out the ending row takes some logic. If h=0, this is the first node, which should be a
         # boundary node developed from the first (headwater) datapoint
         endrow = row+multiple-1
-        for page in pages:
+        for page,attrdict in pages:
             # Get data as a tuple of tuples of len(multiple) and turn it into a list of lists
             data = [[i for i in j] for j in self[row:endrow,:,page]]
             if page == 'Morphology Data':
@@ -320,7 +332,7 @@ class HeatSourceInterface(DataSheet):
             data = [i for i in self.AverageIterables(data)] # Average all the values smartly
             # Now we iterate through the list of averages, and assign the values to the appropriate
             # attributes in the stream node
-            for attr,col in pages[page].iteritems():
+            for attr,col in attrdict.iteritems():
                 try:
                     setattr(node, attr, data[col])
                 except IndexError, inst:
@@ -349,23 +361,25 @@ class HeatSourceInterface(DataSheet):
         # LC attrs
         attrs = ["VHeight","VDensity"]
         ########################################
-        # We build a Zonator instance with lists for all values. This way, we can append
-        # values to the list, then average over the values. The Zonator instance, has 7
-        # directions, each of which holds 4 VegZone instances
-        # with values for the sampled zones in each directions.
-        dir = [] # List to save the seven directions
-        for Direction in xrange(7):
-            z = () #Tuple to store the zones 0-3
-            for Zone in xrange(4):
-                z += VegZone([],[],[]), #Build the VegZone with lists as values
-            dir.append(z) # append to the proper direction
-        node.Zone = Zonator(*dir) # Create a Zonator instance and set the node.Zone attribute
+        # We build a Zonator instance with tuples for all values.
+        node.Zone = Zonator() # Create a Zonator instance and set the node.Zone attribute
         # The values for VHeight and VDensity for emergent vegetation lie in the StreamNode
         node.VDensity = []
         node.VHeight = []
-        # Overhang is also in the streamnode, as a separate variable which is a dictionary
-        # indexed by direction
+        #This is the topographic data
+        Topo_W = []
+        Topo_S = []
+        Topo_E = []
+        #Elevation
+        node.Elevation = []
         ########################################
+        # Temporary lists for
+        tempdir = [] # Temporary direction list
+        for i in xrange(7):
+            tempzone = [] # Temporary zone list
+            for j in xrange(4):
+                tempzone.append([[],[],[],[]]) # Temporary holders for VHeight, VDensity and Elevation
+            tempdir.append(tempzone)
 
         # Now, we add values to the lists as many times as we have rows.
         for i in xrange(len(data)):
@@ -373,31 +387,94 @@ class HeatSourceInterface(DataSheet):
             emerg = LC[data[i][13]] # Dictionary of the emergent veg code
             node.VDensity.append(emerg["VDensity"])
             node.VHeight.append(emerg["VHeight"])
+            ## Topographic info
+            Topo_W.append(data[i][10])
+            Topo_S.append(data[i][11])
+            Topo_E.append(data[i][12])
+            ## Elevation
+            node.Elevation.append(data[i][7])
 
-            for j,k,zone in node.GetZones():
+            for j in xrange(7): # Iterate through the directions
+                for k in xrange(4):
                 # Get the dictionary from the LC code from the ith row at the [14+(j*4)+k]th column
-                zdict = LC[data[i][14+(j*4)+k]]
-                if zdict["VDensity"] != 0:
-                    pass
-                if k == 0: #If we're at the first zone of a given direction, set the StreamNode's Overhang for that direction
-                    try: node.Overhang[j].append(zdict["Overhang"])
-                    except AttributeError:
-                        node.Overhang[j] = [zdict["Overhang"]]
-                zone.VHeight.append(zdict["VHeight"])
-                zone.VDensity.append(zdict["VDensity"])
-                zone.Elevation.append(data[i][42+(j*4)+k])
+                    zdict = LC[data[i][14+(j*4)+k]]
+                    if zdict["VDensity"] != 0:
+                        pass
+                    if k == 0: #If we're at the first zone of a given direction, set the StreamNode's Overhang for that direction
+                        tempdir[j][k][3].append(zdict["Overhang"])
+                    tempdir[j][k][0].append(zdict["VHeight"])
+                    tempdir[j][k][1].append(zdict["VDensity"])
+                    tempdir[j][k][2].append(data[i][42+(j*4)+k])
 
         # Theoretically, we now have lists for all of the values, so we need to average over the lists
         # We use our self.smartaverage() method, so that we take care of any values of None
         # First we average the StreamNode attributes
         node.VHeight, node.VDensity = self.SmartAverage(node.VHeight), self.SmartAverage(node.VDensity)
-        for i in xrange(7): node.Overhang[i] = self.SmartAverage(node.Overhang[i])
+        Topo_W = self.SmartAverage(Topo_W)
+        Topo_S = self.SmartAverage(Topo_S)
+        Topo_E = self.SmartAverage(Topo_E)
+        node.TopoAll = Topo_W + Topo_S + Topo_E
+        node.Elevation = self.SmartAverage(node.Elevation)
+        VTS_Total = 0 #View to sky value
+        LC_Angle_Max = 0
 
-        # Then we iterate over the zones
-        for i,j,zone in node.GetZones():
-            zone.VDensity = self.SmartAverage(zone.VDensity)
-            zone.VHeight = self.SmartAverage(zone.VHeight)
-            zone.Elevation = self.SmartAverage(zone.Elevation)
+        # Now we set the topographic elevations in each direction
+        ElevationList = (Topo_E,
+                         Topo_E,
+                         0.5*(Topo_E+Topo_S),
+                         Topo_S,
+                         0.5*(Topo_S+Topo_W),
+                         Topo_W,
+                         Topo_W)
+
+        for i in xrange(7):
+            T_Full = [] # lowest angle necessary for full sun
+            T_None = [math.radians(ElevationList[i])] # Highest angle necessary for full shade
+            rip = ()
+            for j in xrange(4):
+                # First, get the averages for each zone in each direction
+                if not j:
+                    Overhang = self.SmartAverage(tempdir[i][j][3])# Overhang only on zeroth zone
+                    LC_Angle_Max = 0 # New value for each direction
+                else:
+                    Overhang
+                Vheight = self.SmartAverage(tempdir[i][j][0])
+                Vdens = self.SmartAverage(tempdir[i][j][1])
+                Elev = self.SmartAverage(tempdir[i][j][2])
+                ##########################################################
+                # Calculate the relative ground elev:
+                SH = Elev - node.Elevation
+                # Then calculate the relative vegetation height:
+                VH = Vheight + SH
+                # Calculate the riparian extinction value
+                try:
+                    RE = -math.log(1-Vdens)/10
+                except:
+                    if Vdens == 1: RE = 1 # cannot take log of 0
+                    else: raise
+                # Calculate the node distance
+                LC_Distance = IniParams["TransSample"] * (j - 0.5)
+                if not j: LC_Distance -= Overhang
+                if LC_Distance < 0:
+                    LC_Distance = 0.00001
+                # Calculate the minimum sun angle needed for full sun
+                T_Full.append(math.atan(math.radians(VH/LC_Distance)))
+                # Now get the maximum of bank shade and topographic shade for this
+                # direction
+                T_None.append(math.atan(math.radians(SH/LC_Distance)))
+                ##########################################################
+                # Now we calculate the view to sky value
+                Dummy1 = Vheight + (Elev - node.Elevation)
+                Dummy2 = IniParams["TransSample"] * (j - 0.5) - Overhang
+                #TODO: The following seems to be already in degrees, so why are we multiplying by 180/pi
+                LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)
+                if not j or LC_Angle_Max < LC_Angle:
+                    LC_Angle_Max = LC_Angle
+                if j == 3: VTS_Total + LC_Angle_Max # Add angle at end of each zone calculation
+                rip += RE,
+            node.ShaderList += (max(T_Full), max(T_None), rip),
+        node.ViewToSky = 1 - VTS_Total / (7 * 90)
+
 
     def GetLandCoverCodes(self):
         """Return the codes from the Land Cover Codes worksheet as a dictionary of dictionaries"""
@@ -425,20 +502,16 @@ class HeatSourceInterface(DataSheet):
         #Now that we have a stream node, we set the node's dx value, because
         # we have most nodes that are long-sample-distance times multiple,
 
-        # To make our life easier when building the node we created Topo_W,
-        # Topo_S, and Topo_E, however,
-        # these are better in a dictionary, so we fix that here.
-        node.Topo = {"E":node.Topo_E,
-                     "W":node.Topo_W,
-                     "S":node.Topo_S}
-        del node.Topo_E, node.Topo_W, node.Topo_S # Delete the unnecessary attributes
-        node.dx = IniParams.dx # Set the space-step
-        node.dt = IniParams.dt # Set the node's timestep... this may have to be adjusted to comply with stability
+        node.dx = IniParams["dx"] # Set the space-step
+        node.dt = IniParams["dt"] # Set the node's timestep... this may have to be adjusted to comply with stability
         # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
         node.C_bc = self.C_bc
-        node.T = self.T_bc[0]
-        node.T_prev = self.T_bc[0]
-        node.T_sed = self.T_bc[0]
+        # Find the earliest temperature condition
+        l = self.T_bc.keys()
+        l.sort
+        node.T = self.T_bc[l[0]]
+        node.T_prev = self.T_bc[l[0]]
+        node.T_sed = self.T_bc[l[0]]
         node.SetBankfullMorphology()
         # Taken from the VB code in SubHydraulics- this doesn't have to run at every
         # timestep, since the values don't change. Thus, we just set horizontal conductivity

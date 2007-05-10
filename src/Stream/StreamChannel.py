@@ -1,9 +1,8 @@
 from __future__ import division
-#from psyco.classes import psyobj
 import math, decimal
 from warnings import warn
 import heatsource
-from Dieties.Chronos import Chronos
+from Dieties.Chronos import Chronos as Clock
 from Dieties.IniParams import IniParams
 
 class StreamChannel(object):
@@ -61,19 +60,25 @@ class StreamChannel(object):
         self.GetStreamGeometry = heatsource.GetStreamGeometry
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
-    def GetInputs(self):
+    def __lt__(self, other): return self.km < other.km
+    def __le__(self, other): return self.km <= other.km
+    def __eq__(self, other): return self.km == other.km
+    def __ne__(self, other): return self.km != other.km
+    def __gt__(self, other): return self.km > other.km
+    def __ge__(self, other): return self.km >= other.km
+
+    def GetInputs(self, hour):
         """Returns a value for inputs-outputs to the channel at the time=t"""
-        t = Chronos.TheTime
         Q = 0
         Q += self.Q_in or 0 # Input volume
         Q -= self.Q_out or 0 # Output volume
         if len(self.Q_tribs):
-            Q += self.Q_tribs[t,-1]# Tributary volume
+            Q += self.Q_tribs[hour]# Tributary volume
         if self.E: # Evaporation volume
             Q -= self.E * self.dx * self.W_w
         return Q
 
-    def CalculateDischarge(self):
+    def CalculateDischarge(self, time, hour):
         """Return the discharge for the current timestep
 
         This method uses the GetKnownDischarges() and GetMuskigum() methods to
@@ -88,14 +93,11 @@ class StreamChannel(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
-        Clock = Chronos # make a local variable to speed access, since it's done every time/space step
-        time = Clock.TheTime
-
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             # Get all of the discharges that we know about.
             # In order, they are (t,x-1), (t-1,x-1), (t-1,x).
-            Q1,Q2,Q3 = self.GetKnownDischarges()
+            Q1,Q2,Q3 = self.GetKnownDischarges(hour)
             # Use (t,x-1) to calculate the Muskingum coefficients
             C1,C2,C3 = self.GetMuskingum(Q2)
             # Calculate the new Q
@@ -103,18 +105,17 @@ class StreamChannel(object):
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
             try:
-                Q = self.Q_bc[time,-1]*1 # Get the value at this time, or the closest previous time
+                Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
             except:
-                if time < Clock.MakeDatetime(IniParams.Date):
-                    Q = self.Q_bc[0]*1 #Multiplying by 1 turns it into a true Python float
+                if time < Clock.MakeDatetime(IniParams["Date"]):
+                    Q = self.Q_bc[0]
                 else: raise
             if Q == 1:
                 pass
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
-            Q_in = self.GetInputs() # Add up our inputs to this segment
-            Q = self.prev_km.Q_prev + Q_in # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
+            Q = self.prev_km.Q_prev + self.GetInputs(hour) # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
         else: raise Exception("WTF?")
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
@@ -144,7 +145,7 @@ class StreamChannel(object):
 #        else: dt = iniparams.dt
 #        return dt
 
-    def GetKnownDischarges(self):
+    def GetKnownDischarges(self, hour):
         """Returns the known discharges necessary to calculate current discharge
 
         This method returns a tuple of discharge values used in calculations. To calculate
@@ -163,12 +164,12 @@ class StreamChannel(object):
         be called accordingly.
         """
         # (t, x-1) = flow from the upstream channel at this timestep
-        Q1 = self.prev_km.Q + self.GetInputs()
+        Q1 = self.prev_km.Q + self.GetInputs(hour)
         # Then we make sure it's been calculated- in case there's a problem with the code
         if Q1 is None: raise Exception("Previous channel of %s has no discharge calculation" % self)
 
         # (t-1, x-1) = flow from the upstream channel's previous timestep.
-        Q2 = self.prev_km.Q_prev + self.GetInputs()
+        Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
         if Q2 is None: raise Exception("Previous channel of %s has no previous discharge calculation" % self)
 
         # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep

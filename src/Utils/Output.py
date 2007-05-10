@@ -34,7 +34,7 @@ class Output(object):
                     }
 
         for key in self.files.iterkeys():
-            self.files[key][0] = open(IniParams.OutputDirectory + key, 'w')
+            self.files[key][0] = open(IniParams["OutputDirectory"] + key, 'w')
             self.files[key][0].write("Heat Source Hourly Output File:  ")
             self.files[key][0].write(self.files[key][1])
             today = time.localtime()
