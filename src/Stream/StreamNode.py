@@ -153,7 +153,7 @@ class StreamNode(StreamChannel):
         # Move our current temperature to T_prev before we calculate
         # our new temperature. This just ensures that T and T_prev are
         # known at this point as the current and future temperature.
-        self.T_prev = self.T
+        #self.T_prev = self.T
         self.T = None # This just ensures we don't accidentally use it until it's reset
         DayTime = self.CalcSolarFlux(time, hour,JD,JDC,offset) # Returns false if night
         self.CalcConductionFlux()
@@ -173,6 +173,7 @@ class StreamNode(StreamChannel):
         AzimuthBreaks = [0,67.5,112.5,157.5,202.5,247.5,292.5]
         Direction = bisect.bisect(AzimuthBreaks,Azimuth)-1
         FullSunAngle, TopoShadeAngle, RipExtinction = self.ShaderList[Direction]
+        print self.km, FullSunAngle, TopoShadeAngle, RipExtinction
         SampleDist = IniParams["TransSample"]
         Shade_Density = [0]*4
         # Helios calculates the julian date, so we lazily snag that calculation.
@@ -237,6 +238,8 @@ class StreamNode(StreamChannel):
         ########################################################
         #======================================================
         #3 - Above Stream Surface (Above Bank Shade)
+        if self.km == 0.15:
+            print time, Altitude, TopoShadeAngle, FullSunAngle, Direction
         if Altitude <= TopoShadeAngle:    #>Topographic Shade IS Occurring<
             self.Flux["Direct"][2] = 0
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * self.TopoAll / (90 * 3)
@@ -255,6 +258,8 @@ class StreamNode(StreamChannel):
             self.Flux["Direct"][4] = self.Flux["Direct"][3]
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         else: # Full sun
+            self.Flux["Direct"][2] = self.Flux["Direct"][1]
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoAll / (90 * 3))
             self.Flux["Direct"][3] = self.Flux["Direct"][2]
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
             self.Flux["Direct"][4] = self.Flux["Direct"][3]
@@ -490,22 +495,22 @@ class StreamNode(StreamChannel):
     def RecordHeatData(self,DayTime):
         dt = self.dt
         Heat = {"Solar": [0]*8}
-        if DayTime:
-            self.Flux["Total"] = self.Flux["Solar"][6] + self.Flux["Conduction"] + self.Flux["Evaporation"] + self.Flux["Convection"] + self.Flux["Longwave"]
-            Cp = 4182 # J/kg *C
-            P = 998.2 # kg/m3
-            self.Delta_T = self.Flux["Total"] * dt / (self.d_ave * Cp * P)
-        else:
-            self.Flux["Total"] = 0
-            self.Flux["Conduction"] = 0
-            self.Flux["Evaporation"] = 0
-            self.Flux["Convection"] = 0
-            self.Flux["Longwave"] = 0
-            self.Delta_T = 0
-            self.Flux["Solar"][1] = 0
-            self.Flux["Solar"][4] = 0
-            self.Flux["Solar"][6] = 0
-            self.E = 0
+#        if DayTime:
+        self.Flux["Total"] = self.Flux["Solar"][6] + self.Flux["Conduction"] + self.Flux["Evaporation"] + self.Flux["Convection"] + self.Flux["Longwave"]
+        Cp = 4182 # J/kg *C
+        P = 998.2 # kgS/m3
+        self.Delta_T = self.Flux["Total"] * dt / (self.d_ave * Cp * P)
+#        else:
+#            self.Flux["Total"] = 0
+#            self.Flux["Conduction"] = 0
+#            self.Flux["Evaporation"] = 0
+#            self.Flux["Convection"] = 0
+#            self.Flux["Longwave"] = 0
+#            self.Delta_T = 0
+#            self.Flux["Solar"][1] = 0
+#            self.Flux["Solar"][4] = 0
+#            self.Flux["Solar"][6] = 0
+#            self.E = 0
 
         if False:#Chronos.TheTime > Chronos.start:
             #Calculate Heat by process (J/m2 per day)
@@ -535,7 +540,7 @@ class StreamNode(StreamChannel):
                 mix = self.MixItUp(hour,0)
                 T0 = self.prev_km.T_prev + mix
                 T1 = self.T_prev
-                T2 = self.next_km.T if self.next_km else self.T_prev
+                T2 = self.next_km.T_prev if self.next_km else self.T_prev
                 if not self.S:
                     Shear_Velocity = self.U
                 else:
@@ -578,6 +583,7 @@ class StreamNode(StreamChannel):
                 Dummy1 = -self.U * (T1 - T0) / dx
                 Dummy2 = Dispersion * (T2 - 2 * T1 + T0) / dx ** 2
                 S2 = Dummy1 + Dummy2 + self.Delta_T / dt
+                #print Chronos.TheTime, self.km, self.Delta_T
                 self.T = self.T_prev + ((S1 + S2) / 2) * dt
             else:
                 self.T = self.T_prev
