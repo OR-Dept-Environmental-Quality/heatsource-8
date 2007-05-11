@@ -460,7 +460,6 @@ class HeatSourceInterface(DataSheet):
                 # Calculate the minimum sun angle needed for full sun
                 #T_Full.append(math.atan(math.radians(VH/LC_Distance)))  I think this should be ...
                 T_Full.append(math.degrees(math.atan(VH/LC_Distance)))
-                print node, i, j, VH, LC_Distance
                 # Now get the maximum of bank shade and topographic shade for this
                 # direction
                 T_None.append(math.degrees(math.atan(SH/LC_Distance)))
@@ -472,13 +471,12 @@ class HeatSourceInterface(DataSheet):
                 LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)
                 if not j or LC_Angle_Max < LC_Angle:
                     LC_Angle_Max = LC_Angle
-                if j == 3: VTS_Total + LC_Angle_Max # Add angle at end of each zone calculation
+                if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
                 rip += RE,
             if max(T_Full) > max(T_None):  #Most often what we would expect.
                 node.ShaderList += (max(T_Full), max(T_None), rip),
             else: #This might happen when topographic shading from far away (i.e. not bank shading) is limiting sunlight
                 node.ShaderList += (max(T_None), max(T_None), rip),
-            print node, max(T_Full), max(T_None)
         node.ViewToSky = 1 - VTS_Total / (7 * 90)
 
 

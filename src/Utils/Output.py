@@ -49,8 +49,8 @@ class Output(object):
 
 
     def __del__(self):
-        for key in self.files.iterkeys():
-            self.files[key].close()
+        for filename in self.files.itervalues():
+            filename[0].close()
 
     def Store(self, TheTime):
         if TheTime < self.write_time:

@@ -167,12 +167,12 @@ class StreamNode(StreamChannel):
         #TODO: This is a ridiculously long method. It should be cleaned up.
         #======================================================
         # Get the sun's altitude and azimuth:
-        #Are the below in radians or degress?
+        #All angles are in degrees
         Azimuth,Altitude,Zenith = self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
 #        raise Exception("break")
         AzimuthBreaks = [0,67.5,112.5,157.5,202.5,247.5,292.5]
         Direction = bisect.bisect(AzimuthBreaks,Azimuth)-1
-        FullSunAngle, TopoShadeAngle, RipExtinction = self.ShaderList[Direction]  #The angles are in radians, right?
+        FullSunAngle, TopoShadeAngle, RipExtinction = self.ShaderList[Direction]  #The angles are in degrees
         #print self.km, FullSunAngle, TopoShadeAngle, RipExtinction
         SampleDist = IniParams["TransSample"]
         Shade_Density = [0]*4
@@ -286,7 +286,6 @@ class StreamNode(StreamChannel):
             Shade_Density[0] = 1 - exp(-Rip_Extinct[0] * Path[0])
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density[0])
 
-        #print self, Chronos.TheTime, self.Flux["Direct"][4]
 #        raise Exception("Debug Breakpoint")
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         #5 - Entering Stream
@@ -526,7 +525,7 @@ class StreamNode(StreamChannel):
             Heat["Evaporation"] = dt * self.Flux["Evaporation"]
             Heat["Convection"] = dt * self.Flux["Convection"]
             Heat["Total"] = dt * self.Flux["Total"]
-            #print Heat["Total"]
+
 
     def MacCormick1(self, hour):
         sqrt = math.sqrt
@@ -583,7 +582,6 @@ class StreamNode(StreamChannel):
                 Dummy1 = -self.U * (T1 - T0) / dx
                 Dummy2 = Dispersion * (T2 - 2 * T1 + T0) / dx ** 2
                 S2 = Dummy1 + Dummy2 + self.Delta_T / dt
-                #print Chronos.TheTime, self.km, self.Delta_T
                 self.T = self.T_prev + ((S1 + S2) / 2) * dt
             else:
                 self.T = self.T_prev
