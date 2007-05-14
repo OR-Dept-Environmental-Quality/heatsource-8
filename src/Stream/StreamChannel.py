@@ -58,6 +58,7 @@ class StreamChannel(object):
         for attr in self.slots:
             setattr(self,attr,None)
         self.GetStreamGeometry = heatsource.GetStreamGeometry
+        self.starttime = Clock.MakeDatetime(IniParams["Date"])
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
     def __lt__(self, other): return self.km < other.km
@@ -107,7 +108,7 @@ class StreamChannel(object):
             try:
                 Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
             except:
-                if time < Clock.MakeDatetime(IniParams["Date"]):
+                if time < self.starttime:
                     Q = self.Q_bc[0]
                 else: raise
             if Q == 1:

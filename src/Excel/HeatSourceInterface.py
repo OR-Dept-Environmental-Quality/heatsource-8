@@ -413,7 +413,7 @@ class HeatSourceInterface(DataSheet):
         Topo_W = self.SmartAverage(Topo_W)
         Topo_S = self.SmartAverage(Topo_S)
         Topo_E = self.SmartAverage(Topo_E)
-        node.TopoAll = Topo_W + Topo_S + Topo_E
+        node.TopoFactor = (Topo_W + Topo_S + Topo_E)/(90*3) # Originally in CalcSolarFlux #3.. Above Stream Surface
         node.Elevation = self.SmartAverage(node.Elevation)
         VTS_Total = 0 #View to sky value
         LC_Angle_Max = 0

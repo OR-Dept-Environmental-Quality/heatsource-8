@@ -1,6 +1,7 @@
 from __future__ import division
 
 import cProfile, sys, time
+from os.path import join
 from datetime import datetime, timedelta
 
 from Excel.HeatSourceInterface import HeatSourceInterface
@@ -13,8 +14,8 @@ from Utils.Output import Output as O
 sys.setcheckinterval(1000)
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
-
-Reach = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC_test1.xls", ErrLog).Reach
+debugfile = join(IniParams["DataDirectory"],IniParams["DebugFile"])
+Reach = HeatSourceInterface(debugfile, ErrLog).Reach
 ErrLog("Starting")
 ##########################################################
 # Create a Chronos iterator that controls all model time
@@ -31,11 +32,15 @@ Output = O(dt_out, Reach, start)
 def hydraulics():
     time = Chronos.TheTime
     stop = Chronos.stop
-    offset = Chronos.TZOffset(time)
     while time < stop:
         JD = Chronos.JDay
         JDC = Chronos.JDC
+<<<<<<< .mine
+        offset = Chronos.TZOffset(time)
+        if not time.minute or time.second:
+=======
         if not time.minute or time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
+>>>>>>> .r118
             hour = time
         reachlist = sorted(Reach.itervalues(),reverse=True)
         [x.CalcHydraulics(time, hour) for x in reachlist]

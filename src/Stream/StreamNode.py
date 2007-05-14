@@ -24,6 +24,7 @@ class StreamNode(StreamChannel):
              "T", "T_prev", # Current and previous stream temperature
              "Flux", # Dictionary to hold heat flux values
              "Evap_Rate",  #Evaportion in m/s
+             "TopoFactor", # was Topo_W+Topo_S+Topo_E/(90*3) in original code. From Above stream surface solar flux calculations
              "ShaderList" # List of angles and attributes to determine sun shading.
              ]
         # Set all the attributes to bare lists, or set from the constructor
@@ -242,7 +243,7 @@ class StreamNode(StreamChannel):
 #            print time, Altitude, TopoShadeAngle, FullSunAngle, Direction
         if Altitude <= TopoShadeAngle:    #>Topographic Shade IS Occurring<
             self.Flux["Direct"][2] = 0
-            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * self.TopoAll / (90 * 3)
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * self.TopoFactor
             aaa = self.TopoAll / (90 * 3)
             self.Flux["Direct"][3] = 0
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
@@ -250,7 +251,7 @@ class StreamNode(StreamChannel):
 #            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         elif Altitude < FullSunAngle:  #Partial shade from veg
             self.Flux["Direct"][2] = self.Flux["Direct"][1]
-            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoAll / (90 * 3))
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoFactor)
             Dummy1 = self.Flux["Direct"][2]
             zone = 0
             for vegangle in VegetationAngle:  #Loop to find if shading is occuring from veg. in that zone
