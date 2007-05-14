@@ -35,12 +35,8 @@ def hydraulics():
     while time < stop:
         JD = Chronos.JDay
         JDC = Chronos.JDC
-<<<<<<< .mine
         offset = Chronos.TZOffset(time)
-        if not time.minute or time.second:
-=======
         if not time.minute or time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
->>>>>>> .r118
             hour = time
         reachlist = sorted(Reach.itervalues(),reverse=True)
         [x.CalcHydraulics(time, hour) for x in reachlist]
