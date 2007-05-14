@@ -153,8 +153,8 @@ class StreamNode(StreamChannel):
         # Move our current temperature to T_prev before we calculate
         # our new temperature. This just ensures that T and T_prev are
         # known at this point as the current and future temperature.
-        #self.T_prev = self.T
-        self.T = None # This just ensures we don't accidentally use it until it's reset
+#        self.T_prev = self.T
+#        self.T = None # This just ensures we don't accidentally use it until it's reset
         DayTime = self.CalcSolarFlux(time, hour,JD,JDC,offset) # Returns false if night
         self.CalcConductionFlux()
         self.CalcLongwaveFlux(hour)
@@ -172,7 +172,7 @@ class StreamNode(StreamChannel):
 #        raise Exception("break")
         AzimuthBreaks = [0,67.5,112.5,157.5,202.5,247.5,292.5]
         Direction = bisect.bisect(AzimuthBreaks,Azimuth)-1
-        FullSunAngle, TopoShadeAngle, RipExtinction = self.ShaderList[Direction]  #The angles are in degrees
+        FullSunAngle, TopoShadeAngle, BankShadeAngle, RipExtinction, VegetationAngle = self.ShaderList[Direction]  #The angles are in degrees
         #print self.km, FullSunAngle, TopoShadeAngle, RipExtinction
         SampleDist = IniParams["TransSample"]
         Shade_Density = [0]*4
@@ -243,27 +243,40 @@ class StreamNode(StreamChannel):
         if Altitude <= TopoShadeAngle:    #>Topographic Shade IS Occurring<
             self.Flux["Direct"][2] = 0
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * self.TopoAll / (90 * 3)
+            aaa = self.TopoAll / (90 * 3)
             self.Flux["Direct"][3] = 0
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
-            self.Flux["Direct"][4] = 0
-            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+#            self.Flux["Direct"][4] = 0
+#            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         elif Altitude < FullSunAngle:  #Partial shade from veg
             self.Flux["Direct"][2] = self.Flux["Direct"][1]
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoAll / (90 * 3))
             Dummy1 = self.Flux["Direct"][2]
-            for rip in RipExtinction:
-                Dummy1 *= (1-(1-exp(-1*rip * (SampleDist/cos(radians(Altitude))))))   #I changed to match VB
+            zone = 0
+            for vegangle in VegetationAngle:  #Loop to find if shading is occuring from veg. in that zone
+                if Altitude < vegangle:  #veg shading is occurring from this zone
+                    Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (SampleDist/cos(radians(Altitude))))))   
+                zone += 1
             self.Flux["Direct"][3] = Dummy1
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
-            self.Flux["Direct"][4] = self.Flux["Direct"][3]
-            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+#            self.Flux["Direct"][4] = self.Flux["Direct"][3]
+#            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         else: # Full sun
             self.Flux["Direct"][2] = self.Flux["Direct"][1]
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoAll / (90 * 3))
             self.Flux["Direct"][3] = self.Flux["Direct"][2]
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
+#            self.Flux["Direct"][4] = self.Flux["Direct"][3]
+#            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+        #4 - Above Stream Surface (What a Solar Pathfinder measures)
+        #Account for bank shade
+        if Altitude > TopoShadeAngle and Altitude <= BankShadeAngle:  #Bank shade is occurring
+            self.Flux["Direct"][4] = 0
+            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+        else:  #bank shade is not occurring
             self.Flux["Direct"][4] = self.Flux["Direct"][3]
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
+
         #Account for emergent vegetation
         if IniParams["Emergent"]:
             Path[0] = zone[0][0].VHeight / sin(radians(Altitude))

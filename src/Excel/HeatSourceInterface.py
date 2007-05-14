@@ -429,7 +429,7 @@ class HeatSourceInterface(DataSheet):
 
         for i in xrange(7):
             T_Full = [] # lowest angle necessary for full sun
-            T_None = [ElevationList[i]] # Highest angle necessary for full shade
+            T_None = [] # Highest angle necessary for full shade
             rip = ()
             for j in xrange(4):
                 # First, get the averages for each zone in each direction
@@ -473,10 +473,15 @@ class HeatSourceInterface(DataSheet):
                     LC_Angle_Max = LC_Angle
                 if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
                 rip += RE,
-            if max(T_Full) > max(T_None):  #Most often what we would expect.
-                node.ShaderList += (max(T_Full), max(T_None), rip),
-            else: #This might happen when topographic shading from far away (i.e. not bank shading) is limiting sunlight
-                node.ShaderList += (max(T_None), max(T_None), rip),
+            #Returns a list: 
+            #FullSunAngle (angles greater than this there is no shade occuring),
+            #TopoShadeAngle (shade from features far away, angles less than this there is no direct solar radiation),
+            #BankShadeAngle (shade from topography wihthin the riparin area, angles lass than this there is no direct solar radiation),
+            #RipExtinction, a list of riparian extinctions by zone
+            #VegetationAngle, a list of anlges by zone which are the maximum angle at which shading from vegetation occurs
+            node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
+#            else: #This might happen when topographic shading from far away (i.e. not bank shading) is limiting sunlight
+#                node.ShaderList += (max(T_None), max(T_None), rip, T_Full, ElevationList[i]),
         node.ViewToSky = 1 - VTS_Total / (7 * 90)
 
 
