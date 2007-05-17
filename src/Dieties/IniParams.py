@@ -44,6 +44,14 @@ defaults = (('muskingum',1), # IS1
              ('channelwidth',1) # Flag meaning we know that our channel widths are over bounding.
              )
 
+def isFloat(string):
+    """Test whether a number is a floating point number"""
+    if not "." in string: return False
+    s = string.split(".")
+    if len(s) > 2: return False
+    if s[0].isdigit() and s[1].isdigit(): return True
+    else: return False
+
 class IniParamsDiety(dict):
     """Create an IniParams dictionary"""
     def __init__(self):
@@ -63,10 +71,10 @@ class IniParamsDiety(dict):
                 Parser.set("User",k,v)
         dict.__init__(self,dict((k,v) for k,v in Parser.items("User")))
         for k,v in self.iteritems():
-            try:
-                self[k] = float(v)
-            except ValueError: pass
-            if k == "date":
+            if v.isdigit(): v = int(v)
+            elif isFloat(v): v = float(v)
+            # If it's a date, try to parse it and fail if we can't
+            elif k == "date":
                 try:
                     self[k] = datetime.strptime(v,"%m/%d/%y %H:%M:%S")
                 except ValueError:
@@ -74,8 +82,6 @@ class IniParamsDiety(dict):
                         self[k] = datetime.strptime(v,"%Y-%m-%d %H:%M:%S")
                     except:
                         raise
-                else:
-                    raise
         self.writeFile()
     def __del__(self):
         self.writeFile()
