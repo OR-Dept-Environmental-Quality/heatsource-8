@@ -198,7 +198,6 @@ class HSApp(wx.App):
         return True
 
 if __name__ == "__main__":
-    #psyco.full()
     app = HSApp(False)
 #    sys.stderr = Logger.getInstance()
     app.MainLoop()

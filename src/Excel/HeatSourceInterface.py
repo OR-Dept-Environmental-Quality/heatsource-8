@@ -20,12 +20,6 @@ class HeatSourceInterface(DataSheet):
         if not filename:
             raise Warning("Need a model filename!")
         DataSheet.__init__(self, filename)
-        self.__initialize(gauge) # Put all constructor stuff in a method for Psyco optimation
-
-    def __del__(self):
-        self.Close() # Close the file and quit Excel process
-
-    def __initialize(self, gauge):
         self.Reach = {}
         # Build a quick progress bar
         self.PB = gauge
@@ -39,18 +33,18 @@ class HeatSourceInterface(DataSheet):
         # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
         self.SetSheet("TTools Data")
         IP = IniParams
-        IP["Name"] = self.GetValue("I2")
-        IP["Date"] = self.GetValue("I3")
+        IP["name"] = self.GetValue("I2")
+        IP["date"] = self.GetValue("I3")
         IP["dt"] = self.GetValue("I4")*60
         IP["dx"] = self.GetValue("I5")
-        IP["Length"] = self.GetValue("I6")
-        IP["LongSample"] = self.GetValue("I7")
-        IP["TransSample"] = self.GetValue("I8")
-        IP["InflowSites"] = int(self.GetValue("I9"))
-        IP["ContSites"] = int(self.GetValue("I10"))
-        IP["FlushDays"] = self.GetValue("I11")
-        IP["TimeZone"] = self.GetValue("I12")
-        IP["SimPeriod"] = self.GetValue("I13")
+        IP["length"] = self.GetValue("I6")
+        IP["longsample"] = self.GetValue("I7")
+        IP["transsample"] = self.GetValue("I8")
+        IP["inflowsites"] = int(self.GetValue("I9"))
+        IP["contsites"] = int(self.GetValue("I10"))
+        IP["flushdays"] = self.GetValue("I11")
+        IP["timezone"] = self.GetValue("I12")
+        IP["simperiod"] = self.GetValue("I13")
         ######################################################
 
         # Page names- maybe a useless tuple, we'll see
@@ -66,7 +60,7 @@ class HeatSourceInterface(DataSheet):
 
         # from VB: Apparently, only one day is simulated for the shadelator
         # TODO: Check if we need to run for only one day during shadelator-only run.
-        self.Hours = int(IniParams["SimPeriod"] * 24)
+        self.Hours = int(IniParams["simperiod"] * 24)
 
         # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
@@ -105,6 +99,8 @@ class HeatSourceInterface(DataSheet):
 #        self.SetupSheets2()
 
         del self.PB
+    def __del__(self):
+        self.Close() # Close the file and quit Excel process
 
     def SetAtmosphericData(self):
         for node in self.Reach.itervalues():
@@ -146,8 +142,8 @@ class HeatSourceInterface(DataSheet):
         Gets a block of continuous data from a sheet, for a
         number of sites, each with mod different data columns"""
                                   #  (col, sites * datums per site, time column)
-        cols = {"Flow Data":         (14, IniParams["InflowSites"] * 2, 13),
-                "Continuous Data":   (11, IniParams["ContSites"] * 4, 6)
+        cols = {"Flow Data":         (14, IniParams["inflowsites"] * 2, 13),
+                "Continuous Data":   (11, IniParams["contsites"] * 4, 6)
                 }
         # Make a list of the times
         time_col = self[:,cols[type][2],type]
@@ -173,7 +169,7 @@ class HeatSourceInterface(DataSheet):
 
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
-        for site in xrange(IniParams["InflowSites"]):
+        for site in xrange(IniParams["inflowsites"]):
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
@@ -187,13 +183,13 @@ class HeatSourceInterface(DataSheet):
                 # TimeList instance in the node.
                 node.Q_tribs[timelist[hour]] = data[hour][site*2]
                 node.T_tribs[timelist[hour]] = data[hour][1+site*2]
-            self.PB("Reading Inflow data", site, IniParams["InflowSites"])
+            self.PB("Reading Inflow data", site, IniParams["inflowsites"])
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
         data, timelist = self.GetDataBlock("Continuous Data")
 
-        for site in xrange(IniParams["ContSites"]):
+        for site in xrange(int(IniParams["contsites"])):
             l = self.Reach.keys()
             l.sort()
             km = self.GetValue((site + 17, 4),"Continuous Data")
@@ -215,7 +211,7 @@ class HeatSourceInterface(DataSheet):
             # The VB code essentially uses the last continuous node's
             if not site:
                 self.AtmosphericData = [node.Wind, node.Humidity, node.T_air]
-            self.PB("Reading continuous data", site, IniParams["ContSites"])
+            self.PB("Reading continuous data", site, IniParams["contsites"])
 
     def ScanMorphology(self):
         """Scan morphology variables for null of nonnumeric values"""
@@ -254,12 +250,12 @@ class HeatSourceInterface(DataSheet):
         ####################
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
-        if (IniParams["dx"]%IniParams["LongSample"]
-            or IniParams["dx"]<IniParams["LongSample"]):
+        if (IniParams["dx"]%IniParams["longsample"]
+            or IniParams["dx"]<IniParams["longsample"]):
             raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
-        long = IniParams["LongSample"]
+        long = IniParams["longsample"]
         dx = IniParams["dx"]
-        length = IniParams["Length"]
+        length = IniParams["length"]
         multiple = int(dx/long) #We have this many samples per distance step
         datapoints = self.Num_Q_Var-1 # We subtract one because the first datapoint is a boundary node.
         row = 18 # Current row (Skipping the boundary node row)
@@ -270,7 +266,7 @@ class HeatSourceInterface(DataSheet):
         node = self.GetNode(17,1)
         node.Q_bc = self.Q_bc # Boundary conditions
         node.T_bc = self.T_bc
-        node.dx = IniParams["LongSample"] # Set it to the length of the sample rate
+        node.dx = IniParams["longsample"] # Set it to the length of the sample rate
         self.Reach[node.km] = node#append the boundary condition node, row 17
         # We also need to reset the dx of the first node, since it's of a shorter length:
         # Now, the meat. Most of the nodes will be developed as some multiple of the longitudinal
@@ -453,7 +449,7 @@ class HeatSourceInterface(DataSheet):
                     if Vdens == 1: RE = 1 # cannot take log of 0
                     else: raise
                 # Calculate the node distance
-                LC_Distance = IniParams["TransSample"] * (j + 0.5) #This is "+ 0.5" because j starts at 0.
+                LC_Distance = IniParams["transsample"] * (j + 0.5) #This is "+ 0.5" because j starts at 0.
                 if not j: LC_Distance -= Overhang
                 if LC_Distance < 0:
                     LC_Distance = 0.00001
@@ -466,7 +462,7 @@ class HeatSourceInterface(DataSheet):
                 ##########################################################
                 # Now we calculate the view to sky value
                 Dummy1 = Vheight + (Elev - node.Elevation)
-                Dummy2 = IniParams["TransSample"] * (j + 0.5) - Overhang  #This is "+ 0.5" because j starts at 0.
+                Dummy2 = IniParams["transsample"] * (j + 0.5) - Overhang  #This is "+ 0.5" because j starts at 0.
                 #TODO: The following seems to be already in degrees, so why are we multiplying by 180/pi
                 LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)
                 if not j or LC_Angle_Max < LC_Angle:

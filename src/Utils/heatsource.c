@@ -178,11 +178,62 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
 	double U = Q_est / A;
     return Py_BuildValue("ffffff",D_est,A,Pw,Rh,Ww,U);
 }
+
+static char heatsource_CalcSolarFlux__doc__[] =
+""
+;
+
+static PyObject *
+heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
+{
+	float JD;
+	int hour;
+	float Altitude;
+	float Elevation;
+	float cloud;
+
+	// Constants
+	float pi = 3.14159265358979323846f;
+	float radians = pi/180.0;
+	float degrees = 180.0/pi;
+
+	if (!PyArg_ParseTuple(args, "fifff", &JD, &hour,&Altitude,&Elevation,&cloud))
+		return NULL;
+	//////////////////////////////////////////////////////////////////
+	// 0 - Edge of atmosphere
+	// TODO: Original VB code's JulianDay calculation:
+	// JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
+	// THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
+	float Rad_Vec = 1 + 0.017 * cos((2 * pi / 365) * (186 - JD + hour / 24));
+	float Solar_Constant = 1367; //W/m2
+	float direct_0 = (Solar_Constant / pow(Rad_Vec,2)) * sin(radians*(Altitude)); //Global Direct Solar Radiation
+	float diffuse_0 = 0.0;
+	///////////////////////////////////////////////////////////////////
+    // 1 - Above Topography
+    float Air_Mass = (35 / sqrt(1224 * sin(radians*Altitude) + 1)) * exp(-0.0001184 * Elevation);
+    float Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10)) + 0.8;
+    // Calculate Diffuse Fraction
+	float direct_1 = direct_0 * pow(Trans_Air,Air_Mass) * (1 - 0.65 * pow(cloud,2));
+	float Clearness_Index;
+	float dummy = direct_1;
+    if (direct_0 == 0.0) { Clearness_Index = 1.0; }
+    else {Clearness_Index = direct_1 / direct_0; }
+    float Diffuse_Fraction = (0.938 + 1.071 * Clearness_Index) -
+        (5.14 * pow(Clearness_Index,2)) +
+        (2.98 * pow(Clearness_Index,3)) -
+        (sin(2.0 * pi * (JD - 40.0) / 365.0)) *
+        (0.009 - 0.078 * Clearness_Index);
+    direct_1 = dummy * (1 - Diffuse_Fraction);
+    float diffuse_1 = dummy * (Diffuse_Fraction) * (1 - 0.65 * pow(cloud,2));
+
+	return Py_BuildValue("(ff)(ff)",direct_0,direct_1,diffuse_0,diffuse_1);
+}
 /* List of methods defined in the module */
 
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
-		{"GetStreamGeometry", (PyCFunction) heatsource_GetStreamGeometry, METH_VARARGS,  heatsource_GetStreamGeometry__doc__},
+	{"GetStreamGeometry", (PyCFunction) heatsource_GetStreamGeometry, METH_VARARGS,  heatsource_GetStreamGeometry__doc__},
+	{"CalcSolarFlux", (PyCFunction) heatsource_CalcSolarFlux, METH_VARARGS,  heatsource_CalcSolarFlux__doc__},
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };
 

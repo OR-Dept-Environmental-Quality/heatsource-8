@@ -41,6 +41,7 @@ class StreamNode(StreamChannel):
         self.Log = Logger
         self.CalcSolarPosition = heatsource.CalcSolarPosition
         self.ShaderList = ()
+        self.SampleDist = IniParams["transsample"]
 
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
@@ -115,13 +116,13 @@ class StreamNode(StreamChannel):
         # Iterate down the stream channel, calculating the discharges
         self.CalculateDischarge(time, hour)
         if self.W_w > self.W_bf:
-            if not IniParams["ChannelWidth"]:
+            if not IniParams["channelwidth"]:
                 self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
                 msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
                 dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
                 if dlg.ShowModal() == wx.ID_YES:
                     # Put this in a public place so we don't ask again.
-                    IniParams["ChannelWidth"] = True
+                    IniParams["channelwidth"] = True
                 else:    #Stop Model Run and Change Input Data
                     import sys
                     sys.exit(1)
@@ -175,7 +176,7 @@ class StreamNode(StreamChannel):
         Direction = bisect.bisect(AzimuthBreaks,Azimuth)-1
         FullSunAngle, TopoShadeAngle, BankShadeAngle, RipExtinction, VegetationAngle = self.ShaderList[Direction]  #The angles are in degrees
         #print self.km, FullSunAngle, TopoShadeAngle, RipExtinction
-        SampleDist = IniParams["TransSample"]
+        SampleDist = self.SampleDist
         Shade_Density = [0]*4
         # Helios calculates the julian date, so we lazily snag that calculation.
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces
@@ -207,31 +208,37 @@ class StreamNode(StreamChannel):
         # TODO: Original VB code's JulianDay calculation:
         # JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
         # THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-        Rad_Vec = 1 + 0.017 * cos((2 * pi / 365) * (186 - JD + time.hour / 24))
-        Solar_Constant = 1367 #W/m2
-        self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * sin(radians(Altitude)) #Global Direct Solar Radiation
-        self.Flux["Diffuse"][0] = 0
-        ########################################################
-        #======================================================
-        # 1 - Above Topography
-        Air_Mass = (35 / sqrt(1224 * sin(radians(Altitude)) + 1)) * \
-            exp(-0.0001184 * self.Elevation)
-        Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10)) + 0.8
-        #Calculate Diffuse Fraction
+#        Rad_Vec = 1 + 0.017 * cos((2 * pi / 365) * (186 - JD + time.hour / 24))
+#        Solar_Constant = 1367 #W/m2
+#        self.Flux["Direct"][0] = (Solar_Constant / (Rad_Vec ** 2)) * sin(radians(Altitude)) #Global Direct Solar Radiation
+#        self.Flux["Diffuse"][0] = 0
+#
+#        #F_Direct, F_Diffuse = heatsource.CalcSolarFlux(JD,time.hour,Altitude,self.Elevation, self.C_bc[hour])
+#
+#        ########################################################
+#        #======================================================
+#        # 1 - Above Topography
+#        Air_Mass = (35 / sqrt(1224 * sin(radians(Altitude)) + 1)) * \
+#            exp(-0.0001184 * self.Elevation)
+#        Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10)) + 0.8
+#        #Calculate Diffuse Fraction
+#        self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[hour] ** 2)
+#        if self.Flux["Direct"][0] == 0:
+#            Clearness_Index = 1
+#        else:
+#            Clearness_Index = self.Flux["Direct"][1] / self.Flux["Direct"][0]
+#
+#        Dummy = self.Flux["Direct"][1]
+#        Diffuse_Fraction = (0.938 + 1.071 * Clearness_Index) - \
+#            (5.14 * (Clearness_Index ** 2)) + \
+#            (2.98 * (Clearness_Index ** 3)) - \
+#            (sin(2 * pi * (JD - 40) / 365)) * \
+#            (0.009 - 0.078 * Clearness_Index)
+#        self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
+#        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[hour] ** 2)
 
-        self.Flux["Direct"][1] = self.Flux["Direct"][0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[hour] ** 2)
-        if self.Flux["Direct"][0] == 0:
-            Clearness_Index = 1
-        else:
-            Clearness_Index = self.Flux["Direct"][1] / self.Flux["Direct"][0]
-        Dummy = self.Flux["Direct"][1]
-        Diffuse_Fraction = (0.938 + 1.071 * Clearness_Index) - \
-            (5.14 * (Clearness_Index ** 2)) + \
-            (2.98 * (Clearness_Index ** 3)) - \
-            (sin(2 * pi * (JD - 40) / 365)) * \
-            (0.009 - 0.078 * Clearness_Index)
-        self.Flux["Direct"][1] = Dummy * (1 - Diffuse_Fraction)
-        self.Flux["Diffuse"][1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[hour] ** 2)
+        F_Direct, F_Diffuse =  heatsource.CalcSolarFlux(JD,time.hour,Altitude,self.Elevation, self.C_bc[hour])
+        self.Flux["Direct"][:2], self.Flux["Diffuse"][:2] = F_Direct, F_Diffuse
         ########################################################
         #======================================================
         #2 - Above Land Cover
@@ -278,7 +285,7 @@ class StreamNode(StreamChannel):
             self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
 
         #Account for emergent vegetation
-        if IniParams["Emergent"]:
+        if IniParams["emergent"]:
             Path[0] = zone[0][0].VHeight / sin(radians(Altitude))
             if Path[0] > self.W_b:
                 Path[0] = self.W_b
@@ -460,7 +467,7 @@ class StreamNode(StreamChannel):
         Air_Vapor = self.Humidity[hour] * Sat_Vapor
         #===================================================
         #Calculate the frictional reduction in wind velocity
-        if IniParams["Emergent"] and self.Zone[0][0].VHeight > 0:
+        if IniParams["emergent"] and self.VHeight > 0:
             Zd = 0.7 * self.Zone[0][0].VHeight
             Zo = 0.1 * self.Zone[0][0].VHeight
             Zm = 2
@@ -472,14 +479,15 @@ class StreamNode(StreamChannel):
             Friction_Velocity = Wind
         #===================================================
         #Wind Function f(w)
-        Wind_Function = IniParams["Wind_A"] + IniParams["Wind_B"] * Friction_Velocity #m/mbar/s
+        Wind_Function = IniParams["wind_a"] + IniParams["wind_b"] * Friction_Velocity #m/mbar/s
         #===================================================
         #Latent Heat of Vaporization
         LHV = 1000 * (2501.4 + (1.83 * self.T_prev)) #J/kg
         #===================================================
         #Use Jobson Wind Function
-        if IniParams["Penman"]:
+        if IniParams["penman"]:
             #Calculate Evaporation FLUX
+            P = 998.2 # kg/m3
             Gamma = 1003.5 * Pressure / (LHV * 0.62198) #mb/*C  Cuenca p 141
             Delta = 6.1275 * exp(17.27 * Air_T / (237.3 + Air_T)) - 6.1275 * exp(17.27 * (Air_T - 1) / (237.3 + Air_T - 1))
             NetRadiation = self.Flux["Solar"][5] + self.Flux["Longwave"]  #J/m2/s

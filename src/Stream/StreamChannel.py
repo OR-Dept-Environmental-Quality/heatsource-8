@@ -58,7 +58,7 @@ class StreamChannel(object):
         for attr in self.slots:
             setattr(self,attr,None)
         self.GetStreamGeometry = heatsource.GetStreamGeometry
-        self.starttime = Clock.MakeDatetime(IniParams["Date"])
+        self.starttime = Clock.MakeDatetime(IniParams["date"])
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
     def __lt__(self, other): return self.km < other.km

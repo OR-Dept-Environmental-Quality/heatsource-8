@@ -3,6 +3,7 @@ from __future__ import division
 import cProfile, sys, time
 from os.path import join
 from datetime import datetime, timedelta
+import threading as _T
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties.Chronos import Chronos
@@ -14,27 +15,33 @@ from Utils.Output import Output as O
 sys.setcheckinterval(1000)
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
-#<<<<<<< .mine
-#
-#Reach = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC.xls", ErrLog).Reach
-#=======
-debugfile = join(IniParams["DataDirectory"],IniParams["DebugFile"])
+debugfile = join(IniParams["datadirectory"],IniParams["debugfile"])
 Reach = HeatSourceInterface(debugfile, ErrLog).Reach
-#>>>>>>> .r120
 ErrLog("Starting")
 ##########################################################
 # Create a Chronos iterator that controls all model time
 dt = timedelta(seconds=60)
 start = datetime(2001, 7, 8, 00, 00,00, tzinfo=Pacific)
 stop = start + timedelta(days=4)
-spin = 0 # IniParams["FlushDays"] # Spin up period
+spin = 0 # IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
 Chronos.Start(start, dt, stop, spin)
 dt_out = timedelta(minutes=60)
 Output = O(dt_out, Reach, start)
 ##########################################################
 
-def hydraulics():
+reachlist = sorted(Reach.itervalues(),reverse=True)
+def hydro(t,h): [x.CalcHydraulics(t,h) for x in reachlist]
+def solar(t,h,j,c,o): [x.CalcHeat(t,h,j,c,o) for x in reachlist]
+
+def run_threaded_time():
+    time = Chronos.TheTime
+    stop = Chronos.stop
+    dt = Chronos.dt
+    for time in Chronos:
+        pass
+
+def run_threaded_space():
     time = Chronos.TheTime
     stop = Chronos.stop
     while time < stop:
@@ -43,18 +50,23 @@ def hydraulics():
         offset = Chronos.TZOffset(time)
         if not time.minute or time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
             hour = time
-        reachlist = sorted(Reach.itervalues(),reverse=True)
-        [x.CalcHydraulics(time, hour) for x in reachlist]
-        [x.CalcHeat(time, hour,JD,JDC,offset) for x in reachlist]
+        elif time.hour != hour.hour:
+            raise NotImplementedError("Not divisible by timestep")
+        H = _T.Thread(target=hydro, name="hydro %s"%time, args=(time, hour))
+        S = _T.Thread(target=solar, name="solar %s"%time, args=(time,hour,JD,JDC,offset))
+        H.setDaemon(True)
+        S.setDaemon(True)
+        H.start()
+        S.start()
+        H.join()
+        S.join()
         [x.MacCormick2(hour) for x in reachlist]
-        Output.Store(time)
+#        Output.Store(time)
         for x in reachlist:
             x.T_prev = x.T
             x.T = None # This just ensures we don't accidentally use it until it's reset
-                
         time = Chronos.Tick()
 
-
-#hydraulics()
-cProfile.run('hydraulics()')
+run_threaded_space()
+#cProfile.run('run()')
 ErrLog("Finished")

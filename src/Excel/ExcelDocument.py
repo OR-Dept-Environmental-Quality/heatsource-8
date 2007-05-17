@@ -1,4 +1,3 @@
-#from psyco.classes import __metaclass__
 from win32com.client import constants, Dispatch
 from pythoncom import CoInitialize,CoUninitialize
 import os
