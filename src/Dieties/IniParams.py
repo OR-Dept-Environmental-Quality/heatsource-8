@@ -44,14 +44,6 @@ defaults = (('muskingum',1), # IS1
              ('channelwidth',1) # Flag meaning we know that our channel widths are over bounding.
              )
 
-def isFloat(string):
-    """Test whether a number is a floating point number"""
-    if not "." in string: return False
-    s = string.split(".")
-    if len(s) > 2: return False
-    if s[0].isdigit() and s[1].isdigit(): return True
-    else: return False
-
 class IniParamsDiety(dict):
     """Create an IniParams dictionary"""
     def __init__(self):
@@ -69,19 +61,25 @@ class IniParamsDiety(dict):
         for k,v in defaults:
             if not Parser.has_option("User", k):
                 Parser.set("User",k,v)
-        dict.__init__(self,dict((k,v) for k,v in Parser.items("User")))
-        for k,v in self.iteritems():
-            if v.isdigit(): v = int(v)
-            elif isFloat(v): v = float(v)
-            # If it's a date, try to parse it and fail if we can't
-            elif k == "date":
-                try:
-                    self[k] = datetime.strptime(v,"%m/%d/%y %H:%M:%S")
-                except ValueError:
+        d = {}
+        for k,v in Parser.items("User"):
+            # Try to make it a float
+            try:
+                d[k] = Parser.getfloat("User",k)
+            except ValueError:
+                # Otherwise, test if it's a date
+                if k == "date":
                     try:
-                        self[k] = datetime.strptime(v,"%Y-%m-%d %H:%M:%S")
-                    except:
-                        raise
+                        d[k] = datetime.strptime(v,"%m/%d/%y %H:%M:%S")
+                    except ValueError:
+                        try:
+                            d[k] = datetime.strptime(v,"%Y-%m-%d %H:%M:%S")
+                        except:
+                            raise
+                # Otherwise, it's a string
+                else:
+                    d[k] = v
+        dict.__init__(self,d)
         self.writeFile()
     def __del__(self):
         self.writeFile()

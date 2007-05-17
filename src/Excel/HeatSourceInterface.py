@@ -325,7 +325,18 @@ class HeatSourceInterface(DataSheet):
             # get the zone data before averaging! This is because we would average over the zone code
             # rendering it meaningless
             if page == 'TTools Data': self.GetZoneData(node, data)
-            data = [i for i in self.AverageIterables(data)] # Average all the values smartly
+            if page == 'Flow Data':
+                safe = lambda x: 0 if x is None else x # safe num Return a 0 if it's a None or False
+                ssum = lambda x: sum([safe(i) for i in x]) # safe sum, assuring all numbers
+                Q_in = [x[flow['Q_in']] for x in data]
+                Q_out = [x[flow['Q_out']] for x in data]
+                T_in = [x[flow['T_in']] for x in data]
+                # Create new data row at the same length, destroying all current data.
+                data = [0]*len(data[0]) #NOTE: This destroys the row of data, if we need things later, we'll have to change this
+                data[flow['Q_in']] = ssum(Q_in)
+                data[flow['Q_out']] = ssum(Q_out)
+                data[flow['T_in']] = self.SmartAverage([[i] for i in T_in])
+            else: data = [i for i in self.AverageIterables(data)] # Average all the values smartly
             # Now we iterate through the list of averages, and assign the values to the appropriate
             # attributes in the stream node
             for attr,col in attrdict.iteritems():
