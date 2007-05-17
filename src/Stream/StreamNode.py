@@ -244,7 +244,6 @@ class StreamNode(StreamChannel):
         if Altitude <= TopoShadeAngle:    #>Topographic Shade IS Occurring<
             self.Flux["Direct"][2] = 0
             self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * self.TopoFactor
-            aaa = self.TopoAll / (90 * 3)
             self.Flux["Direct"][3] = 0
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
 #            self.Flux["Direct"][4] = 0
@@ -256,7 +255,7 @@ class StreamNode(StreamChannel):
             zone = 0
             for vegangle in VegetationAngle:  #Loop to find if shading is occuring from veg. in that zone
                 if Altitude < vegangle:  #veg shading is occurring from this zone
-                    Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (SampleDist/cos(radians(Altitude))))))   
+                    Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (SampleDist/cos(radians(Altitude))))))
                 zone += 1
             self.Flux["Direct"][3] = Dummy1
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
@@ -264,7 +263,7 @@ class StreamNode(StreamChannel):
 #            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][3]
         else: # Full sun
             self.Flux["Direct"][2] = self.Flux["Direct"][1]
-            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoAll / (90 * 3))
+            self.Flux["Diffuse"][2] = self.Flux["Diffuse"][1] * (1 - self.TopoFactor)
             self.Flux["Direct"][3] = self.Flux["Direct"][2]
             self.Flux["Diffuse"][3] = self.Flux["Diffuse"][2] * self.ViewToSky
 #            self.Flux["Direct"][4] = self.Flux["Direct"][3]
@@ -512,7 +511,11 @@ class StreamNode(StreamChannel):
         self.Flux["Total"] = self.Flux["Solar"][6] + self.Flux["Conduction"] + self.Flux["Evaporation"] + self.Flux["Convection"] + self.Flux["Longwave"]
         Cp = 4182 # J/kg *C
         P = 998.2 # kgS/m3
-        self.Delta_T = self.Flux["Total"] * dt / (self.d_ave * Cp * P)
+        ave = self.A / self.W_w #TODO: include in above calcuation.
+        self.Delta_T = self.Flux["Total"] * dt / (ave * Cp * P)
+
+#        if self.km == 3.05:
+#            print self.Delta_T, self.Flux["Total"], dt, ave, Cp, P
 #        else:
 #            self.Flux["Total"] = 0
 #            self.Flux["Conduction"] = 0
@@ -558,17 +561,21 @@ class StreamNode(StreamChannel):
                     Shear_Velocity = self.U
                 else:
                     Shear_Velocity = sqrt(9.8 * self.d_w * self.S)
-                Dispersion = 0.011 * (self.U ** 2) * self.W_w ** 2 / (self.d_w * Shear_Velocity)
+                Dispersion = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
                 if Dispersion * dt / (dx ** 2) > 0.5:
                     Dispersion = (0.45 * (dx ** 2)) / dt
+                    print self.km, Dispersion
                 Dummy1 = -self.U * (T1 - T0) / dx
                 Dummy2 = Dispersion * (T2 - 2 * T1 + T0) / (dx ** 2)
                 S1 = Dummy1 + Dummy2 + self.Delta_T / dt
                 self.T = T1 + S1 * dt
+#                if self.km == 3.05:
+#                    print Chronos.TheTime, "M1", T0, T1, T2, Dummy1, Dummy2, S1, dt, self.Delta_T, self.T
             else:
                 self.T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev
         else:
             self.T = self.T_bc[hour]
+            self.T_prev = self.T_bc[hour] #I think this is what the VB code does
         return Dispersion,S1
 
     def MacCormick2(self, hour):

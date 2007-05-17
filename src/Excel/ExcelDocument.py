@@ -205,7 +205,7 @@ class ExcelDocument(object):
         """
         div = int(n/26)
         if div==0:
-            if isinstance(n,float): raise Exception
+            if isinstance(n,float): n = int(n)
             return chr(65+n)
         else:
             return self.excelize(div-1)+chr(65+n%26)

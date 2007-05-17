@@ -255,5 +255,5 @@ class StreamChannel(object):
                 raise
             hL = self.d_w
         #Calculate Hyporheic Flows
-        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * self.dx))
+        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * self.dx)) 
         self.Q_hyp = self.Q if self.Q_hyp > self.Q else self.Q_hyp

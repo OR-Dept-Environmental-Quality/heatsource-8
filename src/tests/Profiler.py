@@ -14,8 +14,13 @@ from Utils.Output import Output as O
 sys.setcheckinterval(1000)
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
+#<<<<<<< .mine
+#
+#Reach = HeatSourceInterface("D:\\dan\\heatsource tests\\HS7_NUmpqua3_Toketee_CCC.xls", ErrLog).Reach
+#=======
 debugfile = join(IniParams["DataDirectory"],IniParams["DebugFile"])
 Reach = HeatSourceInterface(debugfile, ErrLog).Reach
+#>>>>>>> .r120
 ErrLog("Starting")
 ##########################################################
 # Create a Chronos iterator that controls all model time
@@ -44,8 +49,9 @@ def hydraulics():
         [x.MacCormick2(hour) for x in reachlist]
         Output.Store(time)
         for x in reachlist:
-            self.T_prev = self.T
-            self.T = None # This just ensures we don't accidentally use it until it's reset
+            x.T_prev = x.T
+            x.T = None # This just ensures we don't accidentally use it until it's reset
+                
         time = Chronos.Tick()
 
 

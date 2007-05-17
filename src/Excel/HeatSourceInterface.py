@@ -473,7 +473,7 @@ class HeatSourceInterface(DataSheet):
                     LC_Angle_Max = LC_Angle
                 if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
                 rip += RE,
-            #Returns a list: 
+            #Returns a list:
             #FullSunAngle (angles greater than this there is no shade occuring),
             #TopoShadeAngle (shade from features far away, angles less than this there is no direct solar radiation),
             #BankShadeAngle (shade from topography wihthin the riparin area, angles lass than this there is no direct solar radiation),
@@ -516,11 +516,12 @@ class HeatSourceInterface(DataSheet):
         # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
         node.C_bc = self.C_bc
         # Find the earliest temperature condition
-        l = self.T_bc.keys()
-        l.sort
-        node.T = self.T_bc[l[0]]
-        node.T_prev = self.T_bc[l[0]]
-        node.T_sed = self.T_bc[l[0]]
+#        l = self.T_bc.keys()
+#        l.sort  #TODO: This is not working!!!
+        mindate = min(self.T_bc.keys())
+        node.T = self.T_bc[mindate]
+        node.T_prev = self.T_bc[mindate]
+        node.T_sed = self.T_bc[mindate]
         node.SetBankfullMorphology()
         # Taken from the VB code in SubHydraulics- this doesn't have to run at every
         # timestep, since the values don't change. Thus, we just set horizontal conductivity
