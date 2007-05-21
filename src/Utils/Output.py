@@ -2,6 +2,7 @@ from __future__ import division
 from datetime import datetime, timedelta
 import time
 from Dieties.IniParams import IniParams
+from os import path
 
 
 class Output(object):
@@ -34,7 +35,7 @@ class Output(object):
                     }
 
         for key in self.files.iterkeys():
-            self.files[key][0] = open(IniParams["datadirectory"] + key, 'w')
+            self.files[key][0] = open(path.join(IniParams["tempdirectory"], key), 'w')
             self.files[key][0].write("Heat Source Hourly Output File:  ")
             self.files[key][0].write(self.files[key][1])
             today = time.localtime()
@@ -51,6 +52,7 @@ class Output(object):
     def __del__(self):
         for filename in self.files.itervalues():
             filename[0].close()
+        
 
     def Store(self, TheTime):
         if TheTime < self.write_time:
@@ -72,7 +74,7 @@ class Output(object):
                     "Hyd_Hyp.txt": node.Q_hyp,
                     "Hyd_Vel.txt": node.U,
                     "Hyd_WT.txt": node.W_w,
-                    "Rate_Evap.txt": node.Evap_Rate,
+                    "Rate_Evap.txt": node.Evap_Rate * 1000 * 60 * 60,
                     "Temp_H20.txt": node.T,
                     "Temp_Sed.txt": node.T_sed,
                 }
@@ -93,11 +95,11 @@ class Output(object):
             if node.km == first:
                 Excel_time = "%0.6f" % (TheTime.toordinal() - 693594 + (TheTime.hour +  (TheTime.minute + TheTime.second / 60) / 60 ) / 24)
                 self.files[key][0].write(Excel_time.ljust(14))
-            dataf = "%0.3f" % variables[key]
+            dataf = "%0.9f" % variables[key]
             self.files[key][0].write(dataf.ljust(14))
             if node.km == last:
                 self.files[key][0].write("\n")
-            self.files[key][0].flush()
+            #self.files[key][0].flush()
 
             #    def dailyout(self):
 #        lastnode = self.reach[-1]

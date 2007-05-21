@@ -286,25 +286,25 @@ class StreamNode(StreamChannel):
 
         #Account for emergent vegetation
         if IniParams["emergent"]:
-            Path[0] = zone[0][0].VHeight / sin(radians(Altitude))
-            if Path[0] > self.W_b:
-                Path[0] = self.W_b
-            if zone[0][0].VDensity == 1:
-                zone[0][0].VDensity = 0.9999
-                Rip_Extinct[0] = 1
-                Shade_Density[0] = 1
-            elif zone[0][0].VDensity == 0:
-                zone[0][0].VDensity = 0.00001
-                Rip_Extinct[0] = 0
-                Shade_Density[0] = 0
+            Path = self.VHeight / sin(radians(Altitude))
+            if Path > self.W_b:
+                Path = self.W_b
+            if self.VDensity == 1:
+                self.VDensity = 0.9999
+                rip_extinct_emerge = 1
+                shade_density_emerge = 1
+            elif self.VDensity == 0:
+                self.VDensity = 0.00001
+                rip_extinct_emerge = 0
+                shade_density_emerge = 0
             else:
-                Rip_Extinct[0] = -log(1 - zone[0][0].VDensity) / 10
-                Shade_Density[0] = 1 - exp(-Rip_Extinct[0] * Path[0])
-            self.Flux["Direct"][4] = self.Flux["Direct"][4] * (1 - Shade_Density[0])
-            Path[0] = zone[0][0].VHeight
-            Rip_Extinct[0] = -log(1 - zone[0][0].VDensity) / zone[0][0].VHeight
-            Shade_Density[0] = 1 - exp(-Rip_Extinct[0] * Path[0])
-            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - Shade_Density[0])
+                rip_extinct_emerge = -log(1 - self.VDensity) / 10
+                shade_density_emerge = 1 - exp(-rip_extinct_emerge * Path)  
+            self.Flux["Direct"][4] = self.Flux["Direct"][4] * (1 - shade_density_emerge)
+            Path = self.VHeight
+            rip_extinct_emerge = -log(1 - self.VDensity) / self.VHeight
+            shade_density_emerge = 1 - exp(-rip_extinct_emerge * Path)
+            self.Flux["Diffuse"][4] = self.Flux["Diffuse"][4] * (1 - shade_density_emerge)
 
 #        raise Exception("Debug Breakpoint")
         #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -468,10 +468,10 @@ class StreamNode(StreamChannel):
         #===================================================
         #Calculate the frictional reduction in wind velocity
         if IniParams["emergent"] and self.VHeight > 0:
-            Zd = 0.7 * self.Zone[0][0].VHeight
-            Zo = 0.1 * self.Zone[0][0].VHeight
+            Zd = 0.7 * self.VHeight
+            Zo = 0.1 * self.VHeight
             Zm = 2
-            Friction_Velocity = Wind * 0.4 / Log((Zm - Zd) / Zo) #Vertical Wind Decay Rate (Dingman p. 594)
+            Friction_Velocity = Wind * 0.4 / log((Zm - Zd) / Zo) #Vertical Wind Decay Rate (Dingman p. 594)
         else:
             Zo = 0.00023 #Brustsaert (1982) p. 277 Dingman
             Zd = 0 #Brustsaert (1982) p. 277 Dingman
@@ -479,7 +479,9 @@ class StreamNode(StreamChannel):
             Friction_Velocity = Wind
         #===================================================
         #Wind Function f(w)
-        Wind_Function = IniParams["wind_a"] + IniParams["wind_b"] * Friction_Velocity #m/mbar/s
+#        Wind_Function = float(IniParams["wind_a"]) + float(IniParams["wind_b"]) * Friction_Velocity #m/mbar/s
+        Wind_Function = 0.000000001505 + 0.0000000016 * Friction_Velocity #m/mbar/s
+
         #===================================================
         #Latent Heat of Vaporization
         LHV = 1000 * (2501.4 + (1.83 * self.T_prev)) #J/kg

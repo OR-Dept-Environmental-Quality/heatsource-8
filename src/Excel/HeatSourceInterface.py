@@ -523,8 +523,6 @@ class HeatSourceInterface(DataSheet):
         # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
         node.C_bc = self.C_bc
         # Find the earliest temperature condition
-#        l = self.T_bc.keys()
-#        l.sort  #TODO: This is not working!!!
         mindate = min(self.T_bc.keys())
         node.T = self.T_bc[mindate]
         node.T_prev = self.T_bc[mindate]
