@@ -505,7 +505,7 @@ class StreamNode(StreamChannel):
                 Bowen = 1
             F_Conv = F_Evap * Bowen
         F_Conv = F_Evap * Bowen
-        return F_Evap, F_Conv, Evap_Rate*self.dt*self.W_w
+        return F_Evap, F_Conv, Evap_Rate*self.dx*self.W_w  #TODO -- need to change also in C module
 
     def RecordHeatData(self,DayTime):
 
