@@ -24,7 +24,7 @@ time1 = datetime.today()
 ##########################################################
 # Create a Chronos iterator that controls all model time
 dt = timedelta(seconds=60)
-start = datetime(2001, 7, 8, 00, 00,00, tzinfo=Pacific)
+start = Chronos.MakeDatetime(IniParams["date"])
 stop = start + timedelta(days=4)
 spin = 0 # IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
@@ -68,7 +68,7 @@ def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
             hydro(time,hour)
             solar(time,hour,JD,JDC,offset)
         [x.MacCormick2(hour) for x in reachlist]
-#        Output.Store(time)
+        Output.Store(time)
         for x in reachlist:
             x.T_prev = x.T
             x.T = None # This just ensures we don't accidentally use it until it's reset

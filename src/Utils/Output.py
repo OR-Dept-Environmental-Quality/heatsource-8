@@ -63,9 +63,9 @@ class Output(object):
                     "Heat_Cond.txt": node.Flux["Conduction"],
                     "Heat_Conv.txt": node.Flux["Convection"],
                     "Heat_Evap.txt": node.Flux["Evaporation"],
-                    "Heat_SR1.txt": node.Flux["Solar"][1],
-                    "Heat_SR4.txt": node.Flux["Solar"][4],
-                    "Heat_SR6.txt": node.Flux["Solar"][6],
+                    "Heat_SR1.txt": node.F_Solar[1],
+                    "Heat_SR4.txt": node.F_Solar[4],
+                    "Heat_SR6.txt": node.F_Solar[6],
                     "Heat_TR.txt": node.Flux["Longwave"],
                     "Hyd_DA.txt": node.A / node.W_w,
                     "Hyd_DM.txt": node.d_w,
@@ -74,7 +74,7 @@ class Output(object):
                     "Hyd_Hyp.txt": node.Q_hyp,
                     "Hyd_Vel.txt": node.U,
                     "Hyd_WT.txt": node.W_w,
-                    "Rate_Evap.txt": node.Evap_Rate * 1000 * 60 * 60,
+                    "Rate_Evap.txt": node.E / node.dx / node.W_w * 3600 * 1000,  #TODO: Check
                     "Temp_H20.txt": node.T,
                     "Temp_Sed.txt": node.T_sed,
                 }
