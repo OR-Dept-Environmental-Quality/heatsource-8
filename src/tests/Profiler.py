@@ -12,12 +12,11 @@ from Utils.Logger import Logger
 from Utils.TimeZones import Pacific
 from Utils.Output import Output as O
 
-sys.setcheckinterval(1000)
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
 debugfile = join(IniParams["datadirectory"],IniParams["debugfile"])
 Reach = HeatSourceInterface(debugfile, ErrLog).Reach
-ErrLog("Starting")
+time1 = datetime.today()
 ##########################################################
 # Create a Chronos iterator that controls all model time
 dt = timedelta(seconds=60)
@@ -41,7 +40,7 @@ def run_threaded_time():
     for time in Chronos:
         pass
 
-def run_threaded_space():
+def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
     time = Chronos.TheTime
     stop = Chronos.stop
     while time < stop:
@@ -52,14 +51,18 @@ def run_threaded_space():
             hour = time
         elif time.hour != hour.hour:
             raise NotImplementedError("Not divisible by timestep")
-        H = _T.Thread(target=hydro, name="hydro %s"%time, args=(time, hour))
-        S = _T.Thread(target=solar, name="solar %s"%time, args=(time,hour,JD,JDC,offset))
-        H.setDaemon(True)
-        S.setDaemon(True)
-        H.start()
-        S.start()
-        H.join()
-        S.join()
+        if RunThreaded:
+            H = _T.Thread(target=hydro, name="hydro %s"%time, args=(time, hour))
+            S = _T.Thread(target=solar, name="solar %s"%time, args=(time,hour,JD,JDC,offset))
+            H.setDaemon(True)
+            S.setDaemon(True)
+            H.start()
+            S.start()
+            H.join()
+            S.join()
+        else:
+            hydro(time,hour)
+            solar(time,hour,JD,JDC,offset)
         [x.MacCormick2(hour) for x in reachlist]
 #        Output.Store(time)
         for x in reachlist:
@@ -67,6 +70,6 @@ def run_threaded_space():
             x.T = None # This just ensures we don't accidentally use it until it's reset
         time = Chronos.Tick()
 
-run_threaded_space()
-#cProfile.run('run()')
-ErrLog("Finished")
+#run_threaded_space(1)
+cProfile.run('run_threaded_space()')
+ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)

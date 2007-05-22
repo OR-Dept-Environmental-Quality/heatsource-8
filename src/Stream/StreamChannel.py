@@ -49,7 +49,7 @@ class StreamChannel(object):
                     "next_km", # Reference to next (downstream) river channel instance (Set externally)
                     "prev_km", # Reference to prevous (Upstream) river channel instance (also set externally)
                     "Q_bc", # Boundary conditions, in a TimeList class, for discharge.
-                    "E", # Evaporation rate (currently unused)
+                    "E", # Evaporation volume inm m^3
                     "dt", # This is the timestep (for kinematic wave movement, etc.)
                     "phi", # Porosity of the bed
                     "K_h", # Horizontal bed conductivity
@@ -76,7 +76,7 @@ class StreamChannel(object):
         if len(self.Q_tribs):
             Q += self.Q_tribs[hour]# Tributary volume
         if self.E: # Evaporation volume
-            Q -= self.E * self.dx * self.W_w
+            Q -= self.E
         return Q
 
     def CalculateDischarge(self, time, hour):
@@ -255,5 +255,5 @@ class StreamChannel(object):
                 raise
             hL = self.d_w
         #Calculate Hyporheic Flows
-        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * self.dx)) 
+        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * self.dx))
         self.Q_hyp = self.Q if self.Q_hyp > self.Q else self.Q_hyp

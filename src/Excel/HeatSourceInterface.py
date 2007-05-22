@@ -435,8 +435,8 @@ class HeatSourceInterface(DataSheet):
                          Topo_W)
 
         for i in xrange(7):
-            T_Full = [] # lowest angle necessary for full sun
-            T_None = [] # Highest angle necessary for full shade
+            T_Full = () # lowest angle necessary for full sun
+            T_None = () # Highest angle necessary for full shade
             rip = ()
             for j in xrange(4):
                 # First, get the averages for each zone in each direction
@@ -466,10 +466,10 @@ class HeatSourceInterface(DataSheet):
                     LC_Distance = 0.00001
                 # Calculate the minimum sun angle needed for full sun
                 #T_Full.append(math.atan(math.radians(VH/LC_Distance)))  I think this should be ...
-                T_Full.append(math.degrees(math.atan(VH/LC_Distance)))
+                T_Full += math.degrees(math.atan(VH/LC_Distance)),
                 # Now get the maximum of bank shade and topographic shade for this
                 # direction
-                T_None.append(math.degrees(math.atan(SH/LC_Distance)))
+                T_None += math.degrees(math.atan(SH/LC_Distance)),
                 ##########################################################
                 # Now we calculate the view to sky value
                 Dummy1 = Vheight + (Elev - node.Elevation)
