@@ -77,7 +77,7 @@ class HeatSourceInterface(DataSheet):
 # TODO: Uncomment after debugging
 #        self.ScanMorphology()
         self.BuildStreamNodes()
-#        self.GetInflowData()
+        self.GetInflowData()
         self.GetContinuousData()
         self.SetAtmosphericData()
         self.PB("Initializing StreamNodes")
@@ -169,11 +169,18 @@ class HeatSourceInterface(DataSheet):
 
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
+        l = self.Reach.keys()
+        l.sort()
+        print l
         for site in xrange(IniParams["inflowsites"]):
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
-            node = self.Reach[self.GetValue((site + 17, 11),"Flow Data")]
+            km = self.GetValue((site + 17, 11),"Flow Data")
+            
+            key = bisect.bisect(l,km)-1
+            node = self.Reach[l[key]] # Index by kilometer
+            print `km`, key, node
             for hour in xrange(self.Hours):
                 # Now we make a DataPoint object with the flow and temp, where flow is in the
                 # column 0+sitenum*2 and temp is in the column 1+sitenum*2 where sitenum is the
@@ -189,25 +196,16 @@ class HeatSourceInterface(DataSheet):
         """Get data from the "Continuous Data" page"""
         data, timelist = self.GetDataBlock("Continuous Data")
 
+        l = self.Reach.keys()
+        l.sort()
         for site in xrange(int(IniParams["contsites"])):
-            l = self.Reach.keys()
-            l.sort()
             km = self.GetValue((site + 17, 4),"Continuous Data")
-            key = bisect.bisect(l,km)
+            key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
             for hour in xrange(self.Hours):
                 node.Wind[timelist[hour]] = data[hour][site*4]
                 node.Humidity[timelist[hour]] = data[hour][1+site*4]
                 node.T_air[timelist[hour]] = data[hour][2+site*4]
-                #TODO: Uncomment this if necessary, delete it if not. T_stream should be renamed
-#                try:
-#                    node.T_stream.append(DataPoint(data[hour][3+site*4], time=timelist[hour]))
-#                except TypeError, inst:
-#                    # Often, Stream Temp will be blank. Let's make sure that we catch that case.
-#                    # We set the result to a 999 instead of zero to state that it's unknown
-#                    if inst.message == "float() argument must be a string or a number":
-#                        node.T_stream.append(DataPoint(999, time=timelist[hour]))
-#                    else: raise
             # The VB code essentially uses the last continuous node's
             if not site:
                 self.AtmosphericData = [node.Wind, node.Humidity, node.T_air]
@@ -326,6 +324,9 @@ class HeatSourceInterface(DataSheet):
             # rendering it meaningless
             if page == 'TTools Data': self.GetZoneData(node, data)
             if page == 'Flow Data':
+                for i in xrange(len(data)):
+                    while len(data[i]) < flow["Q_out"] + 1:
+                        data[i].append(None)
                 safe = lambda x: 0 if x is None else x # safe num Return a 0 if it's a None or False
                 ssum = lambda x: sum([safe(i) for i in x]) # safe sum, assuring all numbers
                 Q_in = [x[flow['Q_in']] for x in data]
