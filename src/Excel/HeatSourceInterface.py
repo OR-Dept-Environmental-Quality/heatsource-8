@@ -171,16 +171,13 @@ class HeatSourceInterface(DataSheet):
         # TimeList() instances
         l = self.Reach.keys()
         l.sort()
-        print l
         for site in xrange(IniParams["inflowsites"]):
             # Get the stream node corresponding to the kilometer of this inflow site.
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
             km = self.GetValue((site + 17, 11),"Flow Data")
-            
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
-            print `km`, key, node
             for hour in xrange(self.Hours):
                 # Now we make a DataPoint object with the flow and temp, where flow is in the
                 # column 0+sitenum*2 and temp is in the column 1+sitenum*2 where sitenum is the
