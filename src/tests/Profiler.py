@@ -12,6 +12,10 @@ from Utils.Logger import Logger
 from Utils.TimeZones import Pacific
 from Utils.Output import Output as O
 
+import psyco
+psyco.full()
+
+
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
 debugfile = join(IniParams["datadirectory"],IniParams["debugfile"])
@@ -26,7 +30,7 @@ spin = 0 # IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
 Chronos.Start(start, dt, stop, spin)
 dt_out = timedelta(minutes=60)
-Output = O(dt_out, Reach, start)
+#Output = O(dt_out, Reach, start)
 ##########################################################
 
 reachlist = sorted(Reach.itervalues(),reverse=True)
@@ -69,7 +73,6 @@ def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
             x.T_prev = x.T
             x.T = None # This just ensures we don't accidentally use it until it's reset
         time = Chronos.Tick()
-
-#run_threaded_space(1)
-cProfile.run('run_threaded_space()')
+run_threaded_space()
+#cProfile.run('run_threaded_space()')
 ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)

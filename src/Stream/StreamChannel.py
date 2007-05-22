@@ -53,7 +53,8 @@ class StreamChannel(object):
                     "dt", # This is the timestep (for kinematic wave movement, etc.)
                     "phi", # Porosity of the bed
                     "K_h", # Horizontal bed conductivity
-                    "Log"  # Global logging class
+                    "Log",  # Global logging class
+                    "Disp" # Dispersion due to shear stress
                     ]
         for attr in self.slots:
             setattr(self,attr,None)
@@ -79,6 +80,29 @@ class StreamChannel(object):
             Q -= self.E
         return Q
 
+    def CalcDischarge_Opt(self,time,hour):
+        """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
+        # (t, x-1) = flow from the upstream channel at this timestep
+        Q1 = self.prev_km.Q + self.GetInputs(hour)
+        # (t-1, x-1) = flow from the upstream channel's previous timestep.
+        Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
+        # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep
+        # because we have not yet assigned a new value for this timesetp)
+        Q3 = self.Q
+        C1,C2,C3 = self.GetMuskingum(Q2)
+        # Calculate the new Q
+        Q = C1*Q1 + C2*Q2 + C3*Q3
+        # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
+        self.Q_prev = self.Q  or Q
+        self.Q = Q
+
+        if Q > 0.0071: #Channel is not going dry
+            D_est = self.d_cont or 0
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
+            self.CalcHyporheic()
+        else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
+            self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
+            self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
     def CalculateDischarge(self, time, hour):
         """Return the discharge for the current timestep
 
@@ -97,12 +121,20 @@ class StreamChannel(object):
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             # Get all of the discharges that we know about.
-            # In order, they are (t,x-1), (t-1,x-1), (t-1,x).
-            Q1,Q2,Q3 = self.GetKnownDischarges(hour)
+            # (t, x-1) = flow from the upstream channel at this timestep
+            Q1 = self.prev_km.Q + self.GetInputs(hour)
+            # (t-1, x-1) = flow from the upstream channel's previous timestep.
+            Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
+            # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep
+            # because we have not yet assigned a new value for this timesetp)
+            Q3 = self.Q
+
             # Use (t,x-1) to calculate the Muskingum coefficients
             C1,C2,C3 = self.GetMuskingum(Q2)
             # Calculate the new Q
             Q = C1*Q1 + C2*Q2 + C3*Q3
+            # If we hit this once, we remap so we can avoid the if statements in the future.
+            self.CalculateDischarge = self.CalcDischarge_Opt
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
             try:
@@ -128,7 +160,7 @@ class StreamChannel(object):
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
             D_est = self.d_cont or 0
-            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est)
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
             self.CalcHyporheic()
 
     def CalcHydroStability(self):
@@ -145,40 +177,6 @@ class StreamChannel(object):
 #        if Maxdt < iniparams.dt: dt = Maxdt
 #        else: dt = iniparams.dt
 #        return dt
-
-    def GetKnownDischarges(self, hour):
-        """Returns the known discharges necessary to calculate current discharge
-
-        This method returns a tuple of discharge values used in calculations. To calculate
-        our current discharge at this timestep (t) and space step (x) we need three
-        values, one value is our discharge from the last space step (t,x-1), which is
-        essentially the outflow of the upslope cell at this timestep; one is
-        the discharge of the last time step (t-1,xj); and the third is the flow from the last
-        time AND space step (t-1,x-1). This method knows how to retrieve these
-        values and returns a tuple in the form of (Q1,Q2,Q3,Q4) where Q1 is the last space step,
-        Q2 is the last time AND space step, and Q3 is the last time step. Q4 is either a lateral
-        discharge, if it will be calculated by a muskingum coefficient, or 1 if the discharge
-        is included in the muskingum coefficient itself. The order of these corresponds to the
-        order in which the Muskigum coefficients are returned
-        in GetMuskigum, and also to the order in which they are defined in "Applied Hydrology."
-        This method assumes that we are at neither a spatial or temporal boundary, and should
-        be called accordingly.
-        """
-        # (t, x-1) = flow from the upstream channel at this timestep
-        Q1 = self.prev_km.Q + self.GetInputs(hour)
-        # Then we make sure it's been calculated- in case there's a problem with the code
-        if Q1 is None: raise Exception("Previous channel of %s has no discharge calculation" % self)
-
-        # (t-1, x-1) = flow from the upstream channel's previous timestep.
-        Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
-        if Q2 is None: raise Exception("Previous channel of %s has no previous discharge calculation" % self)
-
-        # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep
-        # because we have not yet assigned a new value for this timesetp)
-        Q3 = self.Q
-        if Q3 is None: raise Exception("Channel %s has no previous discharge calculation" % self)
-
-        return Q1,Q2,Q3
 
     def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients

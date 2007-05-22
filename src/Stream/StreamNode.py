@@ -166,7 +166,6 @@ class StreamNode(StreamChannel):
         Azimuth,Altitude,Zenith = self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC)
         AzimuthBreaks = [0,67.5,112.5,157.5,202.5,247.5,292.5]
         Direction = bisect.bisect(AzimuthBreaks,Azimuth)-1
-        FullSunAngle, TopoShadeAngle, BankShadeAngle, RipExtinction, VegetationAngle = self.ShaderList[Direction]  #The angles are in degrees
         SampleDist = self.SampleDist
         ############################################
         ## Solar Flux Calculation, C-style
@@ -199,13 +198,6 @@ class StreamNode(StreamChannel):
                                                                 self.wind_a,self.wind_b, self.T_prev,
                                                                 self.F_Solar[5], self.Flux["Longwave"], self.Elevation,
                                                                 self.dt, self.W_w)
-#        print heatsource.CalcFluxes(self.C_bc[hour], self.Humidity[hour], self.T_air[hour], self.Wind[hour],
-#                                    JD, time.hour, Altitude, Zenith, self.wind_a, self.wind_b,
-#                                    self.Elevation, self.TopoFactor, self.ViewToSky, self.SampleDist,
-#                                    self.ParticleSize, self.phi, self.P_w, solf.dx, self.dt, self.d_w, self.W_b, self.W_w,
-#                                    self.emergent, self.penman, self.VDensity, self.VHeight, self.ShaderList,
-#                                    1600, 2219, 4.5e-6, 1000, 4187, 14.331e-8,
-#                                    self.T_sed, self.T_prev, 0.0)
         self.RecordHeatData(DayTime)
         self.MDispersion,self.MS1 = self.MacCormick1(hour)
 
@@ -452,7 +444,7 @@ class StreamNode(StreamChannel):
         self.Flux["LW_Veg"] = 0.96 * (1 - self.ViewToSky) * 0.96 * Sigma * (Air_T + 273.2) ** 4
         #Calcualte the net longwave flux
         return self.Flux["LW_Atm"], self.Flux["LW_Stream"], self.Flux["LW_Veg"]
-    def CalcEvapConvFlux(self, hour):
+    def EvapConv_THW(self, hour):
 
         #===================================================
         #Calculate Evaporation FLUX
@@ -569,16 +561,8 @@ class StreamNode(StreamChannel):
                 T0 = self.prev_km.T_prev + mix
                 T1 = self.T_prev
                 T2 = self.next_km.T_prev if self.next_km else self.T_prev
-                if not self.S:
-                    Shear_Velocity = self.U
-                else:
-                    Shear_Velocity = sqrt(9.8 * self.d_w * self.S)
-                Dispersion = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
-                if Dispersion * dt / (dx ** 2) > 0.5:
-                    Dispersion = (0.45 * (dx ** 2)) / dt
-                    print self.km, Dispersion
                 Dummy1 = -self.U * (T1 - T0) / dx
-                Dummy2 = Dispersion * (T2 - 2 * T1 + T0) / (dx ** 2)
+                Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / (dx ** 2)
                 S1 = Dummy1 + Dummy2 + self.Delta_T / dt
                 self.T = T1 + S1 * dt
 #                if self.km == 3.05:
@@ -592,7 +576,6 @@ class StreamNode(StreamChannel):
 
     def MacCormick2(self, hour):
         sqrt = math.sqrt
-        Dispersion = self.MDispersion
         S1 = self.MS1
         dt = self.dt
         dx = self.dx
@@ -613,7 +596,7 @@ class StreamNode(StreamChannel):
                 #Final MacCormick Finite Difference Calc.
                 #===================================================
                 Dummy1 = -self.U * (T1 - T0) / dx
-                Dummy2 = Dispersion * (T2 - 2 * T1 + T0) / dx ** 2
+                Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / dx ** 2
                 S2 = Dummy1 + Dummy2 + self.Delta_T / dt
                 self.T = self.T_prev + ((S1 + S2) / 2) * dt
             else:
