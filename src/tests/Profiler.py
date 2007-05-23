@@ -26,11 +26,11 @@ time1 = datetime.today()
 dt = timedelta(seconds=60)
 start = Chronos.MakeDatetime(IniParams["date"])
 stop = start + timedelta(days=4)
-spin = 0 # IniParams["flushdays"] # Spin up period
+spin = IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
 Chronos.Start(start, dt, stop, spin)
 dt_out = timedelta(minutes=60)
-#Output = O(dt_out, Reach, start)
+Output = O(dt_out, Reach, start)
 ##########################################################
 
 reachlist = sorted(Reach.itervalues(),reverse=True)
@@ -52,15 +52,20 @@ def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
         JD = Chronos.JDay
         JDC = Chronos.JDC
         offset = Chronos.TZOffset(time)
+        #When spinning up the model hyrdro need the first timestep boundary conditions while
+        #boundary conditions impacting heat balance loop through the first day.
         if not time.minute or time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
-            hour = time
-            if hour < start:
-                hour += timedelta(days=start.day-hour.day)
-        elif time.hour != hour.hour:
+            hydro_hour = time
+            solar_hour = time
+            if solar_hour < start:
+                hydro_hour = start
+                solar_hour += timedelta(days=start.day-solar_hour.day)
+        elif time.hour != solar_hour.hour:
             raise NotImplementedError("Not divisible by timestep")
+
         if RunThreaded:
-            H = _T.Thread(target=hydro, name="hydro %s"%time, args=(time, hour))
-            S = _T.Thread(target=solar, name="solar %s"%time, args=(time,hour,JD,JDC,offset))
+            H = _T.Thread(target=hydro, name="hydro %s"%time, args=(time, hydro_hour))
+            S = _T.Thread(target=solar, name="solar %s"%time, args=(time, solar_hour,JD,JDC,offset))
             H.setDaemon(True)
             S.setDaemon(True)
             H.start()
@@ -68,10 +73,10 @@ def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
             H.join()
             S.join()
         else:
-            hydro(time,hour)
-            solar(time,hour,JD,JDC,offset)
-        [x.MacCormick2(hour) for x in reachlist]
-#        Output.Store(time)
+            hydro(time,hydro_hour)
+            solar(time,solar_hour,JD,JDC,offset)
+        [x.MacCormick2(solar_hour) for x in reachlist]
+        Output.Store(time)
         for x in reachlist:
             x.T_prev = x.T
             x.T = None # This just ensures we don't accidentally use it until it's reset
