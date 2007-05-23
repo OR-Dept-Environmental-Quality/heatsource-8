@@ -182,20 +182,16 @@ class StreamNode(StreamChannel):
             if time.hour == 1: self.F_DailySum = [0]*5   #reset for the new day
             DayTime = False
         else:
-            print "Day"
             #self.F_Solar =
-            F_S = self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
+            self.F_Solar = self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
                                             JD, time.hour, Altitude, Zenith, # Solar Variables
                                             self.Elevation, self.TopoFactor, self.ViewToSky, SampleDist, # Topographic Vars
                                             self.d_w, self.W_b, self.phi, # Chanell Geometry
                                             int(self.emergent), self.VDensity, self.VHeight,  # Emergent vegetation
-                                            self.ShaderList[Direction]#,self.RipExtinct,self.VegAngle  # Shade variables
+                                            self.ShaderList[Direction]  # Shade variables
                                             )
             # Testing method, these should return the same (to 1.0e-6 or so) result
-            self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
-            for i in xrange(8):
-                print F_S[i], self.F_Solar[i]
-            print
+#            self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
             self.F_DailySum[1] += self.F_Solar[1]
             self.F_DailySum[4] += self.F_Solar[4]
         self.F_Conduction,self.T_sed = self.CalcConductionFlux(1600,2219,4.5e-6, 1000,4187,14.331e-8, self.ParticleSize,

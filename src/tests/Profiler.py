@@ -26,7 +26,7 @@ time1 = datetime.today()
 dt = timedelta(seconds=60)
 start = Chronos.MakeDatetime(IniParams["date"])
 stop = start + timedelta(days=4)
-spin = 0 # IniParams["flushdays"] # Spin up period
+spin = 2 # IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
 Chronos.Start(start, dt, stop, spin)
 dt_out = timedelta(minutes=60)
@@ -47,12 +47,15 @@ def run_threaded_time():
 def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
     time = Chronos.TheTime
     stop = Chronos.stop
+    start = Chronos.start
     while time < stop:
         JD = Chronos.JDay
         JDC = Chronos.JDC
         offset = Chronos.TZOffset(time)
         if not time.minute or time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
             hour = time
+            if hour < start:
+                hour += timedelta(days=start.day-hour.day)
         elif time.hour != hour.hour:
             raise NotImplementedError("Not divisible by timestep")
         if RunThreaded:

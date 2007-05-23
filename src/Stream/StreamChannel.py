@@ -112,12 +112,7 @@ class StreamChannel(object):
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
     def CalcDischarge_BoundaryNode(self, time, hour):
-            try:
-                Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
-            except IndexError:
-                if time < self.starttime:
-                    Q = self.Q_bc[0]
-                else: raise
+        Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
 
     def CalculateDischarge(self, time, hour):
         """Return the discharge for the current timestep
@@ -153,12 +148,7 @@ class StreamChannel(object):
             self.CalculateDischarge = self.CalcDischarge_Opt
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
-            try:
-                Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
-            except:
-                if time < self.starttime:
-                    Q = self.Q_bc[0]
-                else: raise
+            Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
             self.CalculateDischarge = self.CalcDischarge_BoundaryNode
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.

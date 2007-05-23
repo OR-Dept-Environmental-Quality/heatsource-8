@@ -241,7 +241,7 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	float BankShadeAngle; // Angle at which stream is shaded by bank
 	PyObject* RipExtinction; // 4 element tuple of extinction cooefficients by zone
 	PyObject* VegetationAngle; // 4 element tuple of top-of-vegetation angles by zone
-	float rip[4];//rip0,rip1,rip2,rip3;
+	float rip[4];
 	float veg[4];
 	if (!PyArg_ParseTuple(args, "ffifffffffffiffO", &cloud, &JD, &hour,&Altitude,&Zenith,
 													&Elevation,&TopoFactor,&ViewToSky,&SampleDist,
