@@ -333,7 +333,7 @@ class HeatSourceInterface(DataSheet):
                 data = [0]*len(data[0]) #NOTE: This destroys the row of data, if we need things later, we'll have to change this
                 data[flow['Q_in']] = ssum(Q_in)
                 data[flow['Q_out']] = ssum(Q_out)
-                data[flow['T_in']] = self.SmartAverage([[i] for i in T_in])
+                data[flow['T_in']] = self.SmartAverage(T_in)
             else: data = [i for i in self.AverageIterables(data)] # Average all the values smartly
             # Now we iterate through the list of averages, and assign the values to the appropriate
             # attributes in the stream node
