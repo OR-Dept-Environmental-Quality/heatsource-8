@@ -23,7 +23,7 @@ class StreamNode(StreamChannel):
              "T", "T_prev", # Current and previous stream temperature
              "Flux", # Dictionary to hold heat flux values
              "TopoFactor", # was Topo_W+Topo_S+Topo_E/(90*3) in original code. From Above stream surface solar flux calculations
-             "ShaderList", # List of angles and attributes to determine sun shading.
+             "ShaderList","RipExtinct","VegAngle", # List of angles and attributes to determine sun shading.
              "Solar_Daily_Sum",
              "F_Solar", # List of important solar fluxes
              "wind_a","wind_b","emergent","penman",
@@ -46,6 +46,8 @@ class StreamNode(StreamChannel):
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
+        self.RipExtinct = ()
+        self.VegAngle = ()
         self.SampleDist = IniParams["transsample"]
         self.emergent = IniParams["emergent"]
         self.penman = IniParams["penman"]
@@ -124,6 +126,29 @@ class StreamNode(StreamChannel):
         dx = self.dx
         # Iterate down the stream channel, calculating the discharges
         self.CalculateDischarge(time, hour)
+        ################################################################
+        ### This section seems unused in the original code. It calculates a stratification
+        # tendency factor. We can implement it (possibly in StreamChannel) if we need to
+        #===================================================
+        #Calculate tendency to stratify
+        #try:
+        #    self.Froude_Densiometric = math.sqrt(1 / (9.8 * 0.000001)) * dx * self.Q / (self.d_w * self.A * self.dx)
+        #except:
+        #    print self.d_w, self.A, self.dx
+        #    raise
+        #===================================================
+        #else: #Skip Node - No Flow in Channel
+        #    self.Hyporheic_Exchange = 0
+        #    self.T = 0
+        #    self.Froude_Densiometric = 0
+
+        #===================================================
+        #Check to see if wetted widths exceed bankfull widths
+        #TODO: This has to be reimplemented somehow, because Excel is involved
+        # connected to the backend. Meaning this class has NO understanding of what the Excel
+        # spreadsheet is. Thus, something must be propigated backward to the parent class
+        # to fiddle with the spreadsheet. Perhaps we can write a report to a text file or
+        # something. I'm very hesitant to connect this too tightly with the interface.
         if self.W_w > self.W_bf:
             if not IniParams["channelwidth"]:
                 self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
@@ -136,29 +161,6 @@ class StreamNode(StreamChannel):
                     import sys
                     sys.exit(1)
                 dlg.Destroy()
-        ################################################################
-        ### This section seems unused in the original code. It calculates a stratification
-        # tendency factor. We can implement it (possibly in StreamChannel) if we need to
-#        #===================================================
-#        #Calculate tendency to stratify
-#        try:
-#            self.Froude_Densiometric = math.sqrt(1 / (9.8 * 0.000001)) * dx * self.Q / (self.d_w * self.A * self.dx)
-#        except:
-#            print self.d_w, self.A, self.dx
-#            raise
-#        #===================================================
-#        else: #Skip Node - No Flow in Channel
-#            self.Hyporheic_Exchange = 0
-#            self.T = 0
-#            self.Froude_Densiometric = 0
-
-        #===================================================
-        #Check to see if wetted widths exceed bankfull widths
-        #TODO: This has to be reimplemented somehow, because Excel is involved
-        # connected to the backend. Meaning this class has NO understanding of what the Excel
-        # spreadsheet is. Thus, something must be propigated backward to the parent class
-        # to fiddle with the spreadsheet. Perhaps we can write a report to a text file or
-        # something. I'm very hesitant to connect this too tightly with the interface.
 
     def CalcHeat(self, time, hour,JD,JDC,offset):
         # Move our current temperature to T_prev before we calculate
@@ -180,18 +182,19 @@ class StreamNode(StreamChannel):
             if time.hour == 1: self.F_DailySum = [0]*5   #reset for the new day
             DayTime = False
         else:
+            print "Day"
             #self.F_Solar =
-            F_S, F_dir, F_dif = self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
+            F_S = self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
                                             JD, time.hour, Altitude, Zenith, # Solar Variables
                                             self.Elevation, self.TopoFactor, self.ViewToSky, SampleDist, # Topographic Vars
                                             self.d_w, self.W_b, self.phi, # Chanell Geometry
                                             int(self.emergent), self.VDensity, self.VHeight,  # Emergent vegetation
-                                            self.ShaderList[Direction]  # Shade variables
+                                            self.ShaderList[Direction]#,self.RipExtinct,self.VegAngle  # Shade variables
                                             )
             # Testing method, these should return the same (to 1.0e-6 or so) result
-            self.F_Solar, direct, diffuse = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
+            self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
             for i in xrange(8):
-                print F_dir[i], diffuse[i]
+                print F_S[i], self.F_Solar[i]
             print
             self.F_DailySum[1] += self.F_Solar[1]
             self.F_DailySum[4] += self.F_Solar[4]
@@ -226,7 +229,6 @@ class StreamNode(StreamChannel):
         Solar_Constant = 1367 #W/m2
         F_Direct[0] = (Solar_Constant / (Rad_Vec ** 2)) * sin(radians(Altitude)) #Global Direct Solar Radiation
         F_Diffuse[0] = 0
-
         ########################################################
         #======================================================
         # 1 - Above Topography
@@ -364,13 +366,15 @@ class StreamNode(StreamChannel):
 #        '       5 - Entering Stream
 #        '       6 - Received by Water Column
 #        '       7 - Received by Bed
+        F_Solar[0] = F_Diffuse[0] + F_Direct[0]
         F_Solar[1] = F_Diffuse[1] + F_Direct[1]
         F_Solar[2] = F_Diffuse[2] + F_Direct[2]
+        F_Solar[3] = F_Diffuse[3] + F_Direct[3]
         F_Solar[4] = F_Diffuse[4] + F_Direct[4]
         F_Solar[5] = F_Diffuse[5] + F_Direct[5]
         F_Solar[6] = F_Diffuse[6] + F_Direct[6]
         F_Solar[7] = F_Diffuse[7] + F_Direct[7]
-        return F_Solar, F_Direct, F_Diffuse
+        return F_Solar
     def Conduction_THW(self):
 
 

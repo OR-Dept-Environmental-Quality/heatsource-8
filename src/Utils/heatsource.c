@@ -241,13 +241,19 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	float BankShadeAngle; // Angle at which stream is shaded by bank
 	PyObject* RipExtinction; // 4 element tuple of extinction cooefficients by zone
 	PyObject* VegetationAngle; // 4 element tuple of top-of-vegetation angles by zone
-
+	float rip[4];//rip0,rip1,rip2,rip3;
+	float veg[4];
 	if (!PyArg_ParseTuple(args, "ffifffffffffiffO", &cloud, &JD, &hour,&Altitude,&Zenith,
 													&Elevation,&TopoFactor,&ViewToSky,&SampleDist,
 													&d_w, &W_b, &phi, &emergent, &VDensity, &VHeight,
-													&ShaderList))
+													&ShaderList))//,&RipExtinction,&VegetationAngle))
 		return NULL;
+
 	if (!PyArg_ParseTuple(ShaderList, "fffOO", &FullSunAngle,&TopoShadeAngle,&BankShadeAngle,&RipExtinction,&VegetationAngle))
+		return NULL;
+	if (!PyArg_ParseTuple(RipExtinction, "ffff",&rip[0],&rip[1],&rip[2],&rip[3]))
+		return NULL;
+	if (!PyArg_ParseTuple(VegetationAngle, "ffff",&veg[0],&veg[1],&veg[2],&veg[3]))
 		return NULL;
 
 	// Constants
@@ -288,8 +294,8 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	// TODO: Original VB code's JulianDay calculation:
 	// JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
 	// THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-	float Rad_Vec = 1 + 0.017 * cos((2 * pi / 365) * (186 - JD + hour / 24));
-	float Solar_Constant = 1367; //W/m2
+	float Rad_Vec = 1.0 + 0.017 * cos((2.0 * pi / 365.0) * (186.0 - JD + (float)hour / 24.0));
+	float Solar_Constant = 1367.0; //W/m2
 	direct_0 = (Solar_Constant / pow(Rad_Vec,2)) * sin(radians*(Altitude)); //Global Direct Solar Radiation
 	///////////////////////////////////////////////////////////////////
     // 1 - Above Topography
@@ -315,29 +321,24 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
     //######################################################
     //======================================================
     //3 - Above Stream Surface (Above Bank Shade)
-    float *veg[4], *rip[4];
-    if (Altitude <= TopoShadeAngle)	/*>Topographic Shade IS Occurring<*/
+    if (Altitude <= TopoShadeAngle)	//>Topographic Shade IS Occurring<
     {
         direct_2 = 0;
         diffuse_2 = diffuse_1 * TopoFactor;
         direct_3 = 0;
         diffuse_3 = diffuse_2 * ViewToSky;
     }
-    else if (Altitude < FullSunAngle) /* #Partial shade from veg*/
+    else if (Altitude < FullSunAngle) // #Partial shade from veg
     {
         direct_2 = direct_1;
         diffuse_2 = diffuse_1 * (1 - TopoFactor);
         float Dummy1 = direct_2;
         int i;
-        for (i=0; i<4; i++) /*Loop to find if shading is occuring from veg. in that zone*/
+        for (i=0; i<4; i++)
         {
-        	*veg[i] = (float)PyFloat_AsDouble(PyTuple_GetItem(VegetationAngle,i));
-            if (Altitude < *veg[i])  /*veg shading is occurring from this zone*/
-            {
-            	*rip[i] = (float)PyFloat_AsDouble(PyTuple_GetItem(RipExtinction,i));
-                Dummy1 *= (1.0-(1.0-exp(-1* (*rip[i]) * (SampleDist/cos(radians*Altitude)))));
-            }
-        }
+			if (Altitude < veg[i])
+				Dummy1 *= (1.0-(1.0-exp(-1.0 * rip[i] * (SampleDist/cos(radians*Altitude)))));
+		}
         direct_3 = Dummy1;
         diffuse_3 = diffuse_2 * ViewToSky;
     }
@@ -463,9 +464,10 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	float solar_6 = diffuse_6 + direct_6;
 	float solar_7 = diffuse_7 + direct_7;
 
-	return Py_BuildValue("(ffffffff)(ffffffff)(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7,
-														  direct_0,direct_1,direct_2,direct_3,direct_4,direct_5,direct_6,direct_7,
-														  diffuse_0,diffuse_1,diffuse_2,diffuse_3,diffuse_4,diffuse_5,diffuse_6,diffuse_7);
+//	return Py_BuildValue("(ffffffff)(ffffffff)(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7,
+//														  direct_0,direct_1,direct_2,direct_3,direct_4,direct_5,direct_6,direct_7,
+//														  diffuse_0,diffuse_1,diffuse_2,diffuse_3,diffuse_4,diffuse_5,diffuse_6,diffuse_7);
+	return Py_BuildValue("(ffffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7,Rad_Vec, Solar_Constant);
 }
 
 static char heatsource_CalcConductionFlux__doc__[] =
