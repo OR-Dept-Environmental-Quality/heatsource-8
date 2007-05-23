@@ -11,6 +11,15 @@ static PyObject *ErrorObject;
 
 /* ----------------------------------------------------- */
 
+/*static char heatsource_CalcFluxes__doc__[] =
+"Calculate solar position and all solar fluxes"
+;
+
+static PyObject *
+heatsource_CalcFluxes(PyObject *self, PyObject *args)
+{
+}
+*/
 static char heatsource_CalcSolarPosition__doc__[] =
 "Calculates relative position of sun"
 ;
@@ -282,7 +291,6 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	float Rad_Vec = 1 + 0.017 * cos((2 * pi / 365) * (186 - JD + hour / 24));
 	float Solar_Constant = 1367; //W/m2
 	direct_0 = (Solar_Constant / pow(Rad_Vec,2)) * sin(radians*(Altitude)); //Global Direct Solar Radiation
-	diffuse_0 = 0.0;
 	///////////////////////////////////////////////////////////////////
     // 1 - Above Topography
     float Air_Mass = (35 / sqrt(1224 * sin(radians*Altitude) + 1)) * exp(-0.0001184 * Elevation);
@@ -307,6 +315,7 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
     //######################################################
     //======================================================
     //3 - Above Stream Surface (Above Bank Shade)
+    float *veg[4], *rip[4];
     if (Altitude <= TopoShadeAngle)	/*>Topographic Shade IS Occurring<*/
     {
         direct_2 = 0;
@@ -322,17 +331,17 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
         int i;
         for (i=0; i<4; i++) /*Loop to find if shading is occuring from veg. in that zone*/
         {
-        	float *veg = (float*)PyTuple_GetItem(VegetationAngle,i);
-            if (Altitude < (*veg))  /*veg shading is occurring from this zone*/
+        	*veg[i] = (float)PyFloat_AsDouble(PyTuple_GetItem(VegetationAngle,i));
+            if (Altitude < *veg[i])  /*veg shading is occurring from this zone*/
             {
-            	float *rip = (float*)PyTuple_GetItem(RipExtinction,i);
-                Dummy1 *= (1.0-(1.0-exp(-1* (*rip) * (SampleDist/cos(radians*Altitude)))));
+            	*rip[i] = (float)PyFloat_AsDouble(PyTuple_GetItem(RipExtinction,i));
+                Dummy1 *= (1.0-(1.0-exp(-1* (*rip[i]) * (SampleDist/cos(radians*Altitude)))));
             }
         }
         direct_3 = Dummy1;
         diffuse_3 = diffuse_2 * ViewToSky;
     }
-    else /*Full sun*/
+    else //Full sun
     {
         direct_2 = direct_1;
         diffuse_2 = diffuse_1 * (1 - TopoFactor);
@@ -454,7 +463,9 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	float solar_6 = diffuse_6 + direct_6;
 	float solar_7 = diffuse_7 + direct_7;
 
-	return Py_BuildValue("(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7);
+	return Py_BuildValue("(ffffffff)(ffffffff)(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7,
+														  direct_0,direct_1,direct_2,direct_3,direct_4,direct_5,direct_6,direct_7,
+														  diffuse_0,diffuse_1,diffuse_2,diffuse_3,diffuse_4,diffuse_5,diffuse_6,diffuse_7);
 }
 
 static char heatsource_CalcConductionFlux__doc__[] =
@@ -642,10 +653,35 @@ static char heatsource_CalcMacCormick__doc__[] =
 static PyObject *
 heatsource_CalcMacCormick(PyObject *self, PyObject *args, PyObject *keywds)
 {
-	float dt, dx, U;
+	float dt, dx, U, T_sed, T_prev;
+	float Q_up, T_up, Q_in, T_in;
+	float Q_hyp, Q_accr, T_accr;
+	float Delta_T, Disp, S1_value;
+	int S1;
+	float Temp;
 	float T0, T1, T2; // Grid cells for prev, this, next
-	if (!PyArg_ParseTuple(args, "ff", dt,dx,U,T0,T1,T2))
+	if (!PyArg_ParseTuple(args, "fffffffffffffffff", &dt, &dx, &U, &T_sed, &T_prev, &Q_hyp, &Q_in,
+												 &T_in, &Q_up, &T_up, &Delta_T, &Disp,
+												 &S1_value, &S1, &T0, &T1, &T2))
 	return NULL;
+    // This is basically MixItUp from the VB code
+    float T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in);
+    //Calculate temperature change from mass transfer from hyporheic zone
+    T_mix = ((T_sed * Q_hyp) + (T_mix * (Q_up + Q_in))) / (Q_hyp + Q_up + Q_in);
+    //Calculate temperature change from accretion inflows
+    T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp);
+
+    float Dummy1 = -U * (T1 - T0) / dx;
+    float Dummy2 = Disp * (T2 - 2 * T1 + T0) / pow(dx,2);
+    float S = Dummy1 + Dummy2 + Delta_T / dt;
+	if (S1 > 0)
+	{
+		Temp = T_prev + ((S1_value + S) / 2) * dt;
+	} else {
+		Temp = T1 + S * dt;
+	}
+	return Py_BuildValue("f",Temp);
+
 
 }
 
@@ -658,6 +694,7 @@ static struct PyMethodDef heatsource_methods[] = {
 	{"CalcConductionFlux", (PyCFunction) heatsource_CalcConductionFlux, METH_VARARGS,  heatsource_CalcConductionFlux__doc__},
 	{"CalcLongwaveFlux", (PyCFunction) heatsource_CalcLongwaveFlux, METH_VARARGS,  heatsource_CalcLongwaveFlux__doc__},
 	{"CalcEvaporativeFlux", (PyCFunction) heatsource_CalcEvaporativeFlux, METH_VARARGS,  heatsource_CalcEvaporativeFlux__doc__},
+	{"CalcMacCormick", (PyCFunction) heatsource_CalcMacCormick, METH_VARARGS,  heatsource_CalcMacCormick__doc__},
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };
 

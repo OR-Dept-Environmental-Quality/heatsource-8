@@ -111,6 +111,14 @@ class StreamChannel(object):
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
+    def CalcDischarge_BoundaryNode(self, time, hour):
+            try:
+                Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
+            except IndexError:
+                if time < self.starttime:
+                    Q = self.Q_bc[0]
+                else: raise
+
     def CalculateDischarge(self, time, hour):
         """Return the discharge for the current timestep
 
@@ -151,8 +159,7 @@ class StreamChannel(object):
                 if time < self.starttime:
                     Q = self.Q_bc[0]
                 else: raise
-            if Q == 1:
-                pass
+            self.CalculateDischarge = self.CalcDischarge_BoundaryNode
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.

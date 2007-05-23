@@ -60,13 +60,13 @@ class Output(object):
         elif TheTime >= self.write_time:
             for node in sorted(self.reach.itervalues(),reverse=True):
                 variables = {
-                    "Heat_Cond.txt": node.Flux["Conduction"],
-                    "Heat_Conv.txt": node.Flux["Convection"],
-                    "Heat_Evap.txt": node.Flux["Evaporation"],
+                    "Heat_Cond.txt": node.F_Conduction,
+                    "Heat_Conv.txt": node.F_Convection,
+                    "Heat_Evap.txt": node.F_Evaporation,
                     "Heat_SR1.txt": node.F_Solar[1],
                     "Heat_SR4.txt": node.F_Solar[4],
                     "Heat_SR6.txt": node.F_Solar[6],
-                    "Heat_TR.txt": node.Flux["Longwave"],
+                    "Heat_TR.txt": node.F_Longwave,
                     "Hyd_DA.txt": node.A / node.W_w,
                     "Hyd_DM.txt": node.d_w,
                     "Hyd_Flow.txt": node.Q,
@@ -83,7 +83,7 @@ class Output(object):
             if TheTime.hour > self.write_time.hour:  #new day, print daily outputs
                 for node in sorted(self.reach.itervalues(),reverse=True):
                     variables = {
-                        "Shade.txt": (node.Flux["Solar_daily_sum"][1] - node.Flux["Solar_daily_sum"][4]) / node.Flux["Solar_daily_sum"][1],
+                        "Shade.txt": (node.F_DailySum[1] - node.F_DailySum[4]) / node.F_DailySum[1],
                         "VTS.txt": node.ViewToSky
                     }
                     self.append(TheTime, variables, node)

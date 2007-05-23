@@ -25,7 +25,9 @@ class StreamNode(StreamChannel):
              "TopoFactor", # was Topo_W+Topo_S+Topo_E/(90*3) in original code. From Above stream surface solar flux calculations
              "ShaderList", # List of angles and attributes to determine sun shading.
              "Solar_Daily_Sum",
-             "F_Solar" # List of important solar fluxes
+             "F_Solar", # List of important solar fluxes
+             "wind_a","wind_b","emergent","penman",
+             "SampleDist"
              ]
         # Set all the attributes to bare lists, or set from the constructor
         for attr in s:
@@ -34,9 +36,13 @@ class StreamNode(StreamChannel):
         self.slots += s
         for attr in ["Wind", "Humidity", "T_air", "T_tribs", "Q_tribs"]:
             setattr(self, attr, {})
+        # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
+        # and other things the C module needs
+        self.C_dict = {}
+        for attr in self.slots:
+            self.C_dict[attr] = getattr(self, attr)
         self.Solar_daily_sum = [0]*5
         #TODO: Cleanup this flux dictionary
-        self.Flux = {}
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
@@ -171,10 +177,11 @@ class StreamNode(StreamChannel):
         DayTime = True
         if Altitude <= 0: #Nighttime
             self.F_Solar = [0]*8
-            if time.hour == 1: self.Flux["Solar_daily_sum"] = [0]*5   #reset for the new day
+            if time.hour == 1: self.F_DailySum = [0]*5   #reset for the new day
             DayTime = False
         else:
-            self.F_Solar =  self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
+            #self.F_Solar =
+            F_S, F_dir, F_dif = self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
                                             JD, time.hour, Altitude, Zenith, # Solar Variables
                                             self.Elevation, self.TopoFactor, self.ViewToSky, SampleDist, # Topographic Vars
                                             self.d_w, self.W_b, self.phi, # Chanell Geometry
@@ -182,18 +189,21 @@ class StreamNode(StreamChannel):
                                             self.ShaderList[Direction]  # Shade variables
                                             )
             # Testing method, these should return the same (to 1.0e-6 or so) result
-#            self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
-            self.Flux["Solar_daily_sum"][1] += self.F_Solar[1]
-            self.Flux["Solar_daily_sum"][4] += self.F_Solar[4]
-        self.Flux["Conduction"],self.T_sed = self.CalcConductionFlux(1600,2219,4.5e-6, 1000,4187,14.331e-8, self.ParticleSize,
+            self.F_Solar, direct, diffuse = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
+            for i in xrange(8):
+                print F_dir[i], diffuse[i]
+            print
+            self.F_DailySum[1] += self.F_Solar[1]
+            self.F_DailySum[4] += self.F_Solar[4]
+        self.F_Conduction,self.T_sed = self.CalcConductionFlux(1600,2219,4.5e-6, 1000,4187,14.331e-8, self.ParticleSize,
                                                       self.phi, self.P_w, self.dx, self.dt, self.T_sed, self.T_prev,
                                                       self.F_Solar[7], 0.0)
-        self.Flux["LW_Atm"], self.Flux["LW_Stream"], self.Flux["LW_Veg"] = self.CalcLongwaveFlux(self.Humidity[hour],self.T_air[hour],self.C_bc[hour],self.T_prev, self.ViewToSky)
-        self.Flux["Longwave"] = self.Flux["LW_Atm"] + self.Flux["LW_Stream"] + self.Flux["LW_Veg"]
-        self.Flux["Evaporation"], self.Flux["Convection"], self.E = self.CalcEvaporativeFlux(self.Wind[hour], self.T_air[hour], self.Humidity[hour],
+        self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg = self.CalcLongwaveFlux(self.Humidity[hour],self.T_air[hour],self.C_bc[hour],self.T_prev, self.ViewToSky)
+        self.F_Longwave = self.F_LW_Atm + self.F_LW_Stream + self.F_LW_Veg
+        self.F_Evaporation, self.F_Convection, self.E = self.CalcEvaporativeFlux(self.Wind[hour], self.T_air[hour], self.Humidity[hour],
                                                                 int(self.emergent), int(self.penman), self.VHeight,
                                                                 self.wind_a,self.wind_b, self.T_prev,
-                                                                self.F_Solar[5], self.Flux["Longwave"], self.Elevation,
+                                                                self.F_Solar[5], self.F_Longwave, self.Elevation,
                                                                 self.dt, self.W_w)
         self.RecordHeatData(DayTime)
         self.MacCormick1(hour)
@@ -267,7 +277,6 @@ class StreamNode(StreamChannel):
             F_Diffuse[2] = F_Diffuse[1] * (1 - self.TopoFactor)
             F_Direct[3] = F_Direct[2]
             F_Diffuse[3] = F_Diffuse[2] * self.ViewToSky
-
         #4 - Above Stream Surface (What a Solar Pathfinder measures)
         #Account for bank shade
         if Altitude > TopoShadeAngle and Altitude <= BankShadeAngle:  #Bank shade is occurring
@@ -361,8 +370,7 @@ class StreamNode(StreamChannel):
         F_Solar[5] = F_Diffuse[5] + F_Direct[5]
         F_Solar[6] = F_Diffuse[6] + F_Direct[6]
         F_Solar[7] = F_Diffuse[7] + F_Direct[7]
-
-        return F_Solar
+        return F_Solar, F_Direct, F_Diffuse
     def Conduction_THW(self):
 
 
@@ -434,13 +442,13 @@ class StreamNode(StreamChannel):
         Emissivity = 1.72 * (((Air_Vapor * 0.1) / (273.2 + Air_T)) ** (1 / 7)) * (1 + 0.22 * self.C_bc[hour] ** 2) #Dingman p 282
         #======================================================
         #Calcualte the atmospheric longwave flux
-        self.Flux["LW_Atm"] = 0.96 * self.ViewToSky * Emissivity * Sigma * (Air_T + 273.2) ** 4
+        self.F_LW_Atm = 0.96 * self.ViewToSky * Emissivity * Sigma * (Air_T + 273.2) ** 4
         #Calcualte the backradiation longwave flux
-        self.Flux["LW_Stream"] = -0.96 * Sigma * (self.T_prev + 273.2) ** 4
+        self.F_LW_Stream = -0.96 * Sigma * (self.T_prev + 273.2) ** 4
         #Calcualte the vegetation longwave flux
-        self.Flux["LW_Veg"] = 0.96 * (1 - self.ViewToSky) * 0.96 * Sigma * (Air_T + 273.2) ** 4
+        self.F_LW_Veg = 0.96 * (1 - self.ViewToSky) * 0.96 * Sigma * (Air_T + 273.2) ** 4
         #Calcualte the net longwave flux
-        return self.Flux["LW_Atm"], self.Flux["LW_Stream"], self.Flux["LW_Veg"]
+        return self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg
     def EvapConv_THW(self, hour):
 
         #===================================================
@@ -481,7 +489,7 @@ class StreamNode(StreamChannel):
             P = 998.2 # kg/m3
             Gamma = 1003.5 * Pressure / (LHV * 0.62198) #mb/*C  Cuenca p 141
             Delta = 6.1275 * exp(17.27 * Air_T / (237.3 + Air_T)) - 6.1275 * exp(17.27 * (Air_T - 1) / (237.3 + Air_T - 1))
-            NetRadiation = self.F_Solar[5] + self.Flux["Longwave"]  #J/m2/s
+            NetRadiation = self.F_Solar[5] + self.F_Longwave  #J/m2/s
             if NetRadiation < 0:
                 NetRadiation = 0 #J/m2/s
             Ea = Wind_Function * (Sat_Vapor - Air_Vapor)  #m/s
@@ -509,20 +517,20 @@ class StreamNode(StreamChannel):
         dt = self.dt
         Heat = {"Solar": [0]*8}
 #        if DayTime:
-        self.Flux["Total"] = self.F_Solar[6] + self.Flux["Conduction"] + self.Flux["Evaporation"] + self.Flux["Convection"] + self.Flux["Longwave"]
+        self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         Cp = 4182 # J/kg *C
         P = 998.2 # kgS/m3
         ave = self.A / self.W_w #TODO: include in above calcuation.
-        self.Delta_T = self.Flux["Total"] * dt / (ave * Cp * P)
+        self.Delta_T = self.F_Total * dt / (ave * Cp * P)
 
 #        if self.km == 3.05:
-#            print self.Delta_T, self.Flux["Total"], dt, ave, Cp, P
+#            print self.Delta_T, self.F_Total, dt, ave, Cp, P
 #        else:
-#            self.Flux["Total"] = 0
-#            self.Flux["Conduction"] = 0
-#            self.Flux["Evaporation"] = 0
-#            self.Flux["Convection"] = 0
-#            self.Flux["Longwave"] = 0
+#            self.F_Total = 0
+#            self.F_Conduction = 0
+#            self.F_Evaporation = 0
+#            self.F_Convection = 0
+#            self.F_Longwave = 0
 #            self.Delta_T = 0
 #            self.F_Solar[1] = 0
 #            self.F_Solar[4] = 0
@@ -535,15 +543,18 @@ class StreamNode(StreamChannel):
             Heat["Solar"][2] = Heat["Solar"][2] + dt * self.F_Solar[2]
             Heat["Solar"][4] = Heat["Solar"][4] + dt * self.F_Solar[4]
             Heat["Solar"][6] = Heat["Solar"][6] + dt * self.F_Solar[6]
-            Heat["Conduction"] = dt * self.Flux["Conduction"]
-            Heat["Longwave"] = dt * self.Flux["Longwave"]
-            Heat["LW_Atm"] = dt * self.Flux["LW_Atm"]
-            Heat["LW_LC"] = dt * self.Flux["LW_Veg"]
-            Heat["LW_BR"] = dt * self.Flux["LW_Stream"]
-            Heat["Evaporation"] = dt * self.Flux["Evaporation"]
-            Heat["Convection"] = dt * self.Flux["Convection"]
-            Heat["Total"] = dt * self.Flux["Total"]
+            Heat["Conduction"] = dt * self.F_Conduction
+            Heat["Longwave"] = dt * self.F_Longwave
+            Heat["LW_Atm"] = dt * self.F_LW_Atm
+            Heat["LW_LC"] = dt * self.F_LW_Veg
+            Heat["LW_BR"] = dt * self.F_LW_Stream
+            Heat["Evaporation"] = dt * self.F_Evaporation
+            Heat["Convection"] = dt * self.F_Convection
+            Heat["Total"] = dt * self.F_Total
 
+    def BoundaryMacCormick(self, hour):
+        self.T = self.T_bc[hour]
+        self.T_prev = self.T_bc[hour]
 
     def MacCormick1(self, hour):
         sqrt = math.sqrt
