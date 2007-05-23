@@ -30,7 +30,7 @@ spin = 0 # IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
 Chronos.Start(start, dt, stop, spin)
 dt_out = timedelta(minutes=60)
-#Output = O(dt_out, Reach, start)
+Output = O(dt_out, Reach, start)
 ##########################################################
 
 reachlist = sorted(Reach.itervalues(),reverse=True)

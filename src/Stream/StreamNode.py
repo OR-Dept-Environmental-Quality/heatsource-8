@@ -1,6 +1,5 @@
 from __future__ import division
 import math, wx, bisect
-import heatsource
 from warnings import warn
 from Dieties.Chronos import Chronos
 from Dieties.IniParams import IniParams
@@ -38,8 +37,8 @@ class StreamNode(StreamChannel):
         self.Solar_daily_sum = [0]*5
         #TODO: Cleanup this flux dictionary
         self.Flux = {}
+        self.S1 = 0
         self.Log = Logger
-        self.CalcSolarPosition = heatsource.CalcSolarPosition
         self.ShaderList = ()
         self.SampleDist = IniParams["transsample"]
         self.emergent = IniParams["emergent"]
@@ -175,31 +174,29 @@ class StreamNode(StreamChannel):
             if time.hour == 1: self.Flux["Solar_daily_sum"] = [0]*5   #reset for the new day
             DayTime = False
         else:
-            self.F_Solar =  heatsource.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
-                                                    JD, time.hour, Altitude, Zenith, # Solar Variables
-                                                    self.Elevation, self.TopoFactor, self.ViewToSky, SampleDist, # Topographic Vars
-                                                    self.d_w, self.W_b, self.phi, # Chanell Geometry
-                                                    int(self.emergent), self.VDensity, self.VHeight,  # Emergent vegetation
-                                                    self.ShaderList[Direction]  # Shade variables
-                                                    )
+            self.F_Solar =  self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
+                                            JD, time.hour, Altitude, Zenith, # Solar Variables
+                                            self.Elevation, self.TopoFactor, self.ViewToSky, SampleDist, # Topographic Vars
+                                            self.d_w, self.W_b, self.phi, # Chanell Geometry
+                                            int(self.emergent), self.VDensity, self.VHeight,  # Emergent vegetation
+                                            self.ShaderList[Direction]  # Shade variables
+                                            )
             # Testing method, these should return the same (to 1.0e-6 or so) result
 #            self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
             self.Flux["Solar_daily_sum"][1] += self.F_Solar[1]
             self.Flux["Solar_daily_sum"][4] += self.F_Solar[4]
-            if len(self.F_Solar) < 8:
-                raise Exception("Something wrong in heatsource.CalcSolarFlux()")
-        self.Flux["Conduction"],self.T_sed = heatsource.CalcConductionFlux(1600,2219,4.5e-6, 1000,4187,14.331e-8, self.ParticleSize,
+        self.Flux["Conduction"],self.T_sed = self.CalcConductionFlux(1600,2219,4.5e-6, 1000,4187,14.331e-8, self.ParticleSize,
                                                       self.phi, self.P_w, self.dx, self.dt, self.T_sed, self.T_prev,
                                                       self.F_Solar[7], 0.0)
-        self.Flux["LW_Atm"], self.Flux["LW_Stream"], self.Flux["LW_Veg"] = heatsource.CalcLongwaveFlux(self.Humidity[hour],self.T_air[hour],self.C_bc[hour],self.T_prev, self.ViewToSky)
+        self.Flux["LW_Atm"], self.Flux["LW_Stream"], self.Flux["LW_Veg"] = self.CalcLongwaveFlux(self.Humidity[hour],self.T_air[hour],self.C_bc[hour],self.T_prev, self.ViewToSky)
         self.Flux["Longwave"] = self.Flux["LW_Atm"] + self.Flux["LW_Stream"] + self.Flux["LW_Veg"]
-        self.Flux["Evaporation"], self.Flux["Convection"], self.E = heatsource.CalcEvaporativeFlux(self.Wind[hour], self.T_air[hour], self.Humidity[hour],
+        self.Flux["Evaporation"], self.Flux["Convection"], self.E = self.CalcEvaporativeFlux(self.Wind[hour], self.T_air[hour], self.Humidity[hour],
                                                                 int(self.emergent), int(self.penman), self.VHeight,
                                                                 self.wind_a,self.wind_b, self.T_prev,
                                                                 self.F_Solar[5], self.Flux["Longwave"], self.Elevation,
                                                                 self.dt, self.W_w)
         self.RecordHeatData(DayTime)
-        self.MDispersion,self.MS1 = self.MacCormick1(hour)
+        self.MacCormick1(hour)
 
     def Solar_TheHardWay(self,JD,time,hour, Altitude,Zenith,Direction,SampleDist):
         """Old method, now pushed down to a C module. This is left for testing only"""
@@ -552,8 +549,6 @@ class StreamNode(StreamChannel):
         sqrt = math.sqrt
         dt = self.dt
         dx = self.dx
-        Dispersion = 0
-        S1 = 0
         SkipNode = False
         if self.prev_km:
             if not SkipNode:
@@ -563,8 +558,8 @@ class StreamNode(StreamChannel):
                 T2 = self.next_km.T_prev if self.next_km else self.T_prev
                 Dummy1 = -self.U * (T1 - T0) / dx
                 Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / (dx ** 2)
-                S1 = Dummy1 + Dummy2 + self.Delta_T / dt
-                self.T = T1 + S1 * dt
+                self.S1 = Dummy1 + Dummy2 + self.Delta_T / dt
+                self.T = T1 + self.S1 * dt
 #                if self.km == 3.05:
 #                    print Chronos.TheTime, "M1", T0, T1, T2, Dummy1, Dummy2, S1, dt, self.Delta_T, self.T
             else:
@@ -572,11 +567,10 @@ class StreamNode(StreamChannel):
         else:
             self.T = self.T_bc[hour]
             self.T_prev = self.T_bc[hour] #I think this is what the VB code does
-        return Dispersion,S1
 
     def MacCormick2(self, hour):
         sqrt = math.sqrt
-        S1 = self.MS1
+        S1 = self.S1
         dt = self.dt
         dx = self.dx
         SkipNode = False

@@ -642,9 +642,11 @@ static char heatsource_CalcMacCormick__doc__[] =
 static PyObject *
 heatsource_CalcMacCormick(PyObject *self, PyObject *args, PyObject *keywds)
 {
-	float dt, dx;
-	if (!PyArg_ParseTuple(args, "ff", dt,dx))
+	float dt, dx, U;
+	float T0, T1, T2; // Grid cells for prev, this, next
+	if (!PyArg_ParseTuple(args, "ff", dt,dx,U,T0,T1,T2))
 	return NULL;
+
 }
 
 /* List of methods defined in the module */

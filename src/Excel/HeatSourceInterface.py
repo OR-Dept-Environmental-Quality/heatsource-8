@@ -176,6 +176,7 @@ class HeatSourceInterface(DataSheet):
             # TODO: Check whether this is correct (i.e. whether we need to look upstream or downstream)
             # GetByKm() currently looks downstream
             km = self.GetValue((site + 17, 11),"Flow Data")
+
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
             for hour in xrange(self.Hours):

@@ -1,7 +1,7 @@
 from __future__ import division
 import math, decimal
 from warnings import warn
-import heatsource
+import Utils.heatsource
 from Dieties.Chronos import Chronos as Clock
 from Dieties.IniParams import IniParams
 
@@ -58,8 +58,16 @@ class StreamChannel(object):
                     ]
         for attr in self.slots:
             setattr(self,attr,None)
-        self.GetStreamGeometry = heatsource.GetStreamGeometry
         self.starttime = Clock.MakeDatetime(IniParams["date"])
+
+        # Make the C module's functions part of the class
+        self.CalcSolarPosition = Utils.heatsource.CalcSolarPosition
+        self.CalcSolarFlux = Utils.heatsource.CalcSolarFlux
+        self.CalcConductionFlux = Utils.heatsource.CalcConductionFlux
+        self.CalcLongwaveFlux = Utils.heatsource.CalcLongwaveFlux
+        self.CalcEvaporativeFlux = Utils.heatsource.CalcEvaporativeFlux
+        self.GetStreamGeometry = Utils.heatsource.GetStreamGeometry
+
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
     def __lt__(self, other): return self.km < other.km
@@ -236,22 +244,20 @@ class StreamChannel(object):
             self.W_b = self.W_bf - 2*self.z*self.d_bf
             Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
 
+
+
     def CalcHyporheic(self):
         """Calculate the hyporheic exchange value"""
         # Taken directly from the VB code
         #======================================================
         #Calc hyporheic flow in cell Q(0,1)
         #Calculate head at top (ho) and bottom (hL) of reach
-        if not self.prev_km:
+        try:
+            ho = self.prev_km.d_w + self.S * self.dx
+            hL = self.d_w
+        except AttributeError:
             ho = self.S * self.dx
             hL = 0
-        else:
-            try:
-                ho = self.prev_km.d_w + self.S * self.dx
-            except:
-                print self.S, self.prev_km.d_w
-                raise
-            hL = self.d_w
         #Calculate Hyporheic Flows
         self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * self.dx))
         self.Q_hyp = self.Q if self.Q_hyp > self.Q else self.Q_hyp
