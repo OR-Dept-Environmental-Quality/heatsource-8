@@ -191,7 +191,7 @@ class StreamNode(StreamChannel):
                                             self.ShaderList[Direction]  # Shade variables
                                             )
             # Testing method, these should return the same (to 1.0e-6 or so) result
-#            self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
+            #self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
             self.F_DailySum[1] += self.F_Solar[1]
             self.F_DailySum[4] += self.F_Solar[4]
         self.F_Conduction,self.T_sed = self.CalcConductionFlux(1600,2219,4.5e-6, 1000,4187,14.331e-8, self.ParticleSize,
@@ -556,8 +556,18 @@ class StreamNode(StreamChannel):
         self.T = self.T_bc[hour]
         self.T_prev = self.T_bc[hour]
 
+    def CalcDisperion(self):
+        dx = self.dx
+        dt = self.dt
+        if not self.S:
+            Shear_Velocity = self.U
+        else:
+            Shear_Velocity = math.sqrt(9.8 * self.d_w * self.S)
+        self.Disp = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
+        if self.Disp * dt / (dx ** 2) > 0.5:
+            self.Disp = (0.45 * (dx ** 2)) / dt
+
     def MacCormick1(self, hour):
-        sqrt = math.sqrt
         dt = self.dt
         dx = self.dx
         SkipNode = False
@@ -568,6 +578,7 @@ class StreamNode(StreamChannel):
                 T1 = self.T_prev
                 T2 = self.next_km.T_prev if self.next_km else self.T_prev
                 Dummy1 = -self.U * (T1 - T0) / dx
+                self.CalcDisperion()
                 Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / (dx ** 2)
                 self.S1 = Dummy1 + Dummy2 + self.Delta_T / dt
                 self.T = T1 + self.S1 * dt
@@ -579,8 +590,8 @@ class StreamNode(StreamChannel):
             self.T = self.T_bc[hour]
             self.T_prev = self.T_bc[hour] #I think this is what the VB code does
 
+
     def MacCormick2(self, hour):
-        sqrt = math.sqrt
         S1 = self.S1
         dt = self.dt
         dx = self.dx
