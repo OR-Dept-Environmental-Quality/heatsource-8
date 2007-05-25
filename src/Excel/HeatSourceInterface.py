@@ -539,6 +539,10 @@ class HeatSourceInterface(DataSheet):
         node.phi = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
 
         del node.Conductivity, node.Embeddedness
+
+        for attr in ['T_cont','d_cont','Q_cont', 'T_in', 'Q_in', 'Q_out']:
+            if not getattr(node,attr): setattr(node,attr,0)
+
         #############################################################
         #The original VB code has this method BFMorph, which calculates some things and
         # spits them back to the spreadsheet. We want to keep everything in the node, but

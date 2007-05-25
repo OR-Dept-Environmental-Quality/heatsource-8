@@ -26,11 +26,11 @@ time1 = datetime.today()
 dt = timedelta(seconds=60)
 start = Chronos.MakeDatetime(IniParams["date"])
 stop = start + timedelta(days=4)
-spin = IniParams["flushdays"] # Spin up period
+spin = 0 #IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
 Chronos.Start(start, dt, stop, spin)
 dt_out = timedelta(minutes=60)
-Output = O(dt_out, Reach, start)
+#Output = O(dt_out, Reach, start)
 ##########################################################
 
 reachlist = sorted(Reach.itervalues(),reverse=True)
@@ -76,7 +76,7 @@ def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
             hydro(time,hydro_hour)
             solar(time,solar_hour,JD,JDC,offset)
         [x.MacCormick2(solar_hour) for x in reachlist]
-        Output.Store(time)
+#        Output.Store(time)
         for x in reachlist:
             x.T_prev = x.T
             x.T = None # This just ensures we don't accidentally use it until it's reset

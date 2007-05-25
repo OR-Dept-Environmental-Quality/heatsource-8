@@ -80,8 +80,8 @@ class StreamChannel(object):
     def GetInputs(self, hour):
         """Returns a value for inputs-outputs to the channel at the time=t"""
         Q = 0
-        Q += self.Q_in or 0 # Input volume
-        Q -= self.Q_out or 0 # Output volume
+        Q += self.Q_in # Input volume
+        Q -= self.Q_out # Output volume
         if len(self.Q_tribs):
             Q += self.Q_tribs[hour]# Tributary volume
         if self.E: # Evaporation volume
@@ -91,21 +91,21 @@ class StreamChannel(object):
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
         # (t, x-1) = flow from the upstream channel at this timestep
-        Q1 = self.prev_km.Q + self.GetInputs(hour)
+        #Q1 = self.prev_km.Q + self.GetInputs(hour)
         # (t-1, x-1) = flow from the upstream channel's previous timestep.
         Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
         # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep
         # because we have not yet assigned a new value for this timesetp)
-        Q3 = self.Q
+        #Q3 = self.Q
         C1,C2,C3 = self.GetMuskingum(Q2)
         # Calculate the new Q
-        Q = C1*Q1 + C2*Q2 + C3*Q3
+        Q = C1*(self.prev_km.Q + self.GetInputs(hour)) + C2*Q2 + C3*self.Q
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
-        self.Q_prev = self.Q  or Q
+        self.Q_prev = self.Q
         self.Q = Q
 
         if Q > 0.0071: #Channel is not going dry
-            D_est = self.d_cont or 0
+            D_est = self.d_cont
             self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
             self.CalcHyporheic()
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
@@ -114,16 +114,16 @@ class StreamChannel(object):
     def CalcDischarge_BoundaryNode(self, time, hour):
         Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
-        self.Q_prev = self.Q  or Q
+        self.Q_prev = self.Q
         self.Q = Q
 
-        if Q < 0.0071: #Channel is going dry
-            self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
-            self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
-        else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-            D_est = self.d_cont or 0
+        if Q > 0.0071: #Channel is going dry
+            D_est = self.d_cont
             self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
             self.CalcHyporheic()
+        else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
+            self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
+            self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
 
     def CalculateDischarge(self, time, hour):
         """Return the discharge for the current timestep
@@ -175,7 +175,7 @@ class StreamChannel(object):
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-            D_est = self.d_cont or 0
+            D_est = self.d_cont
             self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
             self.CalcHyporheic()
 

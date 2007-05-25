@@ -7,19 +7,37 @@
 #include <math.h>
 #include <stdlib.h>
 
-static PyObject *ErrorObject;
+static PyObject *HeatSourceError;
 
+static int
+internal_bisect_right(PyObject *list, PyObject *item, Py_ssize_t lo, Py_ssize_t hi)
+{
+	PyObject *litem;
+	Py_ssize_t mid, res;
+
+	if (hi == -1) {
+		hi = PySequence_Size(list);
+		if (hi < 0)
+			return -1;
+	}
+	while (lo < hi) {
+		mid = (lo + hi) / 2;
+		litem = PySequence_GetItem(list, mid);
+		if (litem == NULL)
+			return -1;
+		res = PyObject_RichCompareBool(item, litem, Py_LT);
+		Py_DECREF(litem);
+		if (res < 0)
+			return -1;
+		if (res)
+			hi = mid;
+		else
+			lo = mid + 1;
+	}
+	return lo;
+}
 /* ----------------------------------------------------- */
 
-/*static char heatsource_CalcFluxes__doc__[] =
-"Calculate solar position and all solar fluxes"
-;
-
-static PyObject *
-heatsource_CalcFluxes(PyObject *self, PyObject *args)
-{
-}
-*/
 static char heatsource_CalcSolarPosition__doc__[] =
 "Calculates relative position of sun"
 ;
@@ -56,8 +74,9 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 	double pi = 3.1415926535897931;
 	double toRadians = pi/180.0;
 	double toDegrees = 180.0/pi;
+	PyObject *ShaderList;
 
-	if (!PyArg_ParseTuple(args, "ddddddd", &lat, &lon, &hour, &min, &sec, &offset, &JDC))
+	if (!PyArg_ParseTuple(args, "dddddddO", &lat, &lon, &hour, &min, &sec, &offset, &JDC, &ShaderList))
 		return NULL;
 
     MeanObliquity = 23.0 + (26.0 + ((21.448 - JDC * (46.815 + JDC * (0.00059 - JDC * 0.001813))) / 60.0)) / 60.0;
@@ -81,8 +100,8 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 
     SunRadVector = (1.000001018 * (1 - pow(Eccentricity,2))) / (1 + Eccentricity * cos(toRadians*(GeoMeanAnomalySun + SunEqofCenter)));
 
-    /*#======================================================
-    #Equation of time (minutes)*/
+    //======================================================
+    //Equation of time (minutes)
     Dummy = pow((tan(Obliquity * pi / 360)),2);
     Dummy1 = sin(toRadians*(2 * GeoMeanLongSun));
     Dummy2 = sin(toRadians*(GeoMeanAnomalySun));
@@ -134,7 +153,22 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
     Zenith = Zenith - RefractionCorrection;
     Altitude = 90 - Zenith;
 
-	return Py_BuildValue("fff",Azimuth,Altitude,Zenith);
+	PyObject *AzimuthBreaks = Py_BuildValue("(fffffff)",0.0,67.5,112.5,157.5,202.5,247.5,292.5);
+	PyObject *SolVars = Py_BuildValue("(ffiiiif)", lat, lon, hour, min, sec, offset, JDC);
+	PyObject *Az = Py_BuildValue("f",Azimuth);
+	int direction = internal_bisect_right(AzimuthBreaks, Az, 0, -1)-1;
+	PyObject *Shade = PyTuple_GetItem(ShaderList, direction);
+	/////////////////////////////////////////////////////////
+	// De-reference all unused Python objects
+	Py_DECREF(AzimuthBreaks);
+	Py_DECREF(SolVars);
+	Py_DECREF(Az);
+
+	int Daytime = 0;
+	if (Altitude > 0.0)
+		Daytime = 1;
+
+	return Py_BuildValue("ffiO",Altitude,Zenith,Daytime,Shade);
 }
 static char heatsource_GetStreamGeometry__doc__[] =
 "Return a stream's geometry\n\nGiven the known parameters for bottom width, Z factor, Manning\'s n and slope\nas well as the estimated Discharge, this function returns the\nwetted depth (found in a Newton-Raphson iteration or as optional D_est keyword),\narea, wetted perimeter, hydraulic radius, wetted width and velocity."
@@ -206,7 +240,7 @@ static char heatsource_CalcSolarFlux__doc__[] =
 ;
 
 static PyObject *
-heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
+heatsource_CalcSolarFlux(PyObject *self, PyObject *args)
 {
 	//////////////////////////
 	// Cloud cover
@@ -246,15 +280,18 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	if (!PyArg_ParseTuple(args, "ffifffffffffiffO", &cloud, &JD, &hour,&Altitude,&Zenith,
 													&Elevation,&TopoFactor,&ViewToSky,&SampleDist,
 													&d_w, &W_b, &phi, &emergent, &VDensity, &VHeight,
-													&ShaderList))//,&RipExtinction,&VegetationAngle))
+													&ShaderList))
 		return NULL;
-
 	if (!PyArg_ParseTuple(ShaderList, "fffOO", &FullSunAngle,&TopoShadeAngle,&BankShadeAngle,&RipExtinction,&VegetationAngle))
 		return NULL;
 	if (!PyArg_ParseTuple(RipExtinction, "ffff",&rip[0],&rip[1],&rip[2],&rip[3]))
 		return NULL;
 	if (!PyArg_ParseTuple(VegetationAngle, "ffff",&veg[0],&veg[1],&veg[2],&veg[3]))
 		return NULL;
+	return Py_BuildValue("ffifffffffffiffO", cloud, JD, hour,Altitude,Zenith,
+													Elevation,TopoFactor,ViewToSky,SampleDist,
+													d_w, W_b, phi, emergent, VDensity, VHeight,
+													ShaderList);
 
 	// Constants
 	float pi = 3.14159265358979323846f;
@@ -475,7 +512,7 @@ static char heatsource_CalcConductionFlux__doc__[] =
 ;
 
 static PyObject *
-heatsource_CalcConductionFlux(PyObject *self, PyObject *args, PyObject *keywds)
+heatsource_CalcConductionFlux(PyObject *self, PyObject *args)
 {
 	// Substrate conduction constants
 	int Sed_Density; // kg/m3
@@ -539,7 +576,7 @@ static char heatsource_CalcLongwaveFlux__doc__[] =
 ;
 
 static PyObject *
-heatsource_CalcLongwaveFlux(PyObject *self, PyObject *args, PyObject *keywds)
+heatsource_CalcLongwaveFlux(PyObject *self, PyObject *args)
 {
 	float Humidity;
 	float Air_T;
@@ -560,8 +597,8 @@ heatsource_CalcLongwaveFlux(PyObject *self, PyObject *args, PyObject *keywds)
     float F_LW_Stream = -0.96 * Sigma * pow((T_prev + 273.2),4.0);
     //Calcualte the vegetation longwave flux
     float F_LW_Veg = 0.96 * (1 - ViewToSky) * 0.96 * Sigma * pow((Air_T + 273.2),4);
-
-	return Py_BuildValue("fff",F_LW_Atm, F_LW_Stream, F_LW_Veg);
+	float F_Longwave = F_LW_Atm + F_LW_Stream + F_LW_Veg;
+	return Py_BuildValue("ffff",F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg);
 }
 
 static char heatsource_CalcEvaporativeFlux__doc__[] =
@@ -569,7 +606,7 @@ static char heatsource_CalcEvaporativeFlux__doc__[] =
 ;
 
 static PyObject *
-heatsource_CalcEvaporativeFlux(PyObject *self, PyObject *args, PyObject *keywds)
+heatsource_CalcEvaporativeFlux(PyObject *self, PyObject *args)
 {
 	float Wind, Air_T, Humidity;
 	float emergent, penman;
@@ -578,12 +615,12 @@ heatsource_CalcEvaporativeFlux(PyObject *self, PyObject *args, PyObject *keywds)
 	float T_prev;
 	float F_solar5, F_LW; // Rad into stream and longwave flux
 	float Elevation;
-	float dt, W_w;
+	float dx, W_w;
 	// returned variables
 	float F_evap, F_conv, V_evap;
 	if (!PyArg_ParseTuple(args, "ffffffffffffff", &Wind, &Air_T, &Humidity, &emergent, &penman,
 											  &VHeight, &wind_a, &wind_b, &T_prev,
-											  &F_solar5, &F_LW, &Elevation, &dt, &W_w))
+											  &F_solar5, &F_LW, &Elevation, &dx, &W_w))
 	return NULL;
 
     float Pressure = 1013.0 - 0.1055 * Elevation; //mbar
@@ -644,7 +681,7 @@ heatsource_CalcEvaporativeFlux(PyObject *self, PyObject *args, PyObject *keywds)
         }
     }
     F_conv = F_evap * Bowen;
-	V_evap = K_evap * (dt * W_w);
+	V_evap = K_evap * (dx * W_w);
 	return Py_BuildValue("fff",F_evap, F_conv, V_evap);
 }
 
@@ -684,8 +721,12 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args, PyObject *keywds)
 	}
 	return Py_BuildValue("f",Temp);
 
-
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static char heatsource_CalcFluxes__doc__[] =
+"Calculate solar position and all solar fluxes"
+;
 
 /* List of methods defined in the module */
 
@@ -707,7 +748,7 @@ static char heatsource_module_documentation[] =
 ""
 ;
 
-void
+PyMODINIT_FUNC
 initheatsource()
 {
 	PyObject *m, *d;
@@ -719,8 +760,9 @@ initheatsource()
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
-	ErrorObject = PyString_FromString("heatsource.error");
-	PyDict_SetItemString(d, "error", ErrorObject);
+	HeatSourceError = PyString_FromString("HeatSourceError");
+	Py_INCREF(HeatSourceError);
+	PyDict_SetItemString(d, "heatsource.error", HeatSourceError);
 
 	/* XXXX Add constants here */
 	PyDict_SetItemString(d, "__file__", PyString_FromString("heatsource.py"));
