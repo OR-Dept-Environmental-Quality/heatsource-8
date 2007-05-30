@@ -35,7 +35,7 @@ dt_out = timedelta(minutes=60)
 
 reachlist = sorted(Reach.itervalues(),reverse=True)
 def hydro(t,h): [x.CalcHydraulics(t,h) for x in reachlist]
-def solar(t,h,j,c,o): [x.CalcHeat(t,h,j,c,o) for x in reachlist]
+def solar(h,m,s,sh,j,c,o): [x.CalcHeat(h,m,s,sh,j,c,o) for x in reachlist]
 
 def run_threaded_time():
     time = Chronos.TheTime
@@ -74,7 +74,7 @@ def run_threaded_space(RunThreaded=0): # Argument allows profiling and testing
             S.join()
         else:
             hydro(time,hydro_hour)
-            solar(time,solar_hour,JD,JDC,offset)
+            solar(time.hour, time.minute, time.second,solar_hour,JD,JDC,offset)
         [x.MacCormick2(solar_hour) for x in reachlist]
 #        Output.Store(time)
         for x in reachlist:

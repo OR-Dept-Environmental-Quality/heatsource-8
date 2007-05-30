@@ -24,7 +24,7 @@ class StreamNode(StreamChannel):
              "Flux", # Dictionary to hold heat flux values
              "TopoFactor", # was Topo_W+Topo_S+Topo_E/(90*3) in original code. From Above stream surface solar flux calculations
              "ShaderList", # List of angles and attributes to determine sun shading.
-             "Solar_Daily_Sum", # Specific sums of solar fluxes
+             "F_DailySum", # Specific sums of solar fluxes
              "F_Solar", # List of important solar fluxes
              ]
         # Set all the attributes to bare lists, or set from the constructor
@@ -37,7 +37,7 @@ class StreamNode(StreamChannel):
             setattr(self, attr, {})
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
         # and other things the C module needs
-        self.Solar_daily_sum = [0]*5
+        self.F_DailySum = [0]*5
         #TODO: Cleanup this flux dictionary
         self.S1 = 0
         self.Log = Logger
@@ -110,12 +110,75 @@ class StreamNode(StreamChannel):
         self.SetBankfullMorphology()
         # Geographic parameters for the C module that do not change
         self.C_geo = (self.Elevation, self.Latitude, self.Longitude, self.phi, self.VDensity,
-                      self.VHeight, self.ViewToSky, self.ParticleSize, self.dx, self.dt, self.TopoFactor)
+                      self.VHeight, self.ViewToSky, self.SedDepth, self.dx, self.dt, self.TopoFactor)
         # IniParams parameters for the C module that do not change
         self.C_ini = (IniParams["transsample"], IniParams["emergent"], IniParams["penman"], IniParams["wind_a"],IniParams["wind_b"])
         self.C_cond = (1600,2219,4.5e-6, 1000,4187,14.331e-8) # Conduction constants for Sediment and Water
                                                               # Values are for density, heat capacity and thermal diffusivity for
                                                               # sediment and water respectively.
+    def CalcHeat(self, hour, min, sec, solar_hour,JD,JDC,offset):
+        Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+        C_args = ((hour, min, sec, offset, JDC, JD, Altitude, Zenith), # Time variables
+                  (self.C_bc[solar_hour], self.Humidity[solar_hour], self.T_air[solar_hour], self.Wind[solar_hour]), #Boundary Conditions
+                  (self.d_w, self.W_b, self.W_w, self.P_w), # Channel Characteristics
+                  self.C_geo, self.C_ini, self.C_cond, self.ShaderList[dir],
+                  (self.T_prev, self.T_sed, 0.0) # Temperature values. Final is a value for Alluvium flux, if we should calculate it, else it's zero.
+                  )
+
+        ############################################
+        ## Solar Flux Calculation, C-style
+        if Daytime:
+            self.F_Solar = self.CalcSolarFlux(*C_args)
+            self.F_DailySum[1] += self.F_Solar[1]
+            self.F_DailySum[4] += self.F_Solar[4]
+            # Testing method, these should return the same (to 1.0e-6 or so) result
+            #self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
+        else:
+            self.F_Solar = [0]*8
+            if hour == 1: self.F_DailySum = [0]*5   #reset for the new day
+        C_args += (self.F_Solar[5], self.F_Solar[7]),
+
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
+
+#        if DayTime:
+        self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
+#        Cp = 4182 # J/kg *C
+#        P = 998.2 # kgS/m3
+        ave = self.A / self.W_w #TODO: include in above calcuation.
+        self.Delta_T = self.F_Total * self.dt / (ave * 4182 * 998.2)
+        self.MacCormick1(solar_hour)
+
+#        if self.km == 3.05:
+#            print self.Delta_T, self.F_Total, dt, ave, Cp, P
+#        else:
+#            self.F_Total = 0
+#            self.F_Conduction = 0
+#            self.F_Evaporation = 0
+#            self.F_Convection = 0
+#            self.F_Longwave = 0
+#            self.Delta_T = 0
+#            self.F_Solar[1] = 0
+#            self.F_Solar[4] = 0
+#            self.F_Solar[6] = 0
+#            self.E = 0
+
+#        if False:#Chronos.TheTime > Chronos.start:
+#            Heat = {"Solar": [0]*8}
+#            #Calculate Heat by process (J/m2 per day)
+#            Heat["Solar"][1] = Heat["Solar"][1] + dt * self.F_Solar[1]
+#            Heat["Solar"][2] = Heat["Solar"][2] + dt * self.F_Solar[2]
+#            Heat["Solar"][4] = Heat["Solar"][4] + dt * self.F_Solar[4]
+#            Heat["Solar"][6] = Heat["Solar"][6] + dt * self.F_Solar[6]
+#            Heat["Conduction"] = dt * self.F_Conduction
+#            Heat["Longwave"] = dt * self.F_Longwave
+#            Heat["LW_Atm"] = dt * self.F_LW_Atm
+#            Heat["LW_LC"] = dt * self.F_LW_Veg
+#            Heat["LW_BR"] = dt * self.F_LW_Stream
+#            Heat["Evaporation"] = dt * self.F_Evaporation
+#            Heat["Convection"] = dt * self.F_Convection
+#            Heat["Total"] = dt * self.F_Total
+
+
     def CalcHydraulics(self, time, hour):
         # Convenience variables
         dt = self.dt
@@ -157,109 +220,6 @@ class StreamNode(StreamChannel):
                     import sys
                     sys.exit(1)
                 dlg.Destroy()
-
-    def CalcHeat(self, time, hour,JD,JDC,offset):
-        # Move our current temperature to T_prev before we calculate
-        # our new temperature. This just ensures that T and T_prev are
-        # known at this point as the current and future temperature.
-#        self.T_prev = self.T
-#        self.T = None # This just ensures we don't accidentally use it until it's reset
-
-        # Create a tuple to hold our current values.
-        # NOTE: This tuple is ordered! Any changes to this order necessitates changes in the C module!
-        # The tuple is actually a tuple of tuples to make maintanence in Python easier by breaking things into chunks
-#        T_args = (self.T, self.T_prev, self.T_cont, self.T_bc[hour])
-#        if self.prev_km:
-#            T_args += self.prev_km.T, self.prev_km.T_prev,
-#        else:
-#            T_args += None, None,
-#        if self.next_km:
-#            T_args += self.next_km.T, self.next_km.T_prev,
-#        else:
-#            T_args += None, None,
-
-#        import Utils.heatsource
-#        try:
-#            print Utils.heatsource.CalcFluxes(*C_args)
-#        except TypeError:
-#            print self
-#            print C_args
-#            raise
-        # Get the sun's altitude and azimuth:
-        #All angles are in degrees
-        #Azimuth,Altitude,Zenith =
-        Altitude, Zenith, Daytime, Shade = self.CalcSolarPosition(self.Latitude, self.Longitude, time.hour, time.minute, time.second, offset, JDC, self.ShaderList)
-        C_args = ((time.hour, time.minute, time.second, offset, JDC, JD), # Time variables
-                  (self.C_bc[hour], self.Humidity[hour], self.T_air[hour], self.Wind[hour]), #Boundary Conditions
-                  (self.d_w, self.W_b, self.W_w, self.P_w), # Channel Characteristics
-                  self.C_geo, self.C_ini, self.C_cond, self.ShaderList,
-                  (self.T_prev, self.T_sed, 0.0) # Temperature values. Final is a value for Alluvium flux, if we should calculate it, else it's zero.
-                  )
-        ############################################
-        ## Solar Flux Calculation, C-style
-        if Daytime:
-            self.F_Solar = self.CalcSolarFlux(self.C_bc[hour],  # Cloudieness
-                                            JD, time.hour, Altitude, Zenith, # Solar Variables
-                                            self.Elevation, self.TopoFactor, self.ViewToSky, IniParams["transsample"], # Topographic Vars
-                                            self.d_w, self.W_b, self.phi, # Chanell Geometry
-                                            int(IniParams["emergent"]), self.VDensity, self.VHeight,  # Emergent vegetation
-                                            Shade  # Shade variables
-                                            )
-            # Testing method, these should return the same (to 1.0e-6 or so) result
-            #self.F_Solar = self.Solar_TheHardWay(JD,time, hour, Altitude,Zenith,Direction,SampleDist)
-            self.F_DailySum[1] += self.F_Solar[1]
-            self.F_DailySum[4] += self.F_Solar[4]
-        else:
-            self.F_Solar = [0]*8
-            if time.hour == 1: self.F_DailySum = [0]*5   #reset for the new day
-
-        self.F_Conduction,self.T_sed = self.CalcConductionFlux(1600,2219,4.5e-6, 1000,4187,14.331e-8, self.ParticleSize,
-                                                      self.phi, self.P_w, self.dx, self.dt, self.T_sed, self.T_prev,
-                                                      self.F_Solar[7], 0.0)
-        self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg = self.CalcLongwaveFlux(self.Humidity[hour],self.T_air[hour],self.C_bc[hour],self.T_prev, self.ViewToSky)
-        self.F_Evaporation, self.F_Convection, self.E = self.CalcEvaporativeFlux(self.Wind[hour], self.T_air[hour], self.Humidity[hour],
-                                                                int(IniParams["emergent"]), int(IniParams["penman"]), self.VHeight,
-                                                                IniParams["wind_a"],IniParams["wind_b"], self.T_prev,
-                                                                self.F_Solar[5], self.F_Longwave, self.Elevation,
-                                                                self.dx, self.W_w)
-        Heat = {"Solar": [0]*8}
-#        if DayTime:
-        self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
-#        Cp = 4182 # J/kg *C
-#        P = 998.2 # kgS/m3
-        ave = self.A / self.W_w #TODO: include in above calcuation.
-        dt = self.dt
-        self.Delta_T = self.F_Total * dt / (ave * 4182 * 998.2)
-
-#        if self.km == 3.05:
-#            print self.Delta_T, self.F_Total, dt, ave, Cp, P
-#        else:
-#            self.F_Total = 0
-#            self.F_Conduction = 0
-#            self.F_Evaporation = 0
-#            self.F_Convection = 0
-#            self.F_Longwave = 0
-#            self.Delta_T = 0
-#            self.F_Solar[1] = 0
-#            self.F_Solar[4] = 0
-#            self.F_Solar[6] = 0
-#            self.E = 0
-
-#        if False:#Chronos.TheTime > Chronos.start:
-#            #Calculate Heat by process (J/m2 per day)
-#            Heat["Solar"][1] = Heat["Solar"][1] + dt * self.F_Solar[1]
-#            Heat["Solar"][2] = Heat["Solar"][2] + dt * self.F_Solar[2]
-#            Heat["Solar"][4] = Heat["Solar"][4] + dt * self.F_Solar[4]
-#            Heat["Solar"][6] = Heat["Solar"][6] + dt * self.F_Solar[6]
-#            Heat["Conduction"] = dt * self.F_Conduction
-#            Heat["Longwave"] = dt * self.F_Longwave
-#            Heat["LW_Atm"] = dt * self.F_LW_Atm
-#            Heat["LW_LC"] = dt * self.F_LW_Veg
-#            Heat["LW_BR"] = dt * self.F_LW_Stream
-#            Heat["Evaporation"] = dt * self.F_Evaporation
-#            Heat["Convection"] = dt * self.F_Convection
-#            Heat["Total"] = dt * self.F_Total
-        self.MacCormick1(hour)
 
     def Solar_TheHardWay(self,JD,time,hour, Altitude,Zenith,Direction,SampleDist):
         """Old method, now pushed down to a C module. This is left for testing only"""
@@ -443,13 +403,6 @@ class StreamNode(StreamChannel):
         H2O_Density = 1000 #kg/m3
         H2O_ThermalDiffuse = 14.331e-8 #m2/s
         H2O_HeatCapacity = 4187 #J/(kg *C)
-        #======================================================
-        #Variables used in bed conduction
-        #Calculate the sediment depth (conduction layer)
-        Sed_Depth = 10 * self.ParticleSize / 1000
-        if Sed_Depth > 1: Sed_Depth = 1
-        if Sed_Depth < 0.1: Sed_Depth = 0.1
-        #Sed_Depth = 0.2
         #======================================================
         #Variables used in bed conduction
         #Calculate Volumetric Ratio of Water and Substrate

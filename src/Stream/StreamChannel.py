@@ -63,9 +63,7 @@ class StreamChannel(object):
         # Make the C module's functions part of the class
         self.CalcSolarPosition = Utils.heatsource.CalcSolarPosition
         self.CalcSolarFlux = Utils.heatsource.CalcSolarFlux
-        self.CalcConductionFlux = Utils.heatsource.CalcConductionFlux
-        self.CalcLongwaveFlux = Utils.heatsource.CalcLongwaveFlux
-        self.CalcEvaporativeFlux = Utils.heatsource.CalcEvaporativeFlux
+        self.CalcGroundFluxes = Utils.heatsource.CalcGroundFluxes
         self.GetStreamGeometry = Utils.heatsource.GetStreamGeometry
 
     def __repr__(self):
@@ -242,6 +240,7 @@ class StreamChannel(object):
         self.d_bf = self.d_ave
         self.W_b = self.W_bf - 2*self.z*self.d_bf
         Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
+        self.d_w = self.d_ave # Initialize wetted depth to bankfull wetted depth
         # We have to iterate to find the bottom width and bankful depth because we have two equations
         # and two unknowns, so we iterate until the area of the trapazoid (cross-sectional flow area)
         # is equal to the average area (average depth times bankful width). The purpose of this is to

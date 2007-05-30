@@ -537,8 +537,15 @@ class HeatSourceInterface(DataSheet):
         Dummy1 = node.ParticleSize * (1 - node.Embeddedness) #Ratio Size of dominant substrate
         Dummy2 = 0.062 * node.Embeddedness  #Ratio Conductivity of sand - low range
         node.phi = 0.3683 * (Dummy1 + Dummy2) ** (-1*0.0641) #Estimated Porosity
+        #======================================================
+        #Variables used in bed conduction
+        #Calculate the sediment depth (conduction layer)
+        node.SedDepth = 10 * node.ParticleSize / 1000
+        if node.SedDepth > 1: node.SedDepth = 1
+        if node.SedDepth < 0.1: node.SedDepth = 0.1
+        #Sed_Depth = 0.2
 
-        del node.Conductivity, node.Embeddedness
+        del node.Conductivity, node.Embeddedness, node.ParticleSize
 
         for attr in ['T_cont','d_cont','Q_cont', 'T_in', 'Q_in', 'Q_out']:
             if not getattr(node,attr): setattr(node,attr,0)
