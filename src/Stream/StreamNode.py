@@ -139,6 +139,8 @@ class StreamNode(StreamChannel):
         C_args += (self.F_Solar[5], self.F_Solar[7]),
 
         self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
+#        if self.prev_km is None:
+#            print hour, self.F_Conduction
 
 #        if DayTime:
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave

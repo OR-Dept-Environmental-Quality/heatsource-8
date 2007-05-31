@@ -551,9 +551,9 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	float H2O_ThermalDiffuse = PyFloat_AsDouble(PyTuple_GetItem(Cond, 5));
 	/////////////////////////////////////////////
 	// Temperature
-	float T_sed = PyFloat_AsDouble(PyTuple_GetItem(Temp,3));
-	float T_prev = PyFloat_AsDouble(PyTuple_GetItem(Temp,3));
-	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(Temp,3));
+	float T_sed = PyFloat_AsDouble(PyTuple_GetItem(Temp,0));
+	float T_prev = PyFloat_AsDouble(PyTuple_GetItem(Temp,1));
+	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(Temp,2));
 	/////////////////////////////////////////////
 	// Solar fluxes
 	float F_Solar5 = PyFloat_AsDouble(PyTuple_GetItem(Solar,5));
@@ -575,6 +575,8 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
     //======================================================
     //Calculate the conduction flux between water column & substrate
     float F_Conduction = ThermalDiffuse * Density * HeatCapacity * (T_sed - T_prev) / (SedDepth / 2);
+//    return Py_BuildValue("ffff", F_Conduction, ThermalDiffuse, Density, HeatCapacity);
+
     //Calculate the conduction flux between deeper alluvium & substrate
 	float Flux_Conduction_Alluvium = 0.0;
 
