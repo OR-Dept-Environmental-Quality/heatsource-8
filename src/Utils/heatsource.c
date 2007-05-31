@@ -551,8 +551,8 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	float H2O_ThermalDiffuse = PyFloat_AsDouble(PyTuple_GetItem(Cond, 5));
 	/////////////////////////////////////////////
 	// Temperature
-	float T_sed = PyFloat_AsDouble(PyTuple_GetItem(Temp,0));
-	float T_prev = PyFloat_AsDouble(PyTuple_GetItem(Temp,1));
+	float T_prev = PyFloat_AsDouble(PyTuple_GetItem(Temp,0));
+	float T_sed = PyFloat_AsDouble(PyTuple_GetItem(Temp,1));
 	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(Temp,2));
 	/////////////////////////////////////////////
 	// Solar fluxes

@@ -113,11 +113,13 @@ class StreamNode(StreamChannel):
                       self.VHeight, self.ViewToSky, self.SedDepth, self.dx, self.dt, self.TopoFactor)
         # IniParams parameters for the C module that do not change
         self.C_ini = (IniParams["transsample"], IniParams["emergent"], IniParams["penman"], IniParams["wind_a"],IniParams["wind_b"])
+        # Conductivity parameters
         self.C_cond = (1600,2219,4.5e-6, 1000,4187,14.331e-8) # Conduction constants for Sediment and Water
                                                               # Values are for density, heat capacity and thermal diffusivity for
                                                               # sediment and water respectively.
     def CalcHeat(self, hour, min, sec, solar_hour,JD,JDC,offset):
         Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+        # Arguments that are sent into the C module's flux calculations
         C_args = ((hour, min, sec, offset, JDC, JD, Altitude, Zenith), # Time variables
                   (self.C_bc[solar_hour], self.Humidity[solar_hour], self.T_air[solar_hour], self.Wind[solar_hour]), #Boundary Conditions
                   (self.d_w, self.W_b, self.W_w, self.P_w), # Channel Characteristics
@@ -138,16 +140,13 @@ class StreamNode(StreamChannel):
             if hour == 1: self.F_DailySum = [0]*5   #reset for the new day
         C_args += (self.F_Solar[5], self.F_Solar[7]),
 
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
-#        if self.prev_km is None:
-#            print hour, self.F_Conduction
+        cond,sed = self.Conduction_THW()
 
-#        if DayTime:
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
+
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
-#        Cp = 4182 # J/kg *C
-#        P = 998.2 # kgS/m3
         ave = self.A / self.W_w #TODO: include in above calcuation.
-        self.Delta_T = self.F_Total * self.dt / (ave * 4182 * 998.2)
+        self.Delta_T = self.F_Total * self.dt / (ave * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
         self.MacCormick1(solar_hour)
 
 #        if self.km == 3.05:
@@ -409,22 +408,22 @@ class StreamNode(StreamChannel):
         #Variables used in bed conduction
         #Calculate Volumetric Ratio of Water and Substrate
         #Use this Ratio to Estimate Conduction Constants
-        Volume_Sediment = (1 - self.phi) * self.P_w * Sed_Depth * self.dx
-        Volume_H2O = self.phi * self.P_w * Sed_Depth * self.dx
-        Volume_Hyp = self.P_w * Sed_Depth * self.dx
+        Volume_Sediment = (1 - self.phi) * self.P_w * self.SedDepth * self.dx
+        Volume_H2O = self.phi * self.P_w * self.SedDepth * self.dx
+        Volume_Hyp = self.P_w * self.SedDepth * self.dx
         Ratio_Sediment = Volume_Sediment / Volume_Hyp
         Ratio_H2O = Volume_H2O / Volume_Hyp
         Density = (Sed_Density * Ratio_Sediment) + (H2O_Density * Ratio_H2O)
         HeatCapacity = (Sed_HeatCapacity * Ratio_Sediment) + (H2O_HeatCapacity * Ratio_H2O)
         ThermalDiffuse = (Sed_ThermalDiffuse * Ratio_Sediment) + (H2O_ThermalDiffuse * Ratio_H2O)
-#        print Density, HeatCapacity, ThermalDiffuse,self.T_sed, self.T_prev, Sed_Depth
+#        print Density, HeatCapacity, ThermalDiffuse,self.T_sed, self.T_prev, self.SedDepth
         #======================================================
         #Calculate the conduction flux between water column & substrate
-        F_Cond = ThermalDiffuse * Density * HeatCapacity * ((self.T_sed - self.T_prev) / (Sed_Depth / 2))
+        F_Cond = ThermalDiffuse * Density * HeatCapacity * ((self.T_sed - self.T_prev) / (self.SedDepth / 2))
         #Calculate the conduction flux between deeper alluvium & substrate
         # TODO: Figure out when this is necessary or desirable
 ##        If Sheet2.Range("IV21").Value = 1 Then
-##            Flux_Conduction_Alluvium = ThermalDiffuse * Density * HeatCapacity * (Temp_Sed(Node) - Sheet2.Range("IV20").Value) / (Sed_Depth / 2)
+##            Flux_Conduction_Alluvium = ThermalDiffuse * Density * HeatCapacity * (Temp_Sed(Node) - Sheet2.Range("IV20").Value) / (self.SedDepth / 2)
 ##        Else
         Flux_Conduction_Alluvium = 0
         #======================================================
