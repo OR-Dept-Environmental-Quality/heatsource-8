@@ -142,7 +142,10 @@ class StreamNode(StreamChannel):
 
         cond,sed = self.Conduction_THW()
 
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E =self.CalcGroundFluxes(*C_args)
+
+#        print self.T_sed, sed, self.T_sed - sed
+#        if not self.km: print
 
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         ave = self.A / self.W_w #TODO: include in above calcuation.
@@ -434,6 +437,7 @@ class StreamNode(StreamChannel):
         #======================================================
         #Calculate the temperature of the substrate conduction layer
         return F_Cond, self.T_sed + DT_Sed
+
     def Longwave_THW(self, hour):
 
         #=====================================================

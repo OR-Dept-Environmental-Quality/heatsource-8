@@ -12,10 +12,6 @@ from Utils.Logger import Logger
 from Utils.TimeZones import Pacific
 from Utils.Output import Output as O
 
-import psyco
-psyco.full()
-
-
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
 debugfile = join(IniParams["datadirectory"],IniParams["debugfile"])

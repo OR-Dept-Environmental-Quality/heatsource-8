@@ -556,8 +556,8 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(Temp,2));
 	/////////////////////////////////////////////
 	// Solar fluxes
-	float F_Solar5 = PyFloat_AsDouble(PyTuple_GetItem(Solar,5));
-	float F_Solar7 = PyFloat_AsDouble(PyTuple_GetItem(Solar,6));
+	float F_Solar5 = PyFloat_AsDouble(PyTuple_GetItem(Solar,0));
+	float F_Solar7 = PyFloat_AsDouble(PyTuple_GetItem(Solar,1));
 	// End of incoming arguments
 	///////////////////////////////////////////////////////////////////
 	//#################################################################
