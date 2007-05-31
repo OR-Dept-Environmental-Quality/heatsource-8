@@ -186,8 +186,12 @@ class HeatSourceInterface(DataSheet):
                 # 0 and 1. We set the time in this DataPoint to the corresponding hour from the
                 # timelist built above, and we append the datapoint to the Q_tribs or T_tribs
                 # TimeList instance in the node.
-                node.Q_tribs[timelist[hour]] = data[hour][site*2]
-                node.T_tribs[timelist[hour]] = data[hour][1+site*2]
+                try:  #already a tributary, need to mass balance for T
+                    node.T_tribs[timelist[hour]] = (data[hour][1+site*2]*data[hour][site*2] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + data[hour][site*2])
+                    node.Q_tribs[timelist[hour]] += data[hour][site*2]
+                except KeyError:
+                    node.Q_tribs[timelist[hour]] = data[hour][site*2]
+                    node.T_tribs[timelist[hour]] = data[hour][1+site*2]
             self.PB("Reading Inflow data", site, IniParams["inflowsites"])
 
     def GetContinuousData(self):
