@@ -14,7 +14,7 @@ from Utils.Output import Output as O
 
 ErrLog = Logger
 ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
-debugfile = join(IniParams["datadirectory"],IniParams["debugfile"])
+debugfile = join("C:\eclipse\HeatSource\HS8_Example_River.xls")
 Reach = HeatSourceInterface(debugfile, ErrLog).Reach
 time1 = datetime.today()
 ##########################################################

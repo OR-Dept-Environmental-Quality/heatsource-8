@@ -31,20 +31,12 @@ class HeatSourceInterface(DataSheet):
         #######################################################
         # Grab the initialization parameters from the Excel file.
         # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
-        self.SetSheet("TTools Data")
-        IP = IniParams
-        IP["name"] = self.GetValue("I2")
-        IP["date"] = self.GetValue("I3")
-        IP["dt"] = self.GetValue("I4")*60
-        IP["dx"] = self.GetValue("I5")
-        IP["length"] = self.GetValue("I6")
-        IP["longsample"] = self.GetValue("I7")
-        IP["transsample"] = self.GetValue("I8")
-        IP["inflowsites"] = int(self.GetValue("I9"))
-        IP["contsites"] = int(self.GetValue("I10"))
-        IP["flushdays"] = self.GetValue("I11")
-        IP["timezone"] = self.GetValue("I12")
-        IP["simperiod"] = self.GetValue("I13")
+        self.SetSheet("Heat Source Inputs")
+        lst = ("name", "date", "dt","dx", "length", "longsample", "transsample", "inflowsites",
+               "contsites", "flushdays", "timezone", "simperiod","outputdir", "lidar", "evapmethod",
+               "wind_a", "wind_b", "calcevap", "calcalluvium","alluviumtemp","emergent","lcdensity")
+        for i in xrange(len(lst)):
+            IniParams[lst[i]] = self.GetValue("B" + `i+3`)
         ######################################################
 
         # Page names- maybe a useless tuple, we'll see

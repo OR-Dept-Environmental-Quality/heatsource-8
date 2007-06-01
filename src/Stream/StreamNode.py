@@ -140,10 +140,10 @@ class StreamNode(StreamChannel):
             if hour == 1: self.F_DailySum = [0]*5   #reset for the new day
         C_args += (self.F_Solar[5], self.F_Solar[7]),
 
+
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
 #        cond1, sed1 = self.Conduction_THW()
 #        cond2, hyp2, sed2 = self.Conduction_THW_new()
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E =self.CalcGroundFluxes(*C_args)
-
 #        if self.km == 3.15:
 #            print hour, cond1, cond2, self.F_Conduction, hyp2
 #            print sed1, sed2, self.T_sed
@@ -228,7 +228,7 @@ class StreamNode(StreamChannel):
                     sys.exit(1)
                 dlg.Destroy()
 
-    def Solar_TheHardWay(self,JD,time,hour, Altitude,Zenith,Direction,SampleDist):
+    def Solar_THW(self,JD,time,hour, Altitude,Zenith,Direction,SampleDist):
         """Old method, now pushed down to a C module. This is left for testing only"""
         F_Direct = [0]*8
         F_Diffuse = [0]*8
@@ -393,61 +393,12 @@ class StreamNode(StreamChannel):
         F_Solar[7] = F_Diffuse[7] + F_Direct[7]
         return F_Solar
     def Conduction_THW(self):
-
-
-        #======================================================
-        #Calculate Bed Conduction FLUX
-        #and hyporheic exchange temperature change
-        #======================================================
-        #Variables used in bed conduction
-        #Substrate Conduction Constants
-        Sed_Density = 1600 #kg/m3
-        Sed_ThermalDiffuse = 4.5e-6 #m2/s
-        Sed_HeatCapacity = 2219 #J/(kg *C)
-        #======================================================
-        #Variables used in bed conduction
-        #Water Conduction Constants
-        H2O_Density = 1000 #kg/m3
-        H2O_ThermalDiffuse = 14.331e-8 #m2/s
-        H2O_HeatCapacity = 4187 #J/(kg *C)
-        #======================================================
-        #Variables used in bed conduction
-        #Calculate Volumetric Ratio of Water and Substrate
-        #Use this Ratio to Estimate Conduction Constants
-        Volume_Sediment = (1 - self.phi) * self.P_w * self.SedDepth * self.dx
-        Volume_H2O = self.phi * self.P_w * self.SedDepth * self.dx
-        Volume_Hyp = self.P_w * self.SedDepth * self.dx
-        Ratio_Sediment = Volume_Sediment / Volume_Hyp
-        Ratio_H2O = Volume_H2O / Volume_Hyp
-        Density = (Sed_Density * Ratio_Sediment) + (H2O_Density * Ratio_H2O)
-        HeatCapacity = (Sed_HeatCapacity * Ratio_Sediment) + (H2O_HeatCapacity * Ratio_H2O)
-        ThermalDiffuse = (Sed_ThermalDiffuse * Ratio_Sediment) + (H2O_ThermalDiffuse * Ratio_H2O)
-#        print Density, HeatCapacity, ThermalDiffuse,self.T_sed, self.T_prev, self.SedDepth
-        #======================================================
-        #Calculate the conduction flux between water column & substrate
-        F_Cond = ThermalDiffuse * Density * HeatCapacity * ((self.T_sed - self.T_prev) / (self.SedDepth / 2))
-        #Calculate the conduction flux between deeper alluvium & substrate
-        # TODO: Figure out when this is necessary or desirable
-##        If Sheet2.Range("IV21").Value = 1 Then
-##            Flux_Conduction_Alluvium = ThermalDiffuse * Density * HeatCapacity * (Temp_Sed(Node) - Sheet2.Range("IV20").Value) / (self.SedDepth / 2)
-##        Else
-        Flux_Conduction_Alluvium = 0
-        #======================================================
-        #Calculate the changes in temperature in the substrate conduction layer
-        #Temperature change in substrate from solar exposure and conducted heat
-        NetHeat_Sed = self.F_Solar[7] - F_Cond - Flux_Conduction_Alluvium
-        DT_Sed = NetHeat_Sed * self.P_w * self.dx * self.dt / (Volume_Hyp * Density * HeatCapacity)
-        #======================================================
-        #Calculate the temperature of the substrate conduction layer
-        return F_Cond, self.T_sed + DT_Sed
-
-    def Conduction_THW_new(self):
         
         #Sediment Variables (will be spatially variable)
         SedThermCond = 1.57                     # W / m / *C
-        SedThermCond = 13.25  #HS VB for testing only
+        #SedThermCond = 13.25  #HS VB for testing only
         SedThemDiff = 0.0064 / 1000             # m2 / sec
-        SedThemDiff = 3.36e-6 #HS VB for testing only
+        #SedThemDiff = 3.36e-6 #HS VB for testing only
         SedRhoCp = SedThermCond / SedThemDiff   # Sed density * sed heat capacity (J / m3 / *C)
         
         #Water Variable
