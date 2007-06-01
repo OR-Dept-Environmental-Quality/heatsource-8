@@ -140,12 +140,15 @@ class StreamNode(StreamChannel):
             if hour == 1: self.F_DailySum = [0]*5   #reset for the new day
         C_args += (self.F_Solar[5], self.F_Solar[7]),
 
-        cond,sed = self.Conduction_THW()
-
+#        cond1, sed1 = self.Conduction_THW()
+#        cond2, hyp2, sed2 = self.Conduction_THW_new()
         self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E =self.CalcGroundFluxes(*C_args)
 
-#        print self.T_sed, sed, self.T_sed - sed
-#        if not self.km: print
+#        if self.km == 3.15:
+#            print hour, cond1, cond2, self.F_Conduction, hyp2
+#            print sed1, sed2, self.T_sed
+            
+
 
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         ave = self.A / self.W_w #TODO: include in above calcuation.
@@ -437,6 +440,38 @@ class StreamNode(StreamChannel):
         #======================================================
         #Calculate the temperature of the substrate conduction layer
         return F_Cond, self.T_sed + DT_Sed
+
+    def Conduction_THW_new(self):
+        
+        #Sediment Variables (will be spatially variable)
+        SedThermCond = 1.57                     # W / m / *C
+        SedThermCond = 13.25  #HS VB for testing only
+        SedThemDiff = 0.0064 / 1000             # m2 / sec
+        SedThemDiff = 3.36e-6 #HS VB for testing only
+        SedRhoCp = SedThermCond / SedThemDiff   # Sed density * sed heat capacity (J / m3 / *C)
+        
+        #Water Variable
+        rhow = 1000                             #density of water kg / m3
+        H2O_HeatCapacity = 4187                 #J/(kg *C)            
+        
+        #Conduction flux (positive is heat into stream)
+        F_Cond = SedThermCond * (self.T_sed - self.T_prev) / (self.SedDepth / 2)             #units of (W / m2)
+        
+        #Calculate the conduction flux between deeper alluvium & substrate
+        # TODO: Figure out when this is necessary or desirable
+##        If Sheet2.Range("IV21").Value = 1 Then
+##            Flux_Conduction_Alluvium = ThermalDiffuse * Density * HeatCapacity * (Temp_Sed(Node) - Sheet2.Range("IV20").Value) / (self.SedDepth / 2)
+##        Else        
+        Flux_Conduction_Alluvium = 0
+
+        #Hyporheic flux (negative is heat into sediment)
+        F_hyp = self.Q_hyp * rhow * H2O_HeatCapacity * (self.T_sed - self.T_prev) / (self.P_w * self.dx)
+ 
+        NetFlux_Sed = self.F_Solar[7] - F_Cond - Flux_Conduction_Alluvium - F_hyp
+        
+        DT_Sed = NetFlux_Sed * self.dt / (self.SedDepth * SedRhoCp)
+        
+        return F_Cond, F_hyp, self.T_sed + DT_Sed
 
     def Longwave_THW(self, hour):
 
