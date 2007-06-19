@@ -479,4 +479,5 @@ class HeatSourceInterface(XLRDobject):
         node.E = 0 # Same for evaporation
         node.T_alluv = IniParams["alluviumtemp"]
         node.calcevap = IniParams["calcevap"]
+        
         node.SetBankfullMorphology()

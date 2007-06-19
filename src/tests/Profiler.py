@@ -58,6 +58,6 @@ def run(): # Argument allows profiling and testing
             x.T_prev = x.T
             x.T = None # This just ensures we don't accidentally use it until it's reset
         time = Chronos.Tick()
-run()
-#cProfile.run('run()')
+#run()
+cProfile.run('run()')
 ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)

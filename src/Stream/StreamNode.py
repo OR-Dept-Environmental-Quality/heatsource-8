@@ -175,8 +175,8 @@ class StreamNode(StreamChannel):
         ## Solar Flux Calculation, C-style
         if Daytime:
             # Testing method, these should return the same (to 1.0e-6 or so) result
-            self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"])
-            #self.F_Solar = self.CalcSolarFlux(*C_args)
+            #self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"])
+            self.F_Solar = self.CalcSolarFlux(*C_args)
             self.F_DailySum[1] += self.F_Solar[1]
             self.F_DailySum[4] += self.F_Solar[4]
         else:
