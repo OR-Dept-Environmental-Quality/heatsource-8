@@ -103,9 +103,7 @@ class StreamChannel(object):
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
         if Q > 0.0071: #Channel is not going dry
-            D_est = self.d_cont if self.d_cont else 0.0
-#            print self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt
-            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, self.d_cont, self.dx, self.dt)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
@@ -117,8 +115,7 @@ class StreamChannel(object):
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
         if Q > 0.0071: #Channel is going dry
-            D_est = self.d_cont if self.d_cont else 0.0
-            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, self.d_cont, self.dx, self.dt)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
@@ -174,8 +171,7 @@ class StreamChannel(object):
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-            D_est = self.d_cont if self.d_cont else 0
-            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, self.d_cont, self.dx, self.dt)
 
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual

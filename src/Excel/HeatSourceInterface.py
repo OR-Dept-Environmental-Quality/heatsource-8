@@ -289,13 +289,13 @@ class HeatSourceInterface(XLRDobject):
         # Pages we grab columns from
         ttools = ["km","Longitude","Latitude"]
         morph = ["Elevation","S","W_bf","WD","z","n","SedThermCond","SedThermDiff","SedDepth",
-                 "hyp_exch","phi","FLIR_time","FLIR_temp","Q_cont","D_cont"]
+                 "hyp_exch","phi","FLIR_time","FLIR_temp","Q_cont","d_cont"]
         flow = ["Q_in","T_in","Q_out"]
         # Ways that we grab the columns
         sums = ["hyp_exch","Q_in","Q_out"] # These are summed, not averaged
         mins = ["km"]
         aves = ["Longitude","Latitude","Elevation","S","W_bf","WD","z","n","SedThermCond",
-                "SedThermDiff","SedDepth","phi", "Q_cont","D_cont","T_in"]
+                "SedThermDiff","SedDepth","phi", "Q_cont","d_cont","T_in"]
         ignore = ["FLIR_temp","FLIR_time"] # Ignore in the loop, set them manually
 
         data = {}
@@ -479,5 +479,5 @@ class HeatSourceInterface(XLRDobject):
         node.E = 0 # Same for evaporation
         node.T_alluv = IniParams["alluviumtemp"]
         node.calcevap = IniParams["calcevap"]
-        
+
         node.SetBankfullMorphology()

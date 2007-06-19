@@ -175,8 +175,8 @@ class StreamNode(StreamChannel):
         ## Solar Flux Calculation, C-style
         if Daytime:
             # Testing method, these should return the same (to 1.0e-6 or so) result
-            #self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"])
-            self.F_Solar = self.CalcSolarFlux(*C_args)
+            self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"])
+#            self.F_Solar = self.CalcSolarFlux(*C_args)
             self.F_DailySum[1] += self.F_Solar[1]
             self.F_DailySum[4] += self.F_Solar[4]
         else:
@@ -185,8 +185,8 @@ class StreamNode(StreamChannel):
         C_args += (self.F_Solar[5], self.F_Solar[7]),
 
 
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
-#        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.GroundFlux_THW(time)
+#        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.GroundFlux_THW(time)
 
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
@@ -496,10 +496,6 @@ class StreamNode(StreamChannel):
         E = Evap_Rate*self.dt*self.W_w if IniParams["calcevap"] else 0
         return F_Cond, T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_Evap, F_Conv, E
 
-    def BoundaryMacCormick(self, hour):
-        self.T = self.T_bc[hour]
-        self.T_prev = self.T_bc[hour]
-
     def CalcDispersion(self):
         dx = self.dx
         dt = self.dt
@@ -510,6 +506,27 @@ class StreamNode(StreamChannel):
         self.Disp = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
         if self.Disp * dt / (dx ** 2) > 0.5:
             self.Disp = (0.45 * (dx ** 2)) / dt
+
+    def MacCormick1_Boundary(self, hour):
+        self.T = self.T_bc[hour]
+        self.T_prev = self.T_bc[hour]
+
+    def MacCormick1_opt(self,hour):
+        dt = self.dt
+        dx = self.dx
+        SkipNode = False
+        if not SkipNode:
+            mix = self.MixItUp(hour,self.prev_km.Q_prev, self.prev_km.T_prev)
+            T0 = self.prev_km.T_prev + mix
+            T1 = self.T_prev
+            T2 = self.next_km.T_prev if self.next_km else self.T_prev
+            Dummy1 = -self.U * (T1 - T0) / dx
+            self.CalcDispersion()
+            Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / (dx ** 2)
+            self.S1 = Dummy1 + Dummy2 + self.Delta_T / dt
+            self.T = T1 + self.S1 * dt
+        else:
+            self.T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev
 
     def MacCormick1(self, hour):
         dt = self.dt
@@ -528,9 +545,11 @@ class StreamNode(StreamChannel):
                 self.T = T1 + self.S1 * dt
             else:
                 self.T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev
+            self.MacCormick1 = self.MacCormick1_opt
         else:
             self.T = self.T_bc[hour]
             self.T_prev = self.T_bc[hour]
+            self.MacCormick1 = self.MacCormick1_Boundary
 
 
     def MacCormick2(self, hour):

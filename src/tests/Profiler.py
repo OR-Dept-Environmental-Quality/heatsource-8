@@ -30,8 +30,6 @@ dt_out = timedelta(minutes=60)
 ##########################################################
 
 reachlist = sorted(Reach.itervalues(),reverse=True)
-def hydro(t,h): [x.CalcHydraulics(t,h) for x in reachlist]
-def solar(h,m,s,sh,j,c,o): [x.CalcHeat(h,m,s,sh,j,c,o) for x in reachlist]
 
 def run(): # Argument allows profiling and testing
     time = Chronos.TheTime
@@ -50,8 +48,10 @@ def run(): # Argument allows profiling and testing
         elif time.hour != solar_time.hour:
             raise NotImplementedError("Not divisible by timestep")
 
-        hydro(time,hydro_time)
-        solar(time.hour, time.minute, time.second,solar_time,JD,JDC,offset)
+
+        [x.CalcHydraulics(time,hydro_time) for x in reachlist]
+        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in reachlist]
+
 #        [x.MacCormick2(solar_hour) for x in reachlist]
 #        Output.Store(time)
         for x in reachlist:
