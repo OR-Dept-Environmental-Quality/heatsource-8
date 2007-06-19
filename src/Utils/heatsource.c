@@ -244,10 +244,8 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args)
 	PyObject *Channel = PyTuple_GetItem(args,2);
 	PyObject *Geo = PyTuple_GetItem(args,3);
 	PyObject *Ini = PyTuple_GetItem(args,4);
-	PyObject *ShaderList = PyTuple_GetItem(args,6);
+	PyObject *ShaderList = PyTuple_GetItem(args,5);
 
-//	if (!PyArg_ParseTuple(args, "OOOOOOOO", &Time, &BC, &Channel, &Geo, &Ini, &Cond, &ShaderList, &Temp))
-//		return NULL;
 	//////////////////////////
 	// Cloud cover
 	double cloud = PyFloat_AsDouble(PyTuple_GetItem(BC,0)); // fractional cloud cover
@@ -513,9 +511,8 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	PyObject *Channel = PyTuple_GetItem(args, 2);
 	PyObject *Geo = PyTuple_GetItem(args, 3);
 	PyObject *Ini = PyTuple_GetItem(args, 4);
-	PyObject *Cond = PyTuple_GetItem(args, 5);
-	PyObject *Temp = PyTuple_GetItem(args, 7);
-	PyObject *Solar = PyTuple_GetItem(args, 8);
+	PyObject *Temp = PyTuple_GetItem(args, 6);
+	PyObject *Solar = PyTuple_GetItem(args, 7);
 	////////////////////////////////////////////
 	// Boundary Conditions
 	float Cloud = PyFloat_AsDouble(PyTuple_GetItem(BC, 0));
@@ -531,6 +528,9 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	float SedDepth = PyFloat_AsDouble(PyTuple_GetItem(Geo, 7));
 	float dx = PyFloat_AsDouble(PyTuple_GetItem(Geo,8));
 	float dt = PyFloat_AsDouble(PyTuple_GetItem(Geo,9));
+	float SedThermCond = PyFloat_AsDouble(PyTuple_GetItem(Geo,11));
+	float SedThermDiff = PyFloat_AsDouble(PyTuple_GetItem(Geo,12));
+	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(Geo,13));
 	///////////////////////////////////////////
 	// Channel characteristics
 	float P_w = PyFloat_AsDouble(PyTuple_GetItem(Channel, 3));
@@ -541,19 +541,12 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	float penman = PyFloat_AsDouble(PyTuple_GetItem(Ini,2));
 	float wind_a = PyFloat_AsDouble(PyTuple_GetItem(Ini,3));
 	float wind_b = PyFloat_AsDouble(PyTuple_GetItem(Ini,4));
-	//////////////////////////////////////////////
-	// Conduction parameters
-	int Sed_Density = PyInt_AsLong(PyTuple_GetItem(Cond, 0)); // kg/m3
-	int Sed_HeatCapacity = PyInt_AsLong(PyTuple_GetItem(Cond, 1)); // J/(kg * C)
-	float Sed_ThermalDiffuse = PyFloat_AsDouble(PyTuple_GetItem(Cond, 2)); // m2/s
-	int H2O_Density = PyInt_AsLong(PyTuple_GetItem(Cond, 3));
-	int H2O_HeatCapacity = PyInt_AsLong(PyTuple_GetItem(Cond, 4));
-	float H2O_ThermalDiffuse = PyFloat_AsDouble(PyTuple_GetItem(Cond, 5));
+	float calcevap = PyFloat_AsDouble(PyTuple_GetItem(Ini,5));
 	/////////////////////////////////////////////
 	// Temperature
 	float T_prev = PyFloat_AsDouble(PyTuple_GetItem(Temp,0));
 	float T_sed = PyFloat_AsDouble(PyTuple_GetItem(Temp,1));
-	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(Temp,2));
+	float Q_hyp = PyFloat_AsDouble(PyTuple_GetItem(Temp,2));
 	/////////////////////////////////////////////
 	// Solar fluxes
 	float F_Solar5 = PyFloat_AsDouble(PyTuple_GetItem(Solar,0));
@@ -562,33 +555,28 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	///////////////////////////////////////////////////////////////////
 	//#################################################################
 	// Bed Conduction Flux
-    //Calculate Volumetric Ratio of Water and Substrate
-    //Use this Ratio to Estimate Conduction Constants
-    float Volume_Sediment = (1 - phi) * P_w * SedDepth * dx;
-    float Volume_H2O = phi * P_w * SedDepth * dx;
-    float Volume_Hyp = P_w * SedDepth * dx;
-    float Ratio_Sediment = Volume_Sediment / Volume_Hyp;
-    float Ratio_H2O = Volume_H2O / Volume_Hyp;
-    float Density = (Sed_Density * Ratio_Sediment) + (H2O_Density * Ratio_H2O);
-    float HeatCapacity = (Sed_HeatCapacity * Ratio_Sediment) + (H2O_HeatCapacity * Ratio_H2O);
-    float ThermalDiffuse = (Sed_ThermalDiffuse * Ratio_Sediment) + (H2O_ThermalDiffuse * Ratio_H2O);
     //======================================================
     //Calculate the conduction flux between water column & substrate
-    float F_Conduction = ThermalDiffuse * Density * HeatCapacity * (T_sed - T_prev) / (SedDepth / 2);
-//    return Py_BuildValue("ffff", F_Conduction, ThermalDiffuse, Density, HeatCapacity);
+	float SedRhoCp = SedThermCond / (SedThermDiff/1000);
+	// Water variables
+	float rhow = 1000;				// water density (kg/m3)
+	float H2O_HeatCapacity = 4187;	// J/(kg *C)
 
+    float F_Conduction = SedThermCond * (T_sed - T_prev) / (SedDepth / 2);
     //Calculate the conduction flux between deeper alluvium & substrate
 	float Flux_Conduction_Alluvium = 0.0;
 
     if (FAlluvium > 0)
     {
-        Flux_Conduction_Alluvium = ThermalDiffuse * Density * HeatCapacity * (T_sed - FAlluvium) / (SedDepth / 2);
+        Flux_Conduction_Alluvium = SedThermDiff * SedRhoCp * (T_sed - FAlluvium) / (SedDepth / 2);
     }
     //======================================================
     //Calculate the changes in temperature in the substrate conduction layer
+    // Negative hyporheic flow is heat into sediment
+    float F_hyp = Q_hyp * rhow *H2O_HeatCapacity * (T_sed - T_prev) / ( P_w * dx);
     //Temperature change in substrate from solar exposure and conducted heat
-    float NetHeat_Sed = F_Solar7 - F_Conduction - Flux_Conduction_Alluvium;
-    float DT_Sed = NetHeat_Sed * P_w * dx * dt / (Volume_Hyp * Density * HeatCapacity);
+    float NetFlux_Sed = F_Solar7 - F_Conduction - Flux_Conduction_Alluvium - F_hyp;
+    float DT_Sed = NetFlux_Sed * dt / (SedDepth * SedRhoCp);
     //======================================================
     //Calculate the temperature of the substrate conduction layer
     float T_sed_new = T_sed + DT_Sed;
@@ -611,7 +599,7 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	//###############################################################################
 	//######################################################################
 	// Evaporative and Convective flux
-	float F_evap, F_conv, V_evap;
+	float F_evap, F_conv;
     float Pressure = 1013.0 - 0.1055 * Elevation; //mbar
     float Sat_Vapor = 6.1275 * exp(17.27 * T_prev / (237.3 + T_prev)); //mbar (Chapra p. 567)
     float Air_Vapor = Humidity * Sat_Vapor;
@@ -670,7 +658,10 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
         }
     }
     F_conv = F_evap * Bowen;
-	V_evap = K_evap * (dx * W_w);
+    float V_evap = 0.0;
+    if (calcevap) {
+		V_evap = K_evap * (dx * W_w);
+    }
 	// End Evap and Conv Flux
 	//##############################################################################################
 	return Py_BuildValue("fffffffff",F_Conduction,T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_evap, F_conv, V_evap);

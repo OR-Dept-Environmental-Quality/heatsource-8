@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import time, math
-from Utils.TimeZones import Eastern,Central,Mountain,Pacific,utc
+from Utils.TimeZones import TZ
 
 class ChronosDiety(object):
     """This class provides a clock to be used in the model timestepping.
@@ -23,11 +23,11 @@ class ChronosDiety(object):
         self.minute = timedelta(minutes=1)
         self.second = timedelta(seconds=1)
         self.year = timedelta(weeks=52)
-        self.tz = Pacific
+        self.tz = "US/Pacific"
         self.__dayone = None
         self.__current = None # Current time
 
-    def Start(self, start, dt=None, stop=None, spin=0, tz=Pacific):
+    def Start(self, start, dt=None, stop=None, spin=0, tz="US/Pacific"):
         if (not isinstance(start, datetime)) or (stop and not isinstance(stop, datetime)):
             raise Exception("Start and stop times much be Python datetime.datetime instances.")
         if dt and not isinstance(dt,timedelta):
@@ -38,7 +38,7 @@ class ChronosDiety(object):
         self.__stop = stop or self.__start + self.year
         self.__spin = timedelta(days=spin)
         self.__current = self.__start - self.__spin if self.__spin else self.__start
-        self.__dayone = datetime(self.__start.year,1,1,tzinfo=tz)
+        self.__dayone = datetime(self.__start.year,1,1,tzinfo=TZ[tz])
         self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
         self.__jd = None # Placeholder for current julian day
         self.TheTime = self.__current
@@ -105,7 +105,7 @@ class ChronosDiety(object):
     def FracJD(self, t=None):
         """Takes a datetime object in UTC and returns a fractional julian date"""
         t = t or self.__current
-        if not t.tzinfo == utc:
+        if not t.tzinfo == TZ["UTC"]:
             t = self.GetUTC(t)
         y,m,d,H,M,S,tz = self.makeTuple(t)
         # TODO: We should find out if this DST correction is proper
@@ -146,7 +146,7 @@ class ChronosDiety(object):
     def GetUTC(self, t=None):
         """Return UTC version of a datetime object"""
         t = t or self.__current
-        s = t.replace(tzinfo=utc) # Replace our timezone info
+        s = t.replace(tzinfo=TZ["UTC"]) # Replace our timezone info
         s -= t.tzinfo.utcoffset(t) #then subtract the offset and return the object
         return s
     def MakeDatetime(self, t=None, tz=None):
@@ -159,17 +159,23 @@ class ChronosDiety(object):
         t = t or self.__current
         # Set the timezone to the argument, or self.tz
         try:
-            tz = tz or t.tzinfo or self.tz # If given a Datetime object, us that in order of precidence (sp?)
-        except AttributeError:
-            tz = tz or self.tz
+            zone = TZ[tz] or t.tzinfo or TZ[self.tz] # If given a Datetime object, us that in order of precidence (sp?)
+        except (AttributeError,KeyError): # We failed on t.tzinfo, catch the exception
+            zone = TZ[tz] if tz else TZ[self.tz]
+#        except KeyError:
+#            print TZ[self.
+#            raise
         try:
-            y,m,d,H,M,S = time.strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[:6] # Strip out the time info
+            if isinstance(t,tuple):
+                y,m,d,H,M,S = t
+            else:
+                y,m,d,H,M,S = time.strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[:6] # Strip out the time info
         except AttributeError, detail:
             if detail.__str__() == "'datetime.datetime' object has no attribute 'Format'":
                 y, m, d, H, M, S = t.timetuple()[:6]
             else:
                 print t
                 raise AttributeError(detail)
-        return y,m,d,H,M,S,tz
+        return y,m,d,H,M,S,zone
 
 Chronos = ChronosDiety()

@@ -82,8 +82,7 @@ class StreamChannel(object):
         Q -= self.Q_out # Output volume
         if len(self.Q_tribs):
             Q += self.Q_tribs[hour]# Tributary volume
-        if self.E: # Evaporation volume
-            Q -= self.E
+        Q -= self.E # Evaporation loss
         return Q
 
     def CalcDischarge_Opt(self,time,hour):
@@ -101,11 +100,12 @@ class StreamChannel(object):
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q
         self.Q = Q
+        self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
         if Q > 0.0071: #Channel is not going dry
-            D_est = self.d_cont
+            D_est = self.d_cont if self.d_cont else 0.0
+#            print self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt
             self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
-            self.CalcHyporheic()
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
@@ -114,11 +114,11 @@ class StreamChannel(object):
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q
         self.Q = Q
+        self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
         if Q > 0.0071: #Channel is going dry
-            D_est = self.d_cont
+            D_est = self.d_cont if self.d_cont else 0.0
             self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
-            self.CalcHyporheic()
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
@@ -157,7 +157,7 @@ class StreamChannel(object):
             self.CalculateDischarge = self.CalcDischarge_Opt
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
-            Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
+            Q = self.Q_bc[hour]
             self.CalculateDischarge = self.CalcDischarge_BoundaryNode
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
@@ -168,29 +168,29 @@ class StreamChannel(object):
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q  or Q
         self.Q = Q
+        self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
         if Q < 0.0071: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-            D_est = self.d_cont
+            D_est = self.d_cont if self.d_cont else 0
             self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, D_est, self.dx, self.dt)
-            self.CalcHyporheic()
 
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
 
         This is only used if we are not using Muskingum routing, at least in the original code."""
+        #Maxdt = 1e6
+        #for node in reach:
+        #    Dummy = node.dx / (node.Velocity[0] + math.sqrt(9.861 * node.Depth[0]))
+        #    if Dummy < Maxdt: Maxdt = Dummy
+        #    Dummy = (node.Rh ** (4 / 3)) / (9.861 * node.Velocity[0] * (node.N ** 2))
+        #    if Dummy < Maxdt: Maxdt = Dummy
+        #if Maxdt < iniparams.dt: dt = Maxdt
+        #else: dt = iniparams.dt
+        #return dt
         pass
-#        Maxdt = 1e6
-#        for node in reach:
-#            Dummy = node.dx / (node.Velocity[0] + math.sqrt(9.861 * node.Depth[0]))
-#            if Dummy < Maxdt: Maxdt = Dummy
-#            Dummy = (node.Rh ** (4 / 3)) / (9.861 * node.Velocity[0] * (node.N ** 2))
-#            if Dummy < Maxdt: Maxdt = Dummy
-#        if Maxdt < iniparams.dt: dt = Maxdt
-#        else: dt = iniparams.dt
-#        return dt
 
     def GetMuskingum(self,Q_est):
         """Return the values for the Muskigum routing coefficients
@@ -215,15 +215,8 @@ class StreamChannel(object):
         C1 = (0.5*dt - K * X) / D
         C2 = (0.5*dt + K * X) / D
         C3 = (K * (1 - X) - 0.5*dt) / D
-        # For the lateral inflow (C4), we need [l/t], given as the input depth for the channel. Thus,
-        # we divide the input inflows in cms by the channel length times one unit. This gives us a
-        # rate for lateral inflow per unit length of stream. The formula in Bedient and Huber for the
-        # inflow is (q*dt*dx)/D. This would mean that we divide Q/dx=q (because dx*1=dx) then
-        # remultiply by dx. We save a step here by only multiplying Q*dt and achieve the same
-        # result (plus something like 3.5e-16 seconds too! :)
         # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
         return C1, C2, C3
-
 
     def SetBankfullMorphology(self):
         """Calculate initial morphological characteristics in terms of W_bf, z and WD"""
@@ -250,21 +243,3 @@ class StreamChannel(object):
             self.d_bf = self.d_bf + 0.01
             self.W_b = self.W_bf - 2*self.z*self.d_bf
             Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
-
-
-
-    def CalcHyporheic(self):
-        """Calculate the hyporheic exchange value"""
-        # Taken directly from the VB code
-        #======================================================
-        #Calc hyporheic flow in cell Q(0,1)
-        #Calculate head at top (ho) and bottom (hL) of reach
-        try:
-            ho = self.prev_km.d_w + self.S * self.dx
-            hL = self.d_w
-        except AttributeError:
-            ho = self.S * self.dx
-            hL = 0
-        #Calculate Hyporheic Flows
-        self.Q_hyp = abs(self.phi * self.P_w * self.K_h * (ho ** 2 - hL ** 2) / (2 * self.dx))
-        self.Q_hyp = self.Q if self.Q_hyp > self.Q else self.Q_hyp

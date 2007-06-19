@@ -134,7 +134,8 @@ class USTimeZone(tzinfo):
         else:
             return ZERO
 
-Eastern  = USTimeZone(-5, "Eastern",  "EST", "EDT")
-Central  = USTimeZone(-6, "Central",  "CST", "CDT")
-Mountain = USTimeZone(-7, "Mountain", "MST", "MDT")
-Pacific  = USTimeZone(-8, "Pacific",  "PST", "PDT")
+TZ = {"US/Eastern": USTimeZone(-5, "Eastern",  "EST", "EDT"),
+      "US/Central": USTimeZone(-6, "Central",  "CST", "CDT"),
+      "US/Mountain": USTimeZone(-7, "Mountain", "MST", "MDT"),
+      "US/Pacific": USTimeZone(-8, "Pacific",  "PST", "PDT"),
+      "UTC": utc}
