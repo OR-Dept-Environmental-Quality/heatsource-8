@@ -128,6 +128,7 @@ class HeatSourceInterface(XLRDobject):
                 node.Wind, node.Humidity, node.T_air = self.AtmosphericData
             else:
                 self.AtmosphericData = node.Wind, node.Humidity, node.T_air
+            
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
@@ -206,8 +207,8 @@ class HeatSourceInterface(XLRDobject):
             air_col = self.GetColumn(12+site*4,"Continuous Data",4)
             for hour in xrange(self.Hours):
                 node.Wind[timelist[hour]] = wind_col[hour]
-                node.Humidity[timelist[hour]] = wind_col[hour]
-                node.T_air[timelist[hour]] = wind_col[hour]
+                node.Humidity[timelist[hour]] = humid_col[hour]
+                node.T_air[timelist[hour]] = air_col[hour]
             # The VB code essentially uses the last continuous node's
             if not site:
                 self.AtmosphericData = [node.Wind, node.Humidity, node.T_air]
