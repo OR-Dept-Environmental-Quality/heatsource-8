@@ -171,7 +171,7 @@ class HeatSourceInterface(XLRDobject):
         timelist = [makedate(i) for i in timelist]
         for site in xrange(int(IniParams["inflowsites"])):
             # Get the stream node corresponding to the kilometer of this inflow site.
-            km = self.GetValue(site + 3, 1,"Flow Data")
+            km = self.GetValue(site + 3, 9,"Flow Data")
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
 
