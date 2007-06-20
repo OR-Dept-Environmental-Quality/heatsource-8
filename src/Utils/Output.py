@@ -35,7 +35,7 @@ class Output(object):
                     }
 
         for key in self.files.iterkeys():
-            self.files[key][0] = open(path.join(IniParams["tempdirectory"], key), 'w')
+            self.files[key][0] = open(path.join(IniParams["outputdir"], key), 'w')
             self.files[key][0].write("Heat Source Hourly Output File:  ")
             self.files[key][0].write(self.files[key][1])
             today = time.localtime()
@@ -52,7 +52,7 @@ class Output(object):
     def __del__(self):
         for filename in self.files.itervalues():
             filename[0].close()
-        
+
 
     def Store(self, TheTime):
         if TheTime < self.write_time:
