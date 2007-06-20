@@ -128,7 +128,7 @@ class HeatSourceInterface(XLRDobject):
                 node.Wind, node.Humidity, node.T_air = self.AtmosphericData
             else:
                 self.AtmosphericData = node.Wind, node.Humidity, node.T_air
-            
+
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
@@ -362,7 +362,8 @@ class HeatSourceInterface(XLRDobject):
             vheight.append(self.multiplier([LC[x][0] for x in col], average))
             vdensity.append(self.multiplier([LC[x][1] for x in col], average))
             overhang.append(self.multiplier([LC[x][2] for x in col], average))
-            elevation.append(self.multiplier(elev, average))
+            if i>7:  #We don't want to read in column AJ
+                elevation.append(self.multiplier(elev, average))
         VH_iter = chain(*vheight)
         VD_iter = chain(*vdensity)
         OH_iter = chain(*overhang)
@@ -395,16 +396,20 @@ class HeatSourceInterface(XLRDobject):
                              0.5*(topo_s[h]+topo_w[h]),
                              topo_w[h],
                              topo_w[h])
-
+            
             for i in xrange(7):
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
                 rip = ()
                 for j in xrange(4):
-                    Overhang = OH_iter.next()
-                    Vheight = VH_iter.next()
-                    Vdens = VD_iter.next()
-                    Elev = EL_iter.next()
+                    #Overhang = OH_iter.next()
+                    #Vheight = VH_iter.next()
+                    #Vdens = VD_iter.next()
+                    #Elev = EL_iter.next()
+                    Vheight = vheight[i*4+j+1][h]
+                    Vdens = vdensity[i*4+j+1][h]
+                    Overhang = overhang[i*4+j+1][h]
+                    
                     # First, get the averages for each zone in each direction
                     if not j:
                         LC_Angle_Max = 0 # New value for each direction
@@ -412,6 +417,7 @@ class HeatSourceInterface(XLRDobject):
                         Overhang = 0
                     ##########################################################
                     # Calculate the relative ground elev:
+                    Elev = elevation[i*4+j][h]
                     SH = Elev - node.Elevation
                     # Then calculate the relative vegetation height:
                     VH = Vheight + SH
@@ -436,14 +442,14 @@ class HeatSourceInterface(XLRDobject):
                     # Now we calculate the view to sky value
                     Dummy1 = Vheight + (Elev - node.Elevation)
                     Dummy2 = IniParams["transsample"] * (j + 0.5) - Overhang  #This is "+ 0.5" because j starts at 0.
-                    #TODO: The following seems to be already in degrees, so why are we multiplying by 180/pi
-                    LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)
+                    LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)  #TODO: do we really want to multiply by Vdens?
                     if not j or LC_Angle_Max < LC_Angle:
                         LC_Angle_Max = LC_Angle
                     if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
                     rip += RE,
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
             node.ViewToSky = 1 - VTS_Total / (7 * 90)
+            #print node, node.ViewToSky, VTS_Total
     def BuildZonesLidar(self):
         """Build zones if we are using LiDAR data"""
 
