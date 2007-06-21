@@ -21,7 +21,7 @@ time1 = datetime.today()
 # Create a Chronos iterator that controls all model time
 dt = timedelta(seconds=60)
 start = IniParams["date"]
-stop = start + timedelta(days=4)
+stop = start + timedelta(days=20)
 spin = 0 #IniParams["flushdays"] # Spin up period
 # Other classes hold references to the instance, but only we should Start() it.
 Chronos.Start(start, dt, stop, spin)

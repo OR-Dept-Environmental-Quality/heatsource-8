@@ -487,7 +487,6 @@ class HeatSourceInterface(XLRDobject):
         node.T_sed = self.T_bc[mindate]
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
-        node.T_alluv = IniParams["alluviumtemp"]
-        node.calcevap = IniParams["calcevap"]
+        node.T_alluv = IniParams["alluviumtemp"] if IniParams["calcalluvium"] else 0.0
 
         node.SetBankfullMorphology()
