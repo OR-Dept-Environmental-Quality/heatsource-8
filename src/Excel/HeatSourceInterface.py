@@ -327,21 +327,25 @@ class HeatSourceInterface(XLRDobject):
             setattr(node,k,v.pop(0))
         node.Q_bc = self.Q_bc
         node.T_bc = self.T_bc
-        node.dx = IniParams["dx"]
+        node.C_bc = self.C_bc
         self.InitializeNode(node)
+        node.dx = IniParams["longsample"]
         self.Reach[node.km] = node
 
-        for i in range(0, int((self.Num_Q_Var-1)/self.multiple)):
+        #Figure out how many nodes we should have downstream. We use math.ceil() because
+        # if we end up with a fraction, that means that there's a node at the end that
+        # is not a perfect multiple of the sample distance.
+        num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
+        for i in range(0, num_nodes):
             node = StreamNode()
             for k,v in data.iteritems():
                 setattr(node,k,v[i])
             self.InitializeNode(node)
             self.Reach[node.km] = node
             self.PB("Building Stream Nodes", i, self.Num_Q_Var/self.multiple)
-        head = self.Reach[max(self.Reach.keys())]
-        head.Q_bc = self.Q_bc
-        head.T_bc = self.T_bc
-        head.C_bc = self.C_bc
+        mouth = self.Reach[min(self.Reach.keys())]
+        mouth_dx = (self.Num_Q_Var-1)%self.multiple # number of extra variables if we're not perfectly divisible
+        mouth.dx = IniParams["longsample"] * mouth_dx
 
     def BuildZonesNormal(self):
         LC = self.GetLandCoverCodes()
@@ -377,7 +381,7 @@ class HeatSourceInterface(XLRDobject):
                 node.VDensity = VD_iter.next()
                 node.Overhang = OH_iter.next()
         else:
-            raise Exception
+            print len(vheight[0]), len(self.Reach)
 
         topo_w = self.multiplier(self.GetColumn(4, "TTools Data", 5), average)
         topo_s = self.multiplier(self.GetColumn(5, "TTools Data", 5), average)
@@ -396,7 +400,7 @@ class HeatSourceInterface(XLRDobject):
                              0.5*(topo_s[h]+topo_w[h]),
                              topo_w[h],
                              topo_w[h])
-            
+
             for i in xrange(7):
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
@@ -409,7 +413,7 @@ class HeatSourceInterface(XLRDobject):
                     Vheight = vheight[i*4+j+1][h]
                     Vdens = vdensity[i*4+j+1][h]
                     Overhang = overhang[i*4+j+1][h]
-                    
+
                     # First, get the averages for each zone in each direction
                     if not j:
                         LC_Angle_Max = 0 # New value for each direction
@@ -472,8 +476,7 @@ class HeatSourceInterface(XLRDobject):
         ##############################################################
         #Now that we have a stream node, we set the node's dx value, because
         # we have most nodes that are long-sample-distance times multiple,
-
-        node.dx = IniParams["dx"] # Set the space-step
+        node.dx = IniParams["dx"] # Nodes distance step.
         node.dt = IniParams["dt"] # Set the node's timestep... this may have to be adjusted to comply with stability
         # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
         node.C_bc = self.C_bc

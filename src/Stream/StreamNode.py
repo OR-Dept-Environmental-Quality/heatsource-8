@@ -105,19 +105,6 @@ class StreamNode(StreamChannel):
                 k = "%i_%i_%s" %(i, j, attr)
                 attrDict[k] = getattr(zone, attr)
         return attrDict
-    def Initialize(self):
-        """Methods necessary to set initial conditions of the node"""
-        self.SetBankfullMorphology()
-        if IniParams["calcalluvium"]:
-            t_alluv = IniParams["alluviumtemp"]
-        else: t_alluv = 0.0
-        # Geographic parameters for the C module that do not change
-        self.C_geo = (self.Elevation, self.Latitude, self.Longitude, self.phi, self.VDensity,
-                      self.VHeight, self.ViewToSky, self.SedDepth, self.dx, self.dt, self.TopoFactor,
-                      self.SedThermCond, self.SedThermDiff, t_alluv)
-        # IniParams parameters for the C module that do not change
-        self.C_ini = (IniParams["transsample"], IniParams["emergent"], IniParams["penman"],
-                      IniParams["wind_a"],IniParams["wind_b"], IniParams["calcevap"])
 
     def CalcHydraulics(self, time, hour):
         # Convenience variables
@@ -161,15 +148,38 @@ class StreamNode(StreamChannel):
                     sys.exit(1)
                 dlg.Destroy()
 
+    def Initialize(self):
+        """Methods necessary to set initial conditions of the node"""
+        self.SetBankfullMorphology()
+        if IniParams["calcalluvium"]:
+            t_alluv = IniParams["alluviumtemp"]
+        else: t_alluv = 0.0
+        # Geographic and initialization parameters for the C module that do not change
+                    #   22                23            24            25            26
+        self.C_geo = (self.Elevation, self.Latitude, self.Longitude, self.phi, self.VDensity,
+                    #    27            28            29              30       31        32
+                      self.VHeight, self.ViewToSky, self.SedDepth, self.dx, self.dt, self.TopoFactor,
+                    #      33                 34                35
+                      self.SedThermCond, self.SedThermDiff, t_alluv,
+                    #    36                            37                    38
+                      IniParams["transsample"], IniParams["emergent"], IniParams["penman"],
+                    #    39                        40                41
+                      IniParams["wind_a"],IniParams["wind_b"], IniParams["calcevap"])
+
     def CalcHeat(self, hour, min, sec, time,JD,JDC,offset):
         Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
         # Arguments that are sent into the C module's flux calculations
-        C_args = ((hour, min, sec, offset, JDC, JD, Altitude, Zenith), # Time variables
-                  (self.C_bc[time], self.Humidity[time], self.T_air[time], self.Wind[time]), #Boundary Conditions
-                  (self.d_w, self.W_b, self.W_w, self.P_w), # Channel Characteristics
-                  self.C_geo, self.C_ini, self.ShaderList[dir],
-                  (self.T_prev, self.T_sed, self.Q_hyp) # Temperature and Discharge values.
+                 #  0    1    2    3       4    5    6        7
+        C_args = (hour, min, sec, offset, JDC, JD, Altitude, Zenith, # Time variables
+                 #  8                    9                   10               11
+                  self.C_bc[time], self.Humidity[time], self.T_air[time], self.Wind[time], #Boundary Conditions
+                 #  12         13        14        15
+                  self.d_w, self.W_b, self.W_w, self.P_w, # Channel Characteristics
+                 #   19           20            21
+                  self.T_prev, self.T_sed, self.Q_hyp # Temperature and Discharge values.
                   )
+        C_args += self.C_geo # Add elements 22-41
+        C_args += self.ShaderList[dir] # add elements 42-46
 
         ############################################
         ## Solar Flux Calculation, C-style
@@ -182,7 +192,7 @@ class StreamNode(StreamChannel):
         else:
             self.F_Solar = [0]*8
             if hour == 1: self.F_DailySum = [0]*5   #reset for the new day
-        C_args += (self.F_Solar[5], self.F_Solar[7]),
+        C_args += self.F_Solar[5], self.F_Solar[7], # Elements 47 and 48
 
 
 #        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = self.CalcGroundFluxes(*C_args)

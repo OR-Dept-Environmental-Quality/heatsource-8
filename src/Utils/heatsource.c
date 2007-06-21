@@ -239,45 +239,38 @@ static char heatsource_CalcSolarFlux__doc__[] =
 static PyObject *
 heatsource_CalcSolarFlux(PyObject *self, PyObject *args)
 {
-	PyObject *Time = PyTuple_GetItem(args,0);
-	PyObject *BC = PyTuple_GetItem(args,1);
-	PyObject *Channel = PyTuple_GetItem(args,2);
-	PyObject *Geo = PyTuple_GetItem(args,3);
-	PyObject *Ini = PyTuple_GetItem(args,4);
-	PyObject *ShaderList = PyTuple_GetItem(args,5);
-
-	//////////////////////////
-	// Cloud cover
-	double cloud = PyFloat_AsDouble(PyTuple_GetItem(BC,0)); // fractional cloud cover
 	//////////////////////////
 	// Solar variables
-	long JD = PyInt_AsLong(PyTuple_GetItem(Time,5)); // Julian date
-	long hour = PyInt_AsLong(PyTuple_GetItem(Time,0)); // integer hour
-	double Altitude = PyFloat_AsDouble(PyTuple_GetItem(Time,6)); // Solar altitude
-	double Zenith = PyFloat_AsDouble(PyTuple_GetItem(Time,7)); // Solar zenith
-	///////////////////////////
-	// Topographic Information
-	double Elevation = PyFloat_AsDouble(PyTuple_GetItem(Geo,0)); // Node Elevation
-	double TopoFactor = PyFloat_AsDouble(PyTuple_GetItem(Geo,10)); // topographic adjustment factor ?
-	double ViewToSky = PyFloat_AsDouble(PyTuple_GetItem(Geo,6)); // Angle of open sky ?
-	double SampleDist = PyFloat_AsDouble(PyTuple_GetItem(Ini,0)); // Transverse sample distance of zones
+	long hour = PyInt_AsLong(PyTuple_GetItem(args,0)); // integer hour
+	long JD = PyInt_AsLong(PyTuple_GetItem(args,5)); // Julian date
+	double Altitude = PyFloat_AsDouble(PyTuple_GetItem(args,6)); // Solar altitude
+	double Zenith = PyFloat_AsDouble(PyTuple_GetItem(args,7)); // Solar zenith
+	//////////////////////////
+	// Cloud cover
+	double cloud = PyFloat_AsDouble(PyTuple_GetItem(args,8)); // fractional cloud cover
 	///////////////////////////
 	// Channel geometry
-	double d_w = PyFloat_AsDouble(PyTuple_GetItem(Channel,0)); // wetted depth
-	double W_b = PyFloat_AsDouble(PyTuple_GetItem(Channel,1)); // bottom width
-	double phi = PyFloat_AsDouble(PyTuple_GetItem(Geo,3)); // bed porosity
+	double d_w = PyFloat_AsDouble(PyTuple_GetItem(args,12)); // wetted depth
+	double W_b = PyFloat_AsDouble(PyTuple_GetItem(args,13)); // bottom width
+	///////////////////////////
+	// Topographic Information
+	double Elevation = PyFloat_AsDouble(PyTuple_GetItem(args,22)); // Node Elevation
+	double TopoFactor = PyFloat_AsDouble(PyTuple_GetItem(args,32)); // topographic adjustment factor ?
+	double ViewToSky = PyFloat_AsDouble(PyTuple_GetItem(args,28)); // Angle of open sky ?
+	double SampleDist = PyFloat_AsDouble(PyTuple_GetItem(args,36)); // Transverse sample distance of zones
+	double phi = PyFloat_AsDouble(PyTuple_GetItem(args,25)); // bed porosity
 	///////////////////////////
 	//  Emergent vegetation
-	double emergent = PyFloat_AsDouble(PyTuple_GetItem(Ini,1)); // Whether we model emergent vegetation
-	double VDensity = PyFloat_AsDouble(PyTuple_GetItem(Geo,4)); // vegetation density at node
-	double VHeight = PyFloat_AsDouble(PyTuple_GetItem(Geo,5));  // Vegetation height at node
+	double emergent = PyFloat_AsDouble(PyTuple_GetItem(args,37)); // Whether we model emergent vegetation
+	double VDensity = PyFloat_AsDouble(PyTuple_GetItem(args,26)); // vegetation density at node
+	double VHeight = PyFloat_AsDouble(PyTuple_GetItem(args,27));  // Vegetation height at node
 	///////////////////////////
 	// Shading information
-	double FullSunAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,0));   // Angle at which full sun hits stream
-	double TopoShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,1)); // Angle at which stream is shaded by distant topography
-	double BankShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,2)); // Angle at which stream is shaded by bank
-	PyObject *RipExtinction = PyTuple_GetItem(ShaderList,3); // 4 element tuple of extinction cooefficients by zone
-	PyObject *VegetationAngle = PyTuple_GetItem(ShaderList,4); // 4 element tuple of top-of-vegetation angles by zone
+	double FullSunAngle = PyFloat_AsDouble(PyTuple_GetItem(args,42));   // Angle at which full sun hits stream
+	double TopoShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(args,43)); // Angle at which stream is shaded by distant topography
+	double BankShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(args,44)); // Angle at which stream is shaded by bank
+	PyObject *RipExtinction = PyTuple_GetItem(args,45); // 4 element tuple of extinction cooefficients by zone
+	PyObject *VegetationAngle = PyTuple_GetItem(args,46); // 4 element tuple of top-of-vegetation angles by zone
 	double rip[4];
 	double veg[4];
 	int i;
@@ -507,50 +500,44 @@ static char heatsource_CalcGroundFluxes__doc__[] =
 static PyObject *
 heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 {
-	PyObject *BC = PyTuple_GetItem(args, 1);
-	PyObject *Channel = PyTuple_GetItem(args, 2);
-	PyObject *Geo = PyTuple_GetItem(args, 3);
-	PyObject *Ini = PyTuple_GetItem(args, 4);
-	PyObject *Temp = PyTuple_GetItem(args, 6);
-	PyObject *Solar = PyTuple_GetItem(args, 7);
 	////////////////////////////////////////////
 	// Boundary Conditions
-	float Cloud = PyFloat_AsDouble(PyTuple_GetItem(BC, 0));
-	float Humidity = PyFloat_AsDouble(PyTuple_GetItem(BC, 1));
-	float T_air = PyFloat_AsDouble(PyTuple_GetItem(BC, 2));
-	float Wind = PyFloat_AsDouble(PyTuple_GetItem(BC, 3));
+	float Cloud = PyFloat_AsDouble(PyTuple_GetItem(args, 8));
+	float Humidity = PyFloat_AsDouble(PyTuple_GetItem(args, 9));
+	float T_air = PyFloat_AsDouble(PyTuple_GetItem(args, 10));
+	float Wind = PyFloat_AsDouble(PyTuple_GetItem(args, 11));
 	////////////////////////////////////////////
-	// Geographic characteristics
-	float Elevation = PyFloat_AsDouble(PyTuple_GetItem(Geo, 0));
-	float phi = PyFloat_AsDouble(PyTuple_GetItem(Geo,3));
-	float VHeight = PyFloat_AsDouble(PyTuple_GetItem(Geo,5));
-	float ViewToSky = PyFloat_AsDouble(PyTuple_GetItem(Geo,6));
-	float SedDepth = PyFloat_AsDouble(PyTuple_GetItem(Geo, 7));
-	float dx = PyFloat_AsDouble(PyTuple_GetItem(Geo,8));
-	float dt = PyFloat_AsDouble(PyTuple_GetItem(Geo,9));
-	float SedThermCond = PyFloat_AsDouble(PyTuple_GetItem(Geo,11));
-	float SedThermDiff = PyFloat_AsDouble(PyTuple_GetItem(Geo,12));
-	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(Geo,13));
+	// argsgraphic characteristics
+	float Elevation = PyFloat_AsDouble(PyTuple_GetItem(args, 22));
+	float phi = PyFloat_AsDouble(PyTuple_GetItem(args,25));
+	float VHeight = PyFloat_AsDouble(PyTuple_GetItem(args,27));
+	float ViewToSky = PyFloat_AsDouble(PyTuple_GetItem(args,28));
+	float SedDepth = PyFloat_AsDouble(PyTuple_GetItem(args, 29));
+	float dx = PyFloat_AsDouble(PyTuple_GetItem(args,30));
+	float dt = PyFloat_AsDouble(PyTuple_GetItem(args,31));
+	float SedThermCond = PyFloat_AsDouble(PyTuple_GetItem(args,33));
+	float SedThermDiff = PyFloat_AsDouble(PyTuple_GetItem(args,34));
+	float FAlluvium = PyFloat_AsDouble(PyTuple_GetItem(args,35));
 	///////////////////////////////////////////
 	// Channel characteristics
-	float P_w = PyFloat_AsDouble(PyTuple_GetItem(Channel, 3));
-	float W_w = PyFloat_AsDouble(PyTuple_GetItem(Channel, 2));
+	float P_w = PyFloat_AsDouble(PyTuple_GetItem(args, 15));
+	float W_w = PyFloat_AsDouble(PyTuple_GetItem(args, 14));
 	////////////////////////////////////////////
 	// Initialization Params
-	float emergent = PyFloat_AsDouble(PyTuple_GetItem(Ini,1));
-	float penman = PyFloat_AsDouble(PyTuple_GetItem(Ini,2));
-	float wind_a = PyFloat_AsDouble(PyTuple_GetItem(Ini,3));
-	float wind_b = PyFloat_AsDouble(PyTuple_GetItem(Ini,4));
-	float calcevap = PyFloat_AsDouble(PyTuple_GetItem(Ini,5));
+	float emergent = PyFloat_AsDouble(PyTuple_GetItem(args,37));
+	float penman = PyFloat_AsDouble(PyTuple_GetItem(args,38));
+	float wind_a = PyFloat_AsDouble(PyTuple_GetItem(args,39));
+	float wind_b = PyFloat_AsDouble(PyTuple_GetItem(args,40));
+	float calcevap = PyFloat_AsDouble(PyTuple_GetItem(args,41));
 	/////////////////////////////////////////////
 	// Temperature
-	float T_prev = PyFloat_AsDouble(PyTuple_GetItem(Temp,0));
-	float T_sed = PyFloat_AsDouble(PyTuple_GetItem(Temp,1));
-	float Q_hyp = PyFloat_AsDouble(PyTuple_GetItem(Temp,2));
+	float T_prev = PyFloat_AsDouble(PyTuple_GetItem(args,19));
+	float T_sed = PyFloat_AsDouble(PyTuple_GetItem(args,20));
+	float Q_hyp = PyFloat_AsDouble(PyTuple_GetItem(args,21));
 	/////////////////////////////////////////////
 	// Solar fluxes
-	float F_Solar5 = PyFloat_AsDouble(PyTuple_GetItem(Solar,0));
-	float F_Solar7 = PyFloat_AsDouble(PyTuple_GetItem(Solar,1));
+	float F_Solar5 = PyFloat_AsDouble(PyTuple_GetItem(args,47));
+	float F_Solar7 = PyFloat_AsDouble(PyTuple_GetItem(args,48));
 	// End of incoming arguments
 	///////////////////////////////////////////////////////////////////
 	//#################################################################
