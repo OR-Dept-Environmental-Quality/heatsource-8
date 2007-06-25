@@ -12,17 +12,21 @@ from Utils.Output import Output as O
 
 from __version__ import version_info
 
-class Profile(object):
-    def __init__(self,sheet):
+class HSProfile(object):
+    def __init__(self,worksheet,run_type="HS"):
         self.ErrLog = Logger
-        self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
-        debugfile = join(sheet)
-        self.Reach = HeatSourceInterface(debugfile, self.ErrLog).Reach
+        f = open("C:\hserror.txt","w")
+        self.ErrLog.SetFile(f)#sys.stdout) # Set the logger to the stdout
+        self.Reach = HeatSourceInterface(join(worksheet), self.ErrLog).Reach
+        self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         ##########################################################
         # Create a Chronos iterator that controls all model time
-        dt = timedelta(seconds=60)
+        dt = timedelta(seconds=IniParams["dt"])
         start = IniParams["date"]
-        stop = start + timedelta(days=IniParams["simperiod"])
+        if self.run_type=="SH":
+            stop = start + timedelta(days=1)
+        else:
+            stop = start + timedelta(days=IniParams["simperiod"])
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start, dt, stop, spin)
@@ -51,21 +55,30 @@ class Profile(object):
             elif time.hour != solar_time.hour:
                 raise NotImplementedError("Not divisible by timestep")
 
+            if self.run_type=="HS":
+                [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
+                [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
+                [x.MacCormick2(solar_time) for x in self.reachlist]
+            elif self.run_type=="SH":
+                [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
+            elif self.run_type=="HY":
+                [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
+            else: raise Exception("Invalid run_type")
 
-            [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
-            [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
-
-            [x.MacCormick2(solar_time) for x in self.reachlist]
             self.Output.Store(time)
             for x in self.reachlist:
                 x.T_prev = x.T
                 x.T = None # This just ensures we don't accidentally use it until it's reset
             time = Chronos.Tick()
         self.ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)
-def Run(sheetname):
-    P = Profile(sheetname)
-    P.run()
-#    cProfile.run('P.run()')
+
+
+def RunHS(sheet): HSP = HSProfile(sheet).run()
+def RunSH(sheet): HSP = HSProfile(sheet,"SH").run()
+def RunHY(sheet): HSP = HSProfile(sheet,"HY").run()
+def Profile():
+    RunHS("C:\eclipse\HeatSource\HS8_Example_River.xls")
+#    cProfile.run('RunHS("C:\eclipse\HeatSource\HS8_Example_River.xls")')
 
 if __name__ == "__main__":
-    Run("C:\eclipse\HeatSource\HS8_Example_River.xls")
+    Profile()

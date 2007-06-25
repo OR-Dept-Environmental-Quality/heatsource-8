@@ -56,6 +56,7 @@ class HeatSourceInterface(XLRDobject):
         IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
         # Make the date a datetime instance
         IniParams["date"] = Chronos.MakeDatetime(self.GetDatetime(3,1,"Heat Source Inputs"),IniParams["timezone"])
+        IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
         ######################################################
 
         # Page names- maybe a useless tuple, we'll see

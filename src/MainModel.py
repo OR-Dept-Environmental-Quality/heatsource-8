@@ -40,8 +40,8 @@ class MainModel(object):
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams["dt"])
-        start = Chronos.MakeDatetime(IniParams["Date"])+timedelta(hours=0,minutes=0)
-        stop = start + timedelta(days=IniParams["SimPeriod"])
+        start = IniParams["date"]
+        stop = start + timedelta(days=IniParams["simperiod"])
         spin = 0 # IniParams["FlushDays # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start-dt, dt, stop, spin)
@@ -52,8 +52,7 @@ class MainModel(object):
     def Run(self):
         self.Log("Starting")
         self.Reset()
-        self.timer.Start(100
-                         )
+        self.timer.Start(100)
 
     def TimeStep(self):
         try: #Wrap this in a try/except block to catch errors. Othewise, the model will continue running past them

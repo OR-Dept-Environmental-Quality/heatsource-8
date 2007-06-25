@@ -232,6 +232,37 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
     return Py_BuildValue("fffffff",D_est,A,Pw,Rh,Ww,U,Dispersion);
 }
 
+static char heatsource_CalcMuskingum__doc__[] =
+"Calculate the Muskingum coefficients for routing"
+;
+
+static PyObject *
+heatsource_CalcMuskingum(PyObject *self, PyObject *args)
+{
+	float Q_est, U, W_w, S, dx, dt;
+	if (!PyArg_ParseTuple(args, "ffffff", &Q_est, &U, &W_w, &S, &dx, &dt))
+		return NULL;
+    float c_k = (5.0/3.0) * U;  // Wave celerity
+    float X = 0.5 * (1.0 - Q_est / (W_w * S * dx * c_k));
+    if (X > 0.5) { X = 0.5; }
+    else if (X < 0.0) {	X = 0.0; }
+    float K = dx / c_k;
+
+    // Check the celerity to ensure stability. These tests are from the VB code.
+    if ((dt >= (2 * K * (1 - X))) || (dt > (dx/c_k)))  //Unstable - Decrease dt or increase dx
+        PyErr_SetString(HeatSourceError, "Unstable celerity. Decrease dt or increase dx");
+
+    // These calculations are from Chow's "Applied Hydrology"
+    float D = K * (1 - X) + 0.5 * dt;
+    float C1 = (0.5*dt - K * X) / D;
+    float C2 = (0.5*dt + K * X) / D;
+    float C3 = (K * (1 - X) - 0.5*dt) / D;
+    // TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
+    return Py_BuildValue("fff",C1, C2, C3);
+
+}
+
+
 static char heatsource_CalcSolarFlux__doc__[] =
 "Calculate the flux from incoming solar radiation."
 ;
@@ -528,6 +559,11 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
     //======================================================
     //Calculate the temperature of the substrate conduction layer
     float T_sed_new = T_sed + DT_Sed;
+    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // The above calculation is broken, this is a temporary hack
+    T_sed_new = 15.5;
+    if ((T_sed_new > 50.0f) || (T_sed_new < 0.0f))
+	  	PyErr_SetString(HeatSourceError, "Sediment temperature calculations causing an unstable model in CalcGroundFluxes()");
     // End Conduction Flux
 	//###########################################################################################
 	//##############################################################################
@@ -665,6 +701,7 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
 	{"GetStreamGeometry", (PyCFunction) heatsource_GetStreamGeometry, METH_VARARGS,  heatsource_GetStreamGeometry__doc__},
+	{"CalcMuskingum", (PyCFunction) heatsource_CalcMuskingum, METH_VARARGS,  heatsource_CalcMuskingum__doc__},
 	{"CalcSolarFlux", (PyCFunction) heatsource_CalcSolarFlux, METH_VARARGS,  heatsource_CalcSolarFlux__doc__},
 	{"CalcGroundFluxes", (PyCFunction) heatsource_CalcGroundFluxes, METH_VARARGS,  heatsource_CalcGroundFluxes__doc__},
 	{"CalcMacCormick", (PyCFunction) heatsource_CalcMacCormick, METH_VARARGS,  heatsource_CalcMacCormick__doc__},
@@ -690,7 +727,7 @@ initheatsource()
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
-	HeatSourceError = PyString_FromString("HeatSourceError");
+	HeatSourceError = PyString_FromString("HeatSource Error");
 	Py_INCREF(HeatSourceError);
 	PyDict_SetItemString(d, "heatsource.error", HeatSourceError);
 

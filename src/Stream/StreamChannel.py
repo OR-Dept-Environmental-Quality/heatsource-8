@@ -65,6 +65,7 @@ class StreamChannel(object):
         self.CalcSolarFlux = Utils.heatsource.CalcSolarFlux
         self.CalcGroundFluxes = Utils.heatsource.CalcGroundFluxes
         self.GetStreamGeometry = Utils.heatsource.GetStreamGeometry
+        self.GetMuskingum = Utils.heatsource.CalcMuskingum
 
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
@@ -87,14 +88,9 @@ class StreamChannel(object):
 
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
-        # (t, x-1) = flow from the upstream channel at this timestep
-        #Q1 = self.prev_km.Q + self.GetInputs(hour)
-        # (t-1, x-1) = flow from the upstream channel's previous timestep.
         Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
-        # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep
-        # because we have not yet assigned a new value for this timesetp)
-        #Q3 = self.Q
-        C1,C2,C3 = self.GetMuskingum(Q2)
+
+        C1,C2,C3 = self.GetMuskingum(Q2, self.U, self.W_w, self.S, self.dx, self.dt)
         # Calculate the new Q
         Q = C1*(self.prev_km.Q + self.GetInputs(hour)) + C2*Q2 + C3*self.Q
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
@@ -147,7 +143,7 @@ class StreamChannel(object):
             Q3 = self.Q
 
             # Use (t,x-1) to calculate the Muskingum coefficients
-            C1,C2,C3 = self.GetMuskingum(Q2)
+            C1,C2,C3 = self.GetMuskingum(Q2, self.U, self.W_w, self.S, self.dx, self.dt)
             # Calculate the new Q
             Q = C1*Q1 + C2*Q2 + C3*Q3
             # If we hit this once, we remap so we can avoid the if statements in the future.
@@ -191,22 +187,20 @@ class StreamChannel(object):
         #return dt
         pass
 
-    def GetMuskingum(self,Q_est):
+    def GetMuskingum_THW(self, Q_est):
         """Return the values for the Muskigum routing coefficients
         using current timestep and optional discharge"""
         #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
         # Taken from the VB source.
         c_k = (5/3) * self.U  # Wave celerity
-        X = 0.5 * (1 - self.Q / (self.W_w * self.S * self.dx * c_k))
+        X = 0.5 * (1 - Q_est / (self.W_w * self.S * self.dx * c_k))
         if X > 0.5: X = 0.5
         elif X < 0.0: X = 0.0
         K = self.dx / c_k
-#        test0 = 2 * K * X
         dt = self.dt
 
         # Check the celerity to ensure stability. These tests are from the VB code.
         if dt >= (2 * K * (1 - X)) or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
-            print self.W_w, self.Q
             raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
 
         # These calculations are from Chow's "Applied Hydrology"
