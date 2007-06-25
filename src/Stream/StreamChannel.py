@@ -156,10 +156,13 @@ class StreamChannel(object):
             # At spatial boundaries, we return the boundary conditions from Q_bc
             Q = self.Q_bc[hour]
             self.CalculateDischarge = self.CalcDischarge_BoundaryNode
+            self.MacCormick = self.MacCormick_BoundaryNode # We're a boundary node, so go ahead and reset MacCormick.
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
             Q = self.prev_km.Q_prev + self.GetInputs(hour) # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
+            self.MacCormick = Utils.heatsource.CalcMacCormick # We're not a boundary node, so reset MacCormick.
+
         else: raise Exception("WTF?")
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.

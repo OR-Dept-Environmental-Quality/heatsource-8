@@ -184,6 +184,18 @@ class HeatSourceInterface(XLRDobject):
                 except KeyError:
                     node.Q_tribs[timelist[hour]] = flow_col[3+hour]
                     node.T_tribs[timelist[hour]] = temp_col[3+hour]
+        # Here, we set the Q_tribs list to zeros if it's not listed above. This way
+        # We don't have to do an if statement later.
+        for key in l:
+            node = self.Reach[key]
+            for hour in xrange(self.Hours):
+                try:
+                    test = node.Q_tribs[timelist[hour]]
+                    test = node.T_tribs[timelist[hour]]
+                except KeyError:
+                    node.Q_tribs[timelist[hour]] = 0.0
+                    node.T_tribs[timelist[hour]] = 0.0
+
             self.PB("Reading Inflow data", site, IniParams["inflowsites"])
 
     def GetContinuousData(self):
@@ -368,18 +380,14 @@ class HeatSourceInterface(XLRDobject):
             overhang.append(self.multiplier([LC[x][2] for x in col], average))
             if i>7:  #We don't want to read in column AJ
                 elevation.append(self.multiplier(elev, average))
-        VH_iter = chain(*vheight)
-        VD_iter = chain(*vdensity)
-        OH_iter = chain(*overhang)
-        EL_iter = chain(*elevation)
         # We have to set the emergent vegetation, so we strip those off of the iterator
         # before we record the zones.
         if len(self.Reach) == len(vheight[0]):
             for i in xrange(len(keys)):
                 node = self.Reach[keys[i]]
-                node.VHeight = VH_iter.next()
-                node.VDensity = VD_iter.next()
-                node.Overhang = OH_iter.next()
+                node.VHeight = vheight[0][i]
+                node.VDensity = vdensity[0][i]
+                node.Overhang = overhang[0][i]
         else:
             print len(vheight[0]), len(self.Reach)
 
@@ -406,13 +414,10 @@ class HeatSourceInterface(XLRDobject):
                 T_None = () # Highest angle necessary for full shade
                 rip = ()
                 for j in xrange(4):
-                    #Overhang = OH_iter.next()
-                    #Vheight = VH_iter.next()
-                    #Vdens = VD_iter.next()
-                    #Elev = EL_iter.next()
                     Vheight = vheight[i*4+j+1][h]
                     Vdens = vdensity[i*4+j+1][h]
                     Overhang = overhang[i*4+j+1][h]
+                    Elev = elevation[i*4+j][h]
 
                     # First, get the averages for each zone in each direction
                     if not j:
@@ -421,7 +426,6 @@ class HeatSourceInterface(XLRDobject):
                         Overhang = 0
                     ##########################################################
                     # Calculate the relative ground elev:
-                    Elev = elevation[i*4+j][h]
                     SH = Elev - node.Elevation
                     # Then calculate the relative vegetation height:
                     VH = Vheight + SH

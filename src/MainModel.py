@@ -21,8 +21,8 @@ class MainModel(object):
         self.Log = log
         self.filename = filename
 
-    def __del__(self):
-        DPlot.Destroy()
+#    def __del__(self):
+#        DPlot.Destroy()
 
     def Initialize(self):
         self.Log("Initializing Model")
@@ -52,7 +52,8 @@ class MainModel(object):
     def Run(self):
         self.Log("Starting")
         self.Reset()
-        self.timer.Start(100)
+        self.timer.Start(100
+                         )
 
     def TimeStep(self):
         try: #Wrap this in a try/except block to catch errors. Othewise, the model will continue running past them

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import time
 from Dieties.IniParams import IniParams
 from os import path
+import os
 
 
 class Output(object):
@@ -35,6 +36,8 @@ class Output(object):
                     }
 
         for key in self.files.iterkeys():
+            if not os.path.exists(path.join(IniParams["outputdir"])):
+                os.makedirs(path.join(IniParams["outputdir"]))
             self.files[key][0] = open(path.join(IniParams["outputdir"], key), 'w')
             self.files[key][0].write("Heat Source Hourly Output File:  ")
             self.files[key][0].write(self.files[key][1])
@@ -82,8 +85,13 @@ class Output(object):
             self.write_time += self.dt_out
             if TheTime.hour > self.write_time.hour:  #new day, print daily outputs
                 for node in sorted(self.reach.itervalues(),reverse=True):
+                    # TODO: What are we trying to accomplish here?
+                    try:
+                        shade = (node.F_DailySum[1] - node.F_DailySum[4]) / node.F_DailySum[1]
+                    except ZeroDivisionError:
+                        shade = node.F_DailySum[4]
                     variables = {
-                        "Shade.txt": (node.F_DailySum[1] - node.F_DailySum[4]) / node.F_DailySum[1],
+                        "Shade.txt": shade,
                         "VTS.txt": node.ViewToSky
                     }
                     self.append(TheTime, variables, node)
