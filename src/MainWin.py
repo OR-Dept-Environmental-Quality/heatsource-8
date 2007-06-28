@@ -125,7 +125,7 @@ class HSFrame(sc.SizedFrame):
         self.LastLog = ""
         self.Log("HeatSource System started")
         self.FileName = None
-
+        self.run_type = "HS"
         ################################
         ## debugging conveniences
 #       self.FileName = "D:\\dan\\heatsource tests\\HS7_Jackson_CCC.xls"
@@ -151,12 +151,9 @@ class HSFrame(sc.SizedFrame):
 
     def OnStartStop(self,evt):
         if self.Switch(): #Switch model on (GUI and timers)
-            try:
-                self.Model.Run()
-                self.Switch()
-                return
-            except:
-                raise
+            self.IsRunning = not self.Model.Run()
+            self.Switch()
+            return
         else:
             self.Model.Stop()
             del self.Model
@@ -164,7 +161,7 @@ class HSFrame(sc.SizedFrame):
     def OnLoadFile(self,evt):
         if not self.FileName: return
         self.StartStop.Enable(True)
-        self.Model = MainModel(self.FileName,self.Log)
+        self.Model = MainModel(self.FileName,self.Log,self.run_type)
         self.Model.Initialize()
         self.StartStop.SetBackgroundColour("Green")
         self.StartStop.SetLabel("Start Model")

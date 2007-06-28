@@ -17,24 +17,17 @@ class TimeStepper(wx.Timer):
         self.cb()
 
 class MainModel(object):
-    def __init__(self, filename,log):
+    def __init__(self, filename,log,run_type="HS"):
         self.Log = log
         self.filename = filename
-
-#    def __del__(self):
-#        DPlot.Destroy()
+        self.run_type = run_type
 
     def Initialize(self):
         self.Log("Initializing Model")
         self.Reach = HeatSourceInterface(self.filename,gauge=self.Log).Reach
         self.Log("Initialization Complete, %i stream nodes built"% len(self.Reach))
-#        self.DPlot = DynaPlot()
-#        self.PlotAttr = "Q" # Attribute to plot at the reach level
-#        self.X = [n.km for n in self.Reach]
-#        self.Y = [0 for i in xrange(len(self.Reach))]
-#        self.DPlot.Show()
-#        self.DPlot.Initialize(self.X, self.Y)
-        self.timer = TimeStepper(self.TimeStep)
+#        self.timer = TimeStepper(self.TimeStep)
+        self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
 
     def Reset(self):
         ##########################################################
@@ -44,33 +37,53 @@ class MainModel(object):
         stop = start + timedelta(days=IniParams["simperiod"])
         spin = 0 # IniParams["FlushDays # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
-        Chronos.Start(start-dt, dt, stop, spin)
+        Chronos.Start(start, dt, stop, spin)
         ##########################################################
         dt_out = timedelta(minutes=60)
         self.Output = Output(dt_out, self.Reach, start)
 
     def Run(self):
-        self.Log("Starting")
+#        self.Log("Starting")
         self.Reset()
-        self.timer.Start(100)
+        self.time1 = datetime.today()
+        self.time = Chronos.TheTime
+        self.stop = Chronos.stop
+#        self.timer.Start(100)
 
-    def TimeStep(self):
-        try: #Wrap this in a try/except block to catch errors. Othewise, the model will continue running past them
-#            del self.Y[:]
-            # Calculate the hydraulics
-            [x.CalcHydraulics() for x in self.Reach]
-#            [self.Y.append(getattr(node,self.PlotAttr)) for node in self.Reach]
-            # Calculate the solar flux
-            [x.CalcHeat() for x in self.Reach]
-#            self.DPlot.onTimer(False)
-            [x.MacCormick2() for x in self.Reach]
-            self.Output.Store(Chronos.TheTime)
-            print Chronos.Tick()
-            return True
-        except:
-            self.Stop()
-            raise
+#    def TimeStep(self):
+        tm = self.time
+#        try: #Wrap this in a try/except block to catch errors. Othewise, the model will continue running past them
+        while self.time < Chronos.stop:
+            JD = Chronos.JDay
+            JDC = Chronos.JDC
+            offset = Chronos.TZOffset(self.time)
+            if not tm.minute and not tm.second:  #TODO: Would this work if an hour is not divisable by our timestep?
+                self.hydro_time = tm
+                self.solar_time = tm
+                for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
+                if self.solar_time < Chronos.start:
+                    self.hydro_time = Chronos.start
+                    self.solar_time += timedelta(days=Chronos.start.day-self.solar_time.day)
+            elif tm.hour != self.solar_time.hour:
+                raise NotImplementedError("Not divisible by timestep")
+
+            if self.run_type=="HS":
+                [x.CalcHydraulics(tm,self.hydro_time) for x in self.reachlist]
+                [x.CalcHeat(tm.hour, tm.minute, tm.second,self.solar_time,JD,JDC,offset) for x in self.reachlist]
+                [x.MacCormick2(self.solar_time) for x in self.reachlist]
+            elif self.run_type=="SH":
+                [x.CalcHeat(tm.hour, tm.minute, tm.second,self.solar_time,JD,JDC,offset) for x in self.reachlist]
+            elif self.run_type=="HY":
+                [x.CalcHydraulics(tm,self.hydro_time) for x in self.reachlist]
+            else: raise Exception("Invalid run_type")
+
+            self.Output.Store(tm)
+            self.time = Chronos.Tick()
+            print self.time
+        return True
+#        except:
+#            self.Stop()
+#            raise
 
     def Stop(self):
         self.timer.Stop()
-#        self.DPlot.Destroy()

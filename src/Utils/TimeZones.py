@@ -96,7 +96,7 @@ DSTEND = datetime(1, 11, 1, 1)
 
 class USTimeZone(tzinfo):
 
-    def __init__(self, hours, reprname, stdname, dstname):
+    def __init__(self, hours, reprname, stdname, dstname, stdtime=True):
         self.stdoffset = timedelta(hours=hours)
         self.reprname = reprname
         self.stdname = stdname

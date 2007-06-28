@@ -20,11 +20,8 @@ class ExcelDocument(object):
     Some convenience methods for Excel documents accessed
     through COM.
     """
-    def __init__(self, visible=False):
+    def __init__(self):
         self.app = Dispatch("Excel.Application")
-        try:
-            self.app.Visible = visible
-        except: pass
         self.sheet = 1
 
     def __del__(self):

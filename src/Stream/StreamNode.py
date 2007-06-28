@@ -12,8 +12,7 @@ class StreamNode(StreamChannel):
     def __init__(self, **kwargs):
         StreamChannel.__init__(self)
         # Define members in __slots__ to ensure that later member names cannot be added accidentally
-        s = ["Embeddedness", "Conductivity", "ParticleSize", # From Morphology Data sheet
-             "Latitude", "Longitude", "Elevation", # Geographic params
+        s = ["Latitude", "Longitude", "Elevation", # Geographic params
              "FLIR_Temp", "FLIR_Time", # FLIR data
              "T_cont", "T_sed", "T_in", "T_tribs", # Temperature attrs
              "VHeight", "VDensity", #Vegetation params
@@ -37,8 +36,10 @@ class StreamNode(StreamChannel):
             setattr(self, attr, {})
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
         # and other things the C module needs
+        for attr in ["F_Conduction","F_Convection","F_Longwave","F_Evaporation"]:
+            setattr(self, attr, 0)
+        self.F_Solar = [0]*8
         self.F_DailySum = [0]*5
-        #TODO: Cleanup this flux dictionary
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
@@ -132,6 +133,11 @@ class StreamNode(StreamChannel):
         """Methods necessary to set initial conditions of the node"""
         self.SetBankfullMorphology()
     def CalcHeat(self, hour, min, sec, time,JD,JDC,offset):
+        # Reset temperatures
+        self.T_prev = self.T
+        self.T = None
+
+        # Calculate solar position (C module)
         Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
 
         # Set some local variables if they're used more than once

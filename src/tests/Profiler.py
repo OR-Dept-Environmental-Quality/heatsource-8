@@ -1,8 +1,9 @@
 from __future__ import division
 
-import cProfile, sys, time
+import cProfile, sys, time, traceback
 from os.path import join
 from datetime import datetime, timedelta
+from win32com.client import Dispatch
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties.Chronos import Chronos
@@ -15,8 +16,7 @@ from __version__ import version_info
 class HSProfile(object):
     def __init__(self,worksheet,run_type="HS"):
         self.ErrLog = Logger
-        f = open("C:\hserror.txt","w")
-        self.ErrLog.SetFile(f)#sys.stdout) # Set the logger to the stdout
+        self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
         self.Reach = HeatSourceInterface(join(worksheet), self.ErrLog).Reach
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         ##########################################################
@@ -45,7 +45,7 @@ class HSProfile(object):
             JD = Chronos.JDay
             JDC = Chronos.JDC
             offset = Chronos.TZOffset(time)
-            if not time.minute or time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
+            if not time.minute and not time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
                 hydro_time = time
                 solar_time = time
                 for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
@@ -66,18 +66,24 @@ class HSProfile(object):
             else: raise Exception("Invalid run_type")
 
             self.Output.Store(time)
-            for x in self.reachlist:
-                x.T_prev = x.T
-                x.T = None # This just ensures we don't accidentally use it until it's reset
             time = Chronos.Tick()
         self.ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)
 
-
-def RunHS(sheet): HSP = HSProfile(sheet).run()
+def RunHS(sheet,changes):
+    app = Dispatch("Excel.Application")
+    f = open("C:\HSError.txt","w")
+    try:
+        f.write(sheet+"\n")
+        f.write(`changes`+"\n")
+    except Exception, err:
+        traceback.print_exc(file=f)
+        f.close()
+        raise
+#    HSP = HSProfile(sheet).run()
 def RunSH(sheet): HSP = HSProfile(sheet,"SH").run()
 def RunHY(sheet): HSP = HSProfile(sheet,"HY").run()
 def Profile():
-    RunHS("C:\eclipse\HeatSource\HS8_Example_River.xls")
+    HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
 #    cProfile.run('RunHS("C:\eclipse\HeatSource\HS8_Example_River.xls")')
 
 if __name__ == "__main__":
