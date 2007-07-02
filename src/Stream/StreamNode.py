@@ -178,7 +178,7 @@ class StreamNode(StreamChannel):
 
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
-
+        print "test"
         # If we're a boundary node, we don't calculate MacCormick1, so get out quickly
         if not self.prev_km:
             self.T = self.T_bc[time]
@@ -459,7 +459,15 @@ class StreamNode(StreamChannel):
         return F_Solar
     def GroundFlux_THW(self, hour):
 
-        SedRhoCp = self.SedThermCond / (self.SedThermDiff/1000)   # Sed density * sed heat capacity (J / m3 / *C)
+        #SedThermCond units of W/(m *C)
+        #SedThermDiff units of cm^2/sec
+
+        self.SedThermDiff = self.SedThermDiff / 10000  #convert units to m^2/sec
+
+        SedRhoCp = self.SedThermCond / self.SedThermDiff
+        #NOTE: SedRhoCp is the product of sediment density and heat capacity
+        #since thermal conductivity is defined as density * heat capacity * diffusivity,
+        #therefore (density * heat capacity) = (conductivity / diffusivity)  units of (J / m3 / *C)
 
         #Water Variable
         rhow = 1000                             #density of water kg / m3
@@ -470,12 +478,12 @@ class StreamNode(StreamChannel):
 
         #Calculate the conduction flux between deeper alluvium & substrate
         if IniParams["calcalluvium"]:
-            Flux_Conduction_Alluvium = self.SedThermDiff * SedRhoCp * (self.T_sed - self.T_alluv) / (self.SedDepth / 2)
+            Flux_Conduction_Alluvium = self.SedThermCond * (self.T_sed - self.T_alluv) / (self.SedDepth / 2)
         else:
             Flux_Conduction_Alluvium = 0
 
         #Hyporheic flux (negative is heat into sediment)
-        F_hyp = self.Q_hyp * rhow * H2O_HeatCapacity * (self.T_sed - self.T_prev) / (self.P_w * self.dx)
+        F_hyp = self.Q_hyp * rhow * H2O_HeatCapacity * (self.T_sed - self.T_prev) / (self.W_w * self.dx)
 
         NetFlux_Sed = self.F_Solar[7] - F_Cond - Flux_Conduction_Alluvium - F_hyp
 
