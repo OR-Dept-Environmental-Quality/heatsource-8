@@ -471,7 +471,6 @@ class HeatSourceInterface(ExcelDocument):
         node.T = self.T_bc[mindate]
         node.T_prev = self.T_bc[mindate]
         node.T_sed = self.T_bc[mindate]
-        print node, node.T, node.T_prev, node.T_sed, mindate
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
         node.T_alluv = IniParams["alluviumtemp"] if IniParams["calcalluvium"] else 0.0
