@@ -122,14 +122,15 @@ class HeatSourceInterface(ExcelDocument):
         dt = IniParams["dt"]
         col = 6
         row = 4
-        flow_col = self.GetColumn(col,"Continuous Data")
-        temp_col = self.GetColumn(col+1,"Continuous Data")
-        cloud_col = self.GetColumn(col+2,"Continuous Data")
+        endcol,endrow = self.UsedRange("Continuous Data")
+        data = self.GetValue((5,5,endrow,8),"Continuous Data")
+        time_col = [x[0] for x in data]
+        flow_col = [x[1] for x in data]
+        temp_col = [x[2] for x in data]
+        cloud_col = [x[3] for x in data]
 
         for I in xrange(self.Hours):
-            # Here,
-            tm = self.GetValue((I+row+1,col-1),"Continuous Data")
-            time = C.MakeDatetime(tm)
+            time = C.MakeDatetime(time_col[I])
             # Get the flow boundary condition
             val = flow_col[row + I]
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
@@ -337,7 +338,7 @@ class HeatSourceInterface(ExcelDocument):
             self.Reach[node.km] = node
             self.PB("Building Stream Nodes", i, self.Num_Q_Var/self.multiple)
         mouth = self.Reach[min(self.Reach.keys())]
-        mouth_dx = (self.Num_Q_Var-1)%self.multiple # number of extra variables if we're not perfectly divisible
+        mouth_dx = (self.Num_Q_Var-1)%self.multiple or 1 # number of extra variables if we're not perfectly divisible
         mouth.dx = IniParams["longsample"] * mouth_dx
 
     def BuildZonesNormal(self):

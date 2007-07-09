@@ -62,6 +62,10 @@ class Output(object):
             return
         elif TheTime >= self.write_time:
             for node in sorted(self.reach.itervalues(),reverse=True):
+                try:
+                    test =  node.E / node.dx / node.W_w * 3600 * 1000,  #TODO: Check
+                except:
+                    test = 9999
                 variables = {
                     "Heat_Cond.txt": node.F_Conduction,
                     "Heat_Conv.txt": node.F_Convection,
@@ -77,7 +81,7 @@ class Output(object):
                     "Hyd_Hyp.txt": node.Q_hyp,
                     "Hyd_Vel.txt": node.U,
                     "Hyd_WT.txt": node.W_w,
-                    "Rate_Evap.txt": node.E / node.dx / node.W_w * 3600 * 1000,  #TODO: Check
+                    "Rate_Evap.txt": test, #TODO: Check
                     "Temp_H20.txt": node.T,
                     "Temp_Sed.txt": node.T_sed,
                 }

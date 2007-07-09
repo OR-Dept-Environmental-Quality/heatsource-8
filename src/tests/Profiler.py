@@ -68,7 +68,7 @@ class HSProfile(object):
 
             self.Output.Store(time)
             time = Chronos.Tick()
-            self.ErrLog.progress()
+            #self.ErrLog.progress()
         self.ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)
 
 def RunHS(sheet,changes): HSP = HSProfile(sheet).run()

@@ -107,6 +107,7 @@ class ExcelDocument(object):
         Get the value of 'cell'.
         """
         return self.GetRange(cell,sheet).Value
+    
     def UsedRange(self, sheet=None):
         """
         Return the used range of the data in the form of (endcol,endrow)
