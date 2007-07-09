@@ -71,7 +71,7 @@ class HSProfile(object):
             #self.ErrLog.progress()
         self.ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)
 
-def RunHS(sheet,changes): HSP = HSProfile(sheet).run()
+def RunHS(sheet): HSP = HSProfile(sheet).run()
 def RunSH(sheet): HSP = HSProfile(sheet,"SH").run()
 def RunHY(sheet): HSP = HSProfile(sheet,"HY").run()
 def Profile():
