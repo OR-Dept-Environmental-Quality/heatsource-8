@@ -37,6 +37,7 @@ class HSProfile(object):
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
 
     def run(self): # Argument allows profiling and testing
+        self.ErrLog("Starting..")
         time1 = datetime.today()
         time = Chronos.TheTime
         stop = Chronos.stop
@@ -67,24 +68,16 @@ class HSProfile(object):
 
             self.Output.Store(time)
             time = Chronos.Tick()
+            self.ErrLog.progress()
         self.ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)
 
-def RunHS(sheet,changes):
-    app = Dispatch("Excel.Application")
-    f = open("C:\HSError.txt","w")
-    try:
-        f.write(sheet+"\n")
-        f.write(`changes`+"\n")
-    except Exception, err:
-        traceback.print_exc(file=f)
-        f.close()
-        raise
-#    HSP = HSProfile(sheet).run()
+def RunHS(sheet,changes): HSP = HSProfile(sheet).run()
 def RunSH(sheet): HSP = HSProfile(sheet,"SH").run()
 def RunHY(sheet): HSP = HSProfile(sheet,"HY").run()
 def Profile():
     HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
-#    cProfile.run('RunHS("C:\eclipse\HeatSource\HS8_Example_River.xls")')
+    HSP.run()
+#    cProfile.run('HSP.run()')
 
 if __name__ == "__main__":
     Profile()

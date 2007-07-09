@@ -1,5 +1,6 @@
 from win32com.client import constants, Dispatch
 from pythoncom import CoInitialize,CoUninitialize
+from itertools import dropwhile
 import os
 
 borderTop = 3
@@ -20,12 +21,22 @@ class ExcelDocument(object):
     Some convenience methods for Excel documents accessed
     through COM.
     """
-    def __init__(self):
+    def __init__(self,filename):
+        # The following code assumes that there is an active workbook (i.e. that Excel is running
+        # and a workbook is open and active. This is because we should be calling this from the VB
+        # macro which would activate the Heat Source workbook. The reason we do not call Open(excelfile)
+        # is that we want to be able to catch unsaved changes, which is possible only if we catch
+        # a reference to the active workbook.
         self.app = Dispatch("Excel.Application")
-        self.sheet = 1
+        # If we don't have an active workbook, open one
+        if not self.app.ActiveWorkbook:
+            print "opening %s" % filename
+            self.Open(filename)
 
     def __del__(self):
-        self.app.Quit()
+        pass
+#        if self.app.Workbooks.Count == 1:
+#            self.app.Quit()
 
     def New(self, filename=None):
         """
@@ -53,6 +64,14 @@ class ExcelDocument(object):
         Return reference to the sheet
         """
         return self.app.ActiveWorkbook.Worksheets(sheet)
+
+    def GetColumn(self, col, sheet):
+        """
+        Return a column of data
+        """
+        strip = lambda x: x[0] if len(x) == 1 else x
+        lst = [strip(i) for i in self.GetValue((1,col,self.UsedRange(sheet)[1],col),sheet)]
+        return tuple(lst)
 
     def GetRange(self, range, sheet=None):
         """
@@ -87,8 +106,21 @@ class ExcelDocument(object):
         """
         Get the value of 'cell'.
         """
-        value = self.GetRange(cell,sheet).Value
-        return value
+        return self.GetRange(cell,sheet).Value
+    def UsedRange(self, sheet=None):
+        """
+        Return the used range of the data in the form of (endcol,endrow)
+        """
+        from pythoncom import Empty
+        rng = self.app.ActiveWorkbook.Sheets(sheet).UsedRange.Find(What=Empty,\
+                                                                   After=Empty,\
+                                                                   LookIn=constants.xlValues,\
+                                                                   LookAt=constants.xlWhole,\
+                                                                   SearchOrder=constants.xlByRows,\
+                                                                   SearchDirection=constants.xlPrevious,\
+                                                                   MatchCase=False, MatchByte=False,\
+                                                                   SearchFormat=Empty)
+        return (rng.Column,rng.Row)
 
     def Clear(self, cell, sheet=None):
         self.GetRange(cell,sheet).Clear()

@@ -12,5 +12,5 @@ class LoggerDiety(object):
             t = time.strftime("%H:%M:%S",time.localtime(time.time()))
             self._file.write("%s-> %s\n"% (t,message))
             self._last = message
-
+    def progress(self): self._file.write(".")
 Logger = LoggerDiety()

@@ -1,41 +1,24 @@
 from __future__ import division
 from itertools import imap, dropwhile
-import math, time, operator, bisect, xlrd
-from itertools import chain
+import math, time, operator, bisect
+from itertools import chain, ifilterfalse
 from datetime import datetime, timedelta
-from DataSheet import DataSheet
-from Stream.StreamNode import StreamNode
+from win32com.client import Dispatch
 
+from Stream.StreamNode import StreamNode
 from Stream.Zonator import Zonator
 from Dieties.IniParams import IniParams
 from Dieties.Chronos import Chronos
-
+from Excel.ExcelDocument import ExcelDocument
 #Flag_HS values:
 #    0: Flow Router
 #    1: Heat Source
 #    2: Shadelator
 
-class XLRDobject(object):
-    """Defines base functionality to use XLRD module to parse an excel file"""
-    def __init__(self, filename):
-        self._book = xlrd.open_workbook(filename)
-    def S(self, sheet): return self._book.sheets()[self._book.sheet_names().index(sheet)]
-    def Sheets(self): return self.__book.sheets()
-    def SheetNames(self): return self.__book.sheet_names()
-    def GetColumn(self, col, sheet, start=0, stop=None): return self.S(sheet).col_values(col,start,stop)
-    def GetRow(self, row, sheet, start=0, stop=None): return self.S(sheet).row_values(row,start,stop)
-    def GetColumnRaw(self, col, sheet): return self.S(sheet).col(col)
-    def GetRowRaw(self, row, sheet): return self.S(sheet).row(row)
-    def GetDatetime(self, row, col, sheet):
-        return datetime(*xlrd.xldate_as_tuple(self.S(sheet).cell_value(row,col),self._book.datemode))
-    def GetValue(self, row, col, sheet): return self.S(sheet).cell_value(row,col)
-
-class HeatSourceInterface(XLRDobject):
+class HeatSourceInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface"""
     def __init__(self, filename=None, gauge=None):
-        if not filename:
-            raise Warning("Need a model filename!")
-        XLRDobject.__init__(self, filename)
+        ExcelDocument.__init__(self, filename)
         self.Reach = {}
         # Build a quick progress bar
         self.PB = gauge
@@ -51,11 +34,12 @@ class HeatSourceInterface(XLRDobject):
                "contsites", "flushdays", "timezone", "simperiod","outputdir","evapmethod",
                "wind_a", "wind_b", "calcevap", "calcalluvium","alluviumtemp","emergent",
                 "lidar", "lcdensity","knob")
+        vals = [i[0] for i in self.GetValue("B3:B25","Heat Source Inputs")]
         for i in xrange(len(lst)):
-            IniParams[lst[i]] = self.GetValue(i+2,1,"Heat Source Inputs")
+            IniParams[lst[i]] = vals[i]
         IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
         # Make the date a datetime instance
-        IniParams["date"] = Chronos.MakeDatetime(self.GetDatetime(3,1,"Heat Source Inputs"),IniParams["timezone"])
+        IniParams["date"] = Chronos.MakeDatetime(IniParams["date"])
         IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
         ######################################################
 
@@ -84,7 +68,7 @@ class HeatSourceInterface(XLRDobject):
         # new DataSheet's __getitem__ functionality, we can merely access
         # the sheet once, and return the length of that tuple
         self.PB("Calculating the number of datapoints")
-        self.Num_Q_Var = len(self.GetColumn(2,"TTools Data")) - 5
+        self.Num_Q_Var = self.UsedRange("TTools Data")[1] - 5
 
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
@@ -144,7 +128,8 @@ class HeatSourceInterface(XLRDobject):
 
         for I in xrange(self.Hours):
             # Here,
-            time = C.MakeDatetime(self.GetDatetime(I+row,col-1,"Continuous Data"),IniParams["timezone"])
+            tm = self.GetValue((I+row+1,col-1),"Continuous Data")
+            time = C.MakeDatetime(tm)
             # Get the flow boundary condition
             val = flow_col[row + I]
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
@@ -163,21 +148,19 @@ class HeatSourceInterface(XLRDobject):
         # TimeList() instances
         l = self.Reach.keys()
         l.sort()
-        timelist = self.GetColumn(11,"Flow Data")
-        for i in xrange(3): timelist.pop(0)
+        timelist = [i for i in self.GetColumn(11,"Flow Data")[3:]]
         timelist.reverse()
         timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
         timelist.reverse()
-        makedate = lambda x: Chronos.MakeDatetime(xlrd.xldate_as_tuple(x,self._book.datemode), IniParams["timezone"])
-        timelist = [makedate(i) for i in timelist]
+        timelist = [Chronos.MakeDatetime(i) for i in timelist]
         for site in xrange(int(IniParams["inflowsites"])):
             # Get the stream node corresponding to the kilometer of this inflow site.
-            km = self.GetValue(site + 3, 9,"Flow Data")
+            km = self.GetValue((site + 4, 9),"Flow Data")
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
 
-            flow_col = self.GetColumn(12+site*2,"Flow Data")
-            temp_col = self.GetColumn(13+site*2,"Flow Data")
+            flow_col = self.GetColumn(12+site*2,"Flow Data")[3:]
+            temp_col = self.GetColumn(13+site*2,"Flow Data")[3:]
             for hour in xrange(self.Hours):
                 try:  #already a tributary, need to mass balance for T
                     node.T_tribs[timelist[hour]] = (temp_col[3+hour]*flow_col[3+hour] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + flow_col[3+hour])
@@ -204,20 +187,18 @@ class HeatSourceInterface(XLRDobject):
 
         l = self.Reach.keys()
         l.sort()
-        timelist = self.GetColumn(5,"Continuous Data")
-        for i in xrange(4): timelist.pop(0)
+        timelist = [i for i in self.GetColumn(5,"Continuous Data")[4:]]
         timelist.reverse()
         timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
         timelist.reverse()
-        makedate = lambda x: Chronos.MakeDatetime(xlrd.xldate_as_tuple(x,self._book.datemode), IniParams["timezone"])
-        timelist = [makedate(i) for i in timelist]
+        timelist = [Chronos.MakeDatetime(i) for i in timelist]
         for site in xrange(int(IniParams["contsites"])):
-            km = self.GetValue(site + 4, 3,"Continuous Data")
+            km = self.GetValue((site + 4, 3),"Continuous Data")
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
-            wind_col = self.GetColumn(10+site*4,"Continuous Data",4)
-            humid_col = self.GetColumn(11+site*4,"Continuous Data",4)
-            air_col = self.GetColumn(12+site*4,"Continuous Data",4)
+            wind_col = self.GetColumn(10+site*4,"Continuous Data")[4:]
+            humid_col = self.GetColumn(11+site*4,"Continuous Data")[4:]
+            air_col = self.GetColumn(12+site*4,"Continuous Data")[4:]
             for hour in xrange(self.Hours):
                 node.Wind[timelist[hour]] = wind_col[hour]
                 node.Humidity[timelist[hour]] = humid_col[hour]
@@ -292,7 +273,8 @@ class HeatSourceInterface(XLRDobject):
 
     def multiplier(self, iterable, predicate=lambda x:x):
         """Return an iterable that was run through the zipper and had predicate operated on each element of"""
-        return [predicate(x) for x in self.zipper(iterable,self.multiple)]
+        stripNone = lambda y: [i for i in ifilterfalse(lambda x: x is None, y)]
+        return [predicate(stripNone(x)) for x in self.zipper(iterable,self.multiple)]
 
     def zeroOutList(self, lst):
         """Replace blank values in a list with zeros"""
@@ -315,16 +297,14 @@ class HeatSourceInterface(XLRDobject):
         data = {}
         # Get all the columnar data from the sheets
         for i in xrange(len(ttools)):
-            data[ttools[i]] = self.GetColumn(1+i, "TTools Data", start=5)
+            data[ttools[i]] = self.GetColumn(1+i, "TTools Data")[5:]
         for i in xrange(len(morph)):
-            data[morph[i]] = self.GetColumn(2+i, "Morphology Data", start=5)
+            data[morph[i]] = self.GetColumn(2+i, "Morphology Data")[5:]
         for i in xrange(len(flow)):
-            data[flow[i]] = self.GetColumn(2+i, "Flow Data", start=3)
+            data[flow[i]] = self.GetColumn(2+i, "Flow Data")[3:]
         # Then sum and average things as appropriate
-        check = lambda x: 0 if not isinstance(x,float) or not isinstance(x,int) else x
-#        sum = lambda x: sum([check(i) for i in x])
         for attr in sums:
-            data[attr] = self.multiplier(data[attr],lambda x:min(x))
+            data[attr] = self.multiplier(data[attr],lambda x:sum(x))
         for attr in aves:
             data[attr] = self.multiplier(data[attr],lambda x:sum(x)/len(x))
         for attr in mins:
@@ -337,7 +317,7 @@ class HeatSourceInterface(XLRDobject):
         node = StreamNode()
 
         for k,v in data.iteritems():
-            setattr(node,k,v.pop(0))
+            setattr(node,k,v[0])
         node.Q_bc = self.Q_bc
         node.T_bc = self.T_bc
         node.C_bc = self.C_bc
@@ -351,8 +331,8 @@ class HeatSourceInterface(XLRDobject):
         num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
         for i in range(0, num_nodes):
             node = StreamNode()
-            for k,v in data.iteritems():
-                setattr(node,k,v[i])
+            for k,v in data.items():
+                setattr(node,k,v[i+1])# Add one to ignore boundary node
             self.InitializeNode(node)
             self.Reach[node.km] = node
             self.PB("Building Stream Nodes", i, self.Num_Q_Var/self.multiple)
@@ -372,8 +352,8 @@ class HeatSourceInterface(XLRDobject):
         keys.sort(reverse=True)
 
         for i in xrange(7, 36):
-            col = self.GetColumn(i, "TTools Data", 5)
-            elev = self.GetColumn(i+28,"TTools Data", 5)
+            col = self.GetColumn(i, "TTools Data")[5:]
+            elev = self.GetColumn(i+28,"TTools Data")[5:]
             # Make a list from the LC codes from the column, then send that to the multiplier
             # with a lambda function that averages them appropriately
             vheight.append(self.multiplier([LC[x][0] for x in col], average))
@@ -392,9 +372,9 @@ class HeatSourceInterface(XLRDobject):
         else:
             print len(vheight[0]), len(self.Reach)
 
-        topo_w = self.multiplier(self.GetColumn(4, "TTools Data", 5), average)
-        topo_s = self.multiplier(self.GetColumn(5, "TTools Data", 5), average)
-        topo_e = self.multiplier(self.GetColumn(6, "TTools Data", 5), average)
+        topo_w = self.multiplier(self.GetColumn(4, "TTools Data")[5:], average)
+        topo_s = self.multiplier(self.GetColumn(5, "TTools Data")[5:], average)
+        topo_e = self.multiplier(self.GetColumn(6, "TTools Data")[5:], average)
 
         for h in xrange(len(keys)):
             node = self.Reach[keys[h]]
@@ -465,10 +445,10 @@ class HeatSourceInterface(XLRDobject):
     def GetLandCoverCodes(self):
         """Return the codes from the Land Cover Codes worksheet as a dictionary of dictionaries"""
         # GetValue() returns a tuple, but we want a list because we have to reverse it
-        codes = self.GetColumn(1, "Land Cover Codes", 3)
-        height = self.GetColumn(2, "Land Cover Codes", 3)
-        dens = self.GetColumn(3, "Land Cover Codes", 3)
-        over = self.GetColumn(4, "Land Cover Codes", 3)
+        codes = self.GetColumn(1, "Land Cover Codes")[3:]
+        height = self.GetColumn(2, "Land Cover Codes")[3:]
+        dens = self.GetColumn(3, "Land Cover Codes")[3:]
+        over = self.GetColumn(4, "Land Cover Codes")[3:]
         vals = [[j for j in i] for i in zip(height,dens,over)]
         data = {}
         for i in xrange(len(codes)):
