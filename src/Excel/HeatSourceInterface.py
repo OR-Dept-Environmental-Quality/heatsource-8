@@ -132,15 +132,15 @@ class HeatSourceInterface(ExcelDocument):
         for I in xrange(self.Hours):
             time = C.MakeDatetime(time_col[I])
             # Get the flow boundary condition
-            val = flow_col[row + I]
+            val = flow_col[I]
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
             self.Q_bc[time] = val
             # Temperature boundary condition
-            t_val = temp_col[row + I]
+            t_val = temp_col[I]
             if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
             self.T_bc[time] = t_val
             # Cloudiness boundary condition
-            self.C_bc[time] = cloud_col[row + I]
+            self.C_bc[time] = cloud_col[I]
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetInflowData(self):
@@ -471,6 +471,7 @@ class HeatSourceInterface(ExcelDocument):
         node.T = self.T_bc[mindate]
         node.T_prev = self.T_bc[mindate]
         node.T_sed = self.T_bc[mindate]
+        print node, node.T, node.T_prev, node.T_sed, mindate
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
         node.T_alluv = IniParams["alluviumtemp"] if IniParams["calcalluvium"] else 0.0
