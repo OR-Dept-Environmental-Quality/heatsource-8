@@ -165,20 +165,20 @@ class StreamNode(StreamChannel):
         else:
             self.F_Solar = [0]*8
         #Testing method, these should return the same (to 1.0e-6 or so) result
-        #self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-        #    self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-        #    self.GroundFlux_THW(time)
         self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
             self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-            self.CalcGroundFluxes(cloud, self.Humidity[time], self.T_air[time], self.Wind[time], Elev,
-                                self.phi, VHeight, VTS, self.SedDepth, dx,
-                                dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
-                                self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
-                                IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
+            self.GroundFlux_THW(time)
+#        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+#            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
+#            self.CalcGroundFluxes(cloud, self.Humidity[time], self.T_air[time], self.Wind[time], Elev,
+#                                self.phi, VHeight, VTS, self.SedDepth, dx,
+#                                dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
+#                                self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
+#                                IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
 
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
-        print "test"
+
         # If we're a boundary node, we don't calculate MacCormick1, so get out quickly
         if not self.prev_km:
             self.T = self.T_bc[time]
@@ -462,9 +462,7 @@ class StreamNode(StreamChannel):
         #SedThermCond units of W/(m *C)
         #SedThermDiff units of cm^2/sec
 
-        self.SedThermDiff = self.SedThermDiff / 10000  #convert units to m^2/sec
-
-        SedRhoCp = self.SedThermCond / self.SedThermDiff
+        SedRhoCp = self.SedThermCond / (self.SedThermDiff / 10000)
         #NOTE: SedRhoCp is the product of sediment density and heat capacity
         #since thermal conductivity is defined as density * heat capacity * diffusivity,
         #therefore (density * heat capacity) = (conductivity / diffusivity)  units of (J / m3 / *C)
@@ -475,7 +473,6 @@ class StreamNode(StreamChannel):
 
         #Conduction flux (positive is heat into stream)
         F_Cond = self.SedThermCond * (self.T_sed - self.T_prev) / (self.SedDepth / 2)             #units of (W / m2)
-
         #Calculate the conduction flux between deeper alluvium & substrate
         if IniParams["calcalluvium"]:
             Flux_Conduction_Alluvium = self.SedThermCond * (self.T_sed - self.T_alluv) / (self.SedDepth / 2)
@@ -486,11 +483,9 @@ class StreamNode(StreamChannel):
         F_hyp = self.Q_hyp * rhow * H2O_HeatCapacity * (self.T_sed - self.T_prev) / (self.W_w * self.dx)
 
         NetFlux_Sed = self.F_Solar[7] - F_Cond - Flux_Conduction_Alluvium - F_hyp
-
         DT_Sed = NetFlux_Sed * self.dt / (self.SedDepth * SedRhoCp)
-
         T_sed_new = self.T_sed + DT_Sed
-        T_sed_new = 15.5
+
         #=====================================================
         #Calculate Longwave FLUX
         #=====================================================
