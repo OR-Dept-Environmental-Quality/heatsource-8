@@ -533,8 +533,8 @@ class StreamNode(StreamChannel):
             Friction_Velocity = Wind
         #===================================================
         #Wind Function f(w)
-#        Wind_Function = float(IniParams["wind_a"]) + float(IniParams["wind_b"]) * Friction_Velocity #m/mbar/s
-        Wind_Function = 0.000000001505 + 0.0000000016 * Friction_Velocity #m/mbar/s
+        Wind_Function = float(IniParams["wind_a"]) + float(IniParams["wind_b"]) * Friction_Velocity #m/mbar/s
+#        Wind_Function = 0.000000001505 + 0.0000000016 * Friction_Velocity #m/mbar/s
 
         #===================================================
         #Latent Heat of Vaporization
