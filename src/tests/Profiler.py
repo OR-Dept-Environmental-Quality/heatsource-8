@@ -17,7 +17,7 @@ class HSProfile(object):
     def __init__(self,worksheet,run_type="HS"):
         self.ErrLog = Logger
         self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
-        self.HS = HeatSourceInterface(join(worksheet), self.ErrLog).Reach
+        self.HS = HeatSourceInterface(join(worksheet), self.ErrLog)
         self.Reach = self.HS.Reach
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         ##########################################################
