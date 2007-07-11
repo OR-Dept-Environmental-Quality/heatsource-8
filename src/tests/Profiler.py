@@ -1,6 +1,6 @@
 from __future__ import division
 
-import cProfile, sys, time, traceback
+import cProfile, sys, time, traceback, itertools
 from os.path import join
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
@@ -31,19 +31,23 @@ class HSProfile(object):
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start, dt, stop, spin)
-        dt_out = timedelta(minutes=60)
-        self.Output = O(dt_out, self.Reach, start)
+#        dt_out = timedelta(minutes=60)
+#        self.Output = O(dt_out, self.Reach, start)
         ##########################################################
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
 
     def run(self): # Argument allows profiling and testing
-        self.ErrLog("Starting..")
         time1 = datetime.today()
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
-        
+        if (stop-start).seconds:
+            timesteps = (stop-start).seconds/Chronos.dt.seconds
+        else:
+            timesteps = ((stop-start).days*86400)/Chronos.dt.seconds
+        count = itertools.count()
+        count.next() # start at one, not zero
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
@@ -68,10 +72,12 @@ class HSProfile(object):
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
             else: raise Exception("Invalid run_type")
 
-            self.Output.Store(time)
+#            self.Output.Store(time)
             time = Chronos.Tick()
-            #self.ErrLog.progress()
-        self.ErrLog("Finished in %i seconds"% (datetime.today()-time1).seconds)
+            self.HS.PB("%i of %i timesteps"% (count.next(),int(timesteps)))
+        total_time = (datetime.today()-time1).seconds
+        self.HS.PB("Finished in %i seconds (%0.3f seconds per timestep)"%
+                   (total_time, total_time/timesteps))
 
 def RunHS(sheet): HSP = HSProfile(sheet).run()
 def RunSH(sheet): HSP = HSProfile(sheet,"SH").run()

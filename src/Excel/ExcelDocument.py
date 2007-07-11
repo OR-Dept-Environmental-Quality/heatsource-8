@@ -1,3 +1,4 @@
+from __future__ import division
 from win32com.client import constants, Dispatch
 from pythoncom import CoInitialize,CoUninitialize
 from itertools import dropwhile
@@ -24,7 +25,9 @@ class TextPB(object):
     def __call__(self,msg="",num=None,total=None):
         self.text.insert(0,self.text.pop())
         if num and total:
-            msg = "%s %f" %(msg, num/total)
+            msg = "%s %i%%" %(msg, (num/total)*100)
+        elif num:
+            msg = "%s %i%%" %(msg, num)
         return "%s  | %s" %("".join(self.text),msg)
 
 class ExcelDocument(object):
@@ -41,7 +44,7 @@ class ExcelDocument(object):
         self.app = Dispatch("Excel.Application")
         self.app.Visible = True
         self.quit_excel = False
-        self.PB = TextPB()
+        self.PBtext = TextPB()
         # If we don't have an active workbook, open one
         if not self.app.ActiveWorkbook:
             self.quit_excel = True
@@ -50,6 +53,8 @@ class ExcelDocument(object):
     def __del__(self):
         if self.quit_excel:
             self.app.Quit()
+    def PB(self, message, num=None, divisor=None):
+        self.app.StatusBar = self.PBtext(message, num, divisor)
 
     def New(self, filename=None):
         """

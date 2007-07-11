@@ -19,7 +19,7 @@ class HeatSourceInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface"""
     def __init__(self, filename=None, gauge=None):
         ExcelDocument.__init__(self, filename)
-        self.PB = gauge
+        #self.PB = gauge
         self.Reach = {}
         # Make empty Dictionaries for the boundary conditions
         self.Q_bc = {}
@@ -103,8 +103,6 @@ class HeatSourceInterface(ExcelDocument):
                 self.Reach[key].next_km = self.Reach[l[i+1]]
             except IndexError: pass # At final node, there's no next
 
-        del self.PB
-
     def SetAtmosphericData(self):
         for node in self.Reach.itervalues():
             if not node.T_air:
@@ -145,6 +143,7 @@ class HeatSourceInterface(ExcelDocument):
         """Get accumulation data from the "Flow Data" page"""
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
+        self.PB("Reading Inflow Data")
         l = self.Reach.keys()
         l.sort()
         timelist = [i for i in self.GetColumn(11,"Flow Data")[3:]]
@@ -152,14 +151,17 @@ class HeatSourceInterface(ExcelDocument):
         timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
         timelist.reverse()
         timelist = [Chronos.MakeDatetime(i) for i in timelist]
+        endcol,endrow = self.UsedRange("Flow Data")
+        data = self.GetValue((4,12,endrow,endcol),"Flow Data")
+        all_kms = self.GetColumn(9, "Flow Data")[3:]
         for site in xrange(int(IniParams["inflowsites"])):
             # Get the stream node corresponding to the kilometer of this inflow site.
-            km = self.GetValue((site + 4, 9),"Flow Data")
+            km = all_kms[site]
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
 
-            flow_col = self.GetColumn(12+site*2,"Flow Data")[3:]
-            temp_col = self.GetColumn(13+site*2,"Flow Data")[3:]
+            flow_col = [x[site*2] for x in data]
+            temp_col = [x[1+site*2] for x in data]
             for hour in xrange(self.Hours):
                 try:  #already a tributary, need to mass balance for T
                     node.T_tribs[timelist[hour]] = (temp_col[3+hour]*flow_col[3+hour] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + flow_col[3+hour])
@@ -167,6 +169,7 @@ class HeatSourceInterface(ExcelDocument):
                 except KeyError:
                     node.Q_tribs[timelist[hour]] = flow_col[3+hour]
                     node.T_tribs[timelist[hour]] = temp_col[3+hour]
+                self.PB("Reading inflow data")
         # Here, we set the Q_tribs list to zeros if it's not listed above. This way
         # We don't have to do an if statement later.
         for key in l:
@@ -179,11 +182,11 @@ class HeatSourceInterface(ExcelDocument):
                     node.Q_tribs[timelist[hour]] = 0.0
                     node.T_tribs[timelist[hour]] = 0.0
 
-            self.PB("Reading Inflow data", site, IniParams["inflowsites"])
+                    self.PB("Clearing blank inflow nodes")
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
-
+        self.PB("Reading Continuous Data")
         l = self.Reach.keys()
         l.sort()
         timelist = [i for i in self.GetColumn(5,"Continuous Data")[4:]]
@@ -349,7 +352,7 @@ class HeatSourceInterface(ExcelDocument):
 
         keys = self.Reach.keys()
         keys.sort(reverse=True)
-
+        self.PB("Building VegZones")
         for i in xrange(7, 36):
             col = self.GetColumn(i, "TTools Data")[5:]
             elev = self.GetColumn(i+28,"TTools Data")[5:]
@@ -437,7 +440,7 @@ class HeatSourceInterface(ExcelDocument):
                     rip += RE,
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
             node.ViewToSky = 1 - VTS_Total / (7 * 90)
-            #print node, node.ViewToSky, VTS_Total
+            self.PB("Building VegZones", h, len(keys))
     def BuildZonesLidar(self):
         """Build zones if we are using LiDAR data"""
 
