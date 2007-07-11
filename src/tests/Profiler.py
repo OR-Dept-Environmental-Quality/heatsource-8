@@ -17,7 +17,8 @@ class HSProfile(object):
     def __init__(self,worksheet,run_type="HS"):
         self.ErrLog = Logger
         self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
-        self.Reach = HeatSourceInterface(join(worksheet), self.ErrLog).Reach
+        self.HS = HeatSourceInterface(join(worksheet), self.ErrLog).Reach
+        self.Reach = self.HS.Reach
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         ##########################################################
         # Create a Chronos iterator that controls all model time
@@ -42,6 +43,7 @@ class HSProfile(object):
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
+        
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
@@ -80,4 +82,6 @@ def Profile():
 #    cProfile.run('HSP.run()')
 
 if __name__ == "__main__":
-    Profile()
+    #Profile()
+    HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
+    cProfile.runctx('HSP.run()',globals(), locals())

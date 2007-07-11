@@ -165,16 +165,16 @@ class StreamNode(StreamChannel):
         else:
             self.F_Solar = [0]*8
         #Testing method, these should return the same (to 1.0e-6 or so) result
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-            self.GroundFlux_THW(time)
 #        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
 #            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-#            self.CalcGroundFluxes(cloud, self.Humidity[time], self.T_air[time], self.Wind[time], Elev,
-#                                self.phi, VHeight, VTS, self.SedDepth, dx,
-#                                dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
-#                                self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
-#                                IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
+#            self.GroundFlux_THW(time)
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
+            self.CalcGroundFluxes(cloud, self.Humidity[time], self.T_air[time], self.Wind[time], Elev,
+                                self.phi, VHeight, VTS, self.SedDepth, dx,
+                                dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
+                                self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
+                                IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
 
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)

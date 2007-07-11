@@ -19,10 +19,8 @@ class HeatSourceInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface"""
     def __init__(self, filename=None, gauge=None):
         ExcelDocument.__init__(self, filename)
-        self.Reach = {}
-        # Build a quick progress bar
         self.PB = gauge
-
+        self.Reach = {}
         # Make empty Dictionaries for the boundary conditions
         self.Q_bc = {}
         self.T_bc = {}

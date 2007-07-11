@@ -536,7 +536,7 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 	// Bed Conduction Flux
     //======================================================
     //Calculate the conduction flux between water column & substrate
-	float SedRhoCp = SedThermCond / (SedThermDiff/1000);
+	float SedRhoCp = SedThermCond / (SedThermDiff/10000);
 	// Water variables
 	float rhow = 1000;				// water density (kg/m3)
 	float H2O_HeatCapacity = 4187;	// J/(kg *C)
@@ -547,21 +547,18 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 
     if (FAlluvium > 0)
     {
-        Flux_Conduction_Alluvium = SedThermDiff * SedRhoCp * (T_sed - FAlluvium) / (SedDepth / 2);
+        Flux_Conduction_Alluvium = SedThermCond * (T_sed - FAlluvium) / (SedDepth / 2);
     }
     //======================================================
     //Calculate the changes in temperature in the substrate conduction layer
     // Negative hyporheic flow is heat into sediment
-    float F_hyp = Q_hyp * rhow *H2O_HeatCapacity * (T_sed - T_prev) / ( P_w * dx);
+    float F_hyp = Q_hyp * rhow *H2O_HeatCapacity * (T_sed - T_prev) / ( W_w * dx);
     //Temperature change in substrate from solar exposure and conducted heat
     float NetFlux_Sed = F_Solar7 - F_Conduction - Flux_Conduction_Alluvium - F_hyp;
     float DT_Sed = NetFlux_Sed * dt / (SedDepth * SedRhoCp);
     //======================================================
     //Calculate the temperature of the substrate conduction layer
     float T_sed_new = T_sed + DT_Sed;
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // The above calculation is broken, this is a temporary hack
-    T_sed_new = 15.5;
     if ((T_sed_new > 50.0f) || (T_sed_new < 0.0f))
 	  	PyErr_SetString(HeatSourceError, "Sediment temperature calculations causing an unstable model in CalcGroundFluxes()");
     // End Conduction Flux

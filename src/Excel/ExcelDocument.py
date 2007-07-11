@@ -16,6 +16,17 @@ directionDown = -4121
 directionLeft = -4131
 directionRight = -4152
 
+class TextPB(object):
+    def __init__(self):
+        self.bar = "---->"
+        self.text = list(self.bar) + [" "]*60
+
+    def __call__(self,msg="",num=None,total=None):
+        self.text.insert(0,self.text.pop())
+        if num and total:
+            msg = "%s %f" %(msg, num/total)
+        return "%s  | %s" %("".join(self.text),msg)
+
 class ExcelDocument(object):
     """
     Some convenience methods for Excel documents accessed
@@ -28,15 +39,17 @@ class ExcelDocument(object):
         # is that we want to be able to catch unsaved changes, which is possible only if we catch
         # a reference to the active workbook.
         self.app = Dispatch("Excel.Application")
+        self.app.Visible = True
+        self.quit_excel = False
+        self.PB = TextPB()
         # If we don't have an active workbook, open one
         if not self.app.ActiveWorkbook:
-            print "opening %s" % filename
+            self.quit_excel = True
             self.Open(filename)
 
     def __del__(self):
-        pass
-#        if self.app.Workbooks.Count == 1:
-#            self.app.Quit()
+        if self.quit_excel:
+            self.app.Quit()
 
     def New(self, filename=None):
         """
@@ -107,7 +120,7 @@ class ExcelDocument(object):
         Get the value of 'cell'.
         """
         return self.GetRange(cell,sheet).Value
-    
+
     def UsedRange(self, sheet=None):
         """
         Return the used range of the data in the form of (endcol,endrow)
