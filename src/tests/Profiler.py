@@ -4,6 +4,7 @@ import cProfile, sys, time, traceback, itertools
 from os.path import join
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
+from win32gui import PumpWaitingMessages
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties.Chronos import Chronos
@@ -75,6 +76,7 @@ class HSProfile(object):
 #            self.Output.Store(time)
             time = Chronos.Tick()
             self.HS.PB("%i of %i timesteps"% (count.next(),int(timesteps)))
+            PumpWaitingMessages()
         total_time = (datetime.today()-time1).seconds
         self.HS.PB("Finished in %i seconds (%0.3f seconds per timestep)"%
                    (total_time, total_time/timesteps))
