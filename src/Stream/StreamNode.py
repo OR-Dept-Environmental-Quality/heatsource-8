@@ -39,7 +39,7 @@ class StreamNode(StreamChannel):
         for attr in ["F_Conduction","F_Convection","F_Longwave","F_Evaporation"]:
             setattr(self, attr, 0)
         self.F_Solar = [0]*8
-        self.F_DailySum = [0]*5
+#        self.F_DailySum = [0]*5
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
