@@ -80,16 +80,38 @@ class HSProfile(object):
         total_time = (datetime.today()-time1).seconds
         self.HS.PB("Finished in %i seconds (%0.3f seconds per timestep)"%
                    (total_time, total_time/timesteps))
-
-def RunHS(sheet): HSP = HSProfile(sheet).run()
-def RunSH(sheet): HSP = HSProfile(sheet,"SH").run()
-def RunHY(sheet): HSP = HSProfile(sheet,"HY").run()
-def Profile():
-    HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
-    HSP.run()
-#    cProfile.run('HSP.run()')
+def RunHS(sheet):
+    try:
+        HSP = HSProfile(sheet).run()
+    except Exception:
+        f = open("c:\HSError.txt","w")
+        traceback.print_exc(file=f)
+        f.close()
+        raise
+def RunSH(sheet):
+    try:
+        HSP = HSProfile(sheet,"SH").run()
+    except Exception:
+        f = open("c:\HSError.txt","w")
+        traceback.print_exc(file=f)
+        f.close()
+        raise
+def RunHY(sheet):
+    try:
+        HSP = HSProfile(sheet,"HY").run()
+    except Exception:
+        f = open("c:\HSError.txt","w")
+        traceback.print_exc(file=f)
+        f.close()
+        raise
 
 if __name__ == "__main__":
     #Profile()
-    HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
+    try:
+        HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
+    except Exception:
+        f = open("c:\HSError.txt","w")
+        traceback.print_exc(file=f)
+        f.close()
+        raise
     cProfile.runctx('HSP.run()',globals(), locals())
