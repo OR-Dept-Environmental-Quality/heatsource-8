@@ -131,7 +131,7 @@ class ExcelDocument(object):
         Return the used range of the data in the form of (endcol,endrow)
         """
         from pythoncom import Empty
-        rng = self.app.ActiveWorkbook.Sheets(sheet).UsedRange.Find(What=Empty,\
+        rng = self.app.ActiveWorkbook.Sheets(sheet).UsedRange.Find(What="*",\
                                                                    After=Empty,\
                                                                    LookIn=constants.xlValues,\
                                                                    LookAt=constants.xlWhole,\

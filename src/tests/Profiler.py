@@ -107,11 +107,13 @@ def RunHY(sheet):
 
 if __name__ == "__main__":
     #Profile()
+
     try:
-        HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
+        HSP = HSProfile("D:\dan\eclipse_workspace\HeatSource\HS8_Example_River.xls","HS")
     except Exception:
         f = open("c:\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
         raise
+
     cProfile.runctx('HSP.run()',globals(), locals())
