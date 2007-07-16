@@ -1,5 +1,5 @@
 from __future__ import division
-from itertools import imap, dropwhile
+from itertools import imap, dropwhile, izip, chain, repeat
 import math, time, operator, bisect
 from itertools import chain, ifilterfalse
 from datetime import datetime, timedelta
@@ -66,7 +66,7 @@ class HeatSourceInterface(ExcelDocument):
         # new DataSheet's __getitem__ functionality, we can merely access
         # the sheet once, and return the length of that tuple
         self.PB("Calculating the number of datapoints")
-        self.Num_Q_Var = self.UsedRange("TTools Data")[1] - 5
+        self.Num_Q_Var = self.LastRow("TTools Data") - 5
 
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
@@ -114,16 +114,13 @@ class HeatSourceInterface(ExcelDocument):
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
         # Get the columns, which is faster than accessing cells
+        self.PB("Reading boundary conditions")
         C = Chronos
-        dt = IniParams["dt"]
-        col = 6
-        row = 4
-        endcol,endrow = self.UsedRange("Continuous Data")
-        data = self.GetValue((5,5,endrow,8),"Continuous Data")
-        time_col = [x[0] for x in data]
-        flow_col = [x[1] for x in data]
-        temp_col = [x[2] for x in data]
-        cloud_col = [x[3] for x in data]
+        data = self.GetUsedRange("Continuous Data")[4:]
+        time_col = [x[5] for x in data]
+        flow_col = [x[6] for x in data]
+        temp_col = [x[7] for x in data]
+        cloud_col = [x[8] for x in data]
 
         for I in xrange(self.Hours):
             time = C.MakeDatetime(time_col[I])
@@ -151,24 +148,22 @@ class HeatSourceInterface(ExcelDocument):
         timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
         timelist.reverse()
         timelist = [Chronos.MakeDatetime(i) for i in timelist]
-        endcol,endrow = self.UsedRange("Flow Data")
-        data = self.GetValue((4,12,endrow,endcol),"Flow Data")
-        all_kms = self.GetColumn(9, "Flow Data")[3:]
+        data = self.GetUsedRange("Flow Data")[3:]
         for site in xrange(int(IniParams["inflowsites"])):
             # Get the stream node corresponding to the kilometer of this inflow site.
-            km = all_kms[site]
+            km = data[site][1]
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
 
-            flow_col = [x[site*2] for x in data]
-            temp_col = [x[1+site*2] for x in data]
+            flow_col = [x[12+site*2] for x in data]
+            temp_col = [x[13+site*2] for x in data]
             for hour in xrange(self.Hours):
                 try:  #already a tributary, need to mass balance for T
-                    node.T_tribs[timelist[hour]] = (temp_col[3+hour]*flow_col[3+hour] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + flow_col[3+hour])
-                    node.Q_tribs[timelist[hour]] += flow_col[3+hour]
-                except KeyError:
-                    node.Q_tribs[timelist[hour]] = flow_col[3+hour]
-                    node.T_tribs[timelist[hour]] = temp_col[3+hour]
+                    node.T_tribs[timelist[hour]] = (temp_col[hour]*flow_col[hour] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + flow_col[hour])
+                    node.Q_tribs[timelist[hour]] += flow_col[hour]
+                except:# KeyError:
+                    node.Q_tribs[timelist[hour]] = flow_col[hour]
+                    node.T_tribs[timelist[hour]] = temp_col[hour]
                 self.PB("Reading inflow data")
         # Here, we set the Q_tribs list to zeros if it's not listed above. This way
         # We don't have to do an if statement later.
@@ -240,16 +235,12 @@ class HeatSourceInterface(ExcelDocument):
         enough elements to make n equal length lists, and modify itself appropriately so that the remaining list
         will contain all leftover elements. The usefulness of this method is that it will allow us to average over each <mul> consecutive elements
         """
-        newlst = []
-        lst = [i for i in iterable]
-        first = lst.pop(0)
-        for i in xrange(mul):
-            newlst.append(lst[i::mul])
-        lst = [(first,)]
-        m = max(map(len,newlst))
-        for i in newlst:
-            while len(i) < m: i.append(None)
-        lst.extend([x for x in zip(*newlst)])
+        # From itertools recipes... We use all but the first (boundary node) element
+        lst = [i for i in izip(*[chain(iterable[1:], repeat(None, mul-1))]*mul)]
+        # Then we tack on the boundary node element
+        lst.insert(0,(iterable[0],))
+        # Then strip off the None values from the last (if any)
+        lst[-1] = tuple(ifilterfalse(lambda x: x is None,lst[-1]))
         return self.numify(lst)
 
     def numify(self, lst):

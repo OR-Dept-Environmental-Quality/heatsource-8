@@ -88,7 +88,7 @@ class ExcelDocument(object):
         Return a column of data
         """
         strip = lambda x: x[0] if len(x) == 1 else x
-        lst = [strip(i) for i in self.GetValue((1,col,self.UsedRange(sheet)[1],col),sheet)]
+        lst = [strip(i) for i in self.GetValue((1,col,self.LastRow(sheet),col),sheet)]
         return tuple(lst)
 
     def GetRange(self, range, sheet=None):
@@ -126,20 +126,22 @@ class ExcelDocument(object):
         """
         return self.GetRange(cell,sheet).Value
 
+    def GetUsedRange(self, sheet=None):
+        """
+        Return the data for the entire used range.
+        """
+        return self.app.ActiveWorkbook.Sheets(sheet).UsedRange.Value
+
+    def LastRow(self, sheet=None):
+        return self.app.ActiveWorkbook.Sheets(sheet).Cells.SpecialCells(constants.xlLastCell).Row
+    def LastColumn(self, sheet=None):
+        return self.app.ActiveWorkbook.Sheets(sheet).Cells.SpecialCells(constants.xlLastCell).Column
+
     def UsedRange(self, sheet=None):
         """
         Return the used range of the data in the form of (endcol,endrow)
         """
-        from pythoncom import Empty
-        rng = self.app.ActiveWorkbook.Sheets(sheet).UsedRange.Find(What="*",\
-                                                                   After=Empty,\
-                                                                   LookIn=constants.xlValues,\
-                                                                   LookAt=constants.xlWhole,\
-                                                                   SearchOrder=constants.xlByRows,\
-                                                                   SearchDirection=constants.xlPrevious,\
-                                                                   MatchCase=False, MatchByte=False,\
-                                                                   SearchFormat=Empty)
-        return (rng.Column,rng.Row)
+        return (self.LastColumn(sheet), self.LastRow(sheet))
 
     def Clear(self, cell, sheet=None):
         self.GetRange(cell,sheet).Clear()
