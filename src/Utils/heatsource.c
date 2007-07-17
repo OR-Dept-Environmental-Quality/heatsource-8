@@ -191,7 +191,7 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
 	double D_est = 0.0;
 	if (!PyArg_ParseTuple(args, "dddddddd", &Q_est, &W_b, &z, &n, &S, &D_est, &dx, &dt))
 		return NULL;
-	if (D_est == 0.0)
+	if (1) //D_est == 0.0)
 	{
 	    while (Converge > 1e-8)
 		{
