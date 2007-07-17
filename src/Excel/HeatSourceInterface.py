@@ -4,6 +4,9 @@ import math, time, operator, bisect
 from itertools import chain, ifilterfalse
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
+from os.path import exists
+from sys import exit
+from win32gui import PumpWaitingMessages
 
 from Stream.StreamNode import StreamNode
 from Stream.Zonator import Zonator
@@ -25,6 +28,7 @@ class HeatSourceInterface(ExcelDocument):
         self.Q_bc = {}
         self.T_bc = {}
         self.C_bc = {}
+        self.AtmosphericData = [[],[],[]]
         #######################################################
         # Grab the initialization parameters from the Excel file.
         # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
@@ -85,7 +89,8 @@ class HeatSourceInterface(ExcelDocument):
 #        self.ScanMorphology()
         # Land cover codes
         self.BuildNodes()
-        self.BuildZonesNormal()
+        if IniParams["lidar"]: self.BuildZonesLidar()
+        else: self.BuildZonesNormal()
         self.GetInflowData()
         self.GetContinuousData()
         self.SetAtmosphericData()
@@ -103,7 +108,14 @@ class HeatSourceInterface(ExcelDocument):
                 self.Reach[key].next_km = self.Reach[l[i+1]]
             except IndexError: pass # At final node, there's no next
 
+    def CheckEarlyQuit(self):
+        PumpWaitingMessages()
+        if exists("c:\\quitHS"):
+            self.PB("Simulation stopped by user")
+            raise Exception("User forced quit")
+
     def SetAtmosphericData(self):
+        self.CheckEarlyQuit()
         for node in self.Reach.itervalues():
             if not node.T_air:
                 node.Wind, node.Humidity, node.T_air = self.AtmosphericData
@@ -113,6 +125,7 @@ class HeatSourceInterface(ExcelDocument):
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
+        self.CheckEarlyQuit()
         # Get the columns, which is faster than accessing cells
         self.PB("Reading boundary conditions")
         C = Chronos
@@ -130,7 +143,7 @@ class HeatSourceInterface(ExcelDocument):
             self.Q_bc[time] = val
             # Temperature boundary condition
             t_val = temp_col[I]
-            if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
+            #if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
             self.T_bc[time] = t_val
             # Cloudiness boundary condition
             self.C_bc[time] = cloud_col[I]
@@ -138,6 +151,7 @@ class HeatSourceInterface(ExcelDocument):
 
     def GetInflowData(self):
         """Get accumulation data from the "Flow Data" page"""
+        self.CheckEarlyQuit()
         # Now we have all the data, we loop through setting our values in the
         # TimeList() instances
         self.PB("Reading Inflow Data")
@@ -181,6 +195,7 @@ class HeatSourceInterface(ExcelDocument):
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
+        self.CheckEarlyQuit()
         self.PB("Reading Continuous Data")
         l = self.Reach.keys()
         l.sort()
@@ -207,6 +222,7 @@ class HeatSourceInterface(ExcelDocument):
 
     def ScanMorphology(self):
         """Scan morphology variables for null of nonnumeric values"""
+        self.CheckEarlyQuit()
         # Start scanning at the 17th row of the spreadsheet
         #TODO: The visual basic code for this routine makes absolutely no sense
         # Included is a transcription of the original, which I've tried to interpret
@@ -275,6 +291,7 @@ class HeatSourceInterface(ExcelDocument):
         return [test(i) for i in lst]
     def GetColumnarData(self):
         """return a dictionary of attributes that are averaged or summed as appropriate"""
+        self.CheckEarlyQuit()
         # Pages we grab columns from
         ttools = ["km","Longitude","Latitude"]
         morph = ["Elevation","S","W_bf","WD","z","n","SedThermCond","SedThermDiff","SedDepth",
@@ -305,6 +322,7 @@ class HeatSourceInterface(ExcelDocument):
         return data
 
     def BuildNodes(self):
+        self.CheckEarlyQuit()
 
         data = self.GetColumnarData()
         node = StreamNode()
@@ -322,10 +340,10 @@ class HeatSourceInterface(ExcelDocument):
         # if we end up with a fraction, that means that there's a node at the end that
         # is not a perfect multiple of the sample distance.
         num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
-        for i in range(0, num_nodes):
+        for i in range(1, num_nodes):
             node = StreamNode()
-            for k,v in data.items():
-                setattr(node,k,v[i+1])# Add one to ignore boundary node
+            for k,v in data.iteritems():
+                setattr(node,k,v[i])# Add one to ignore boundary node
             self.InitializeNode(node)
             self.Reach[node.km] = node
             self.PB("Building Stream Nodes", i, self.Num_Q_Var/self.multiple)
@@ -334,6 +352,7 @@ class HeatSourceInterface(ExcelDocument):
         mouth.dx = IniParams["longsample"] * mouth_dx
 
     def BuildZonesNormal(self):
+        self.CheckEarlyQuit()
         LC = self.GetLandCoverCodes()
         vheight = []
         vdensity = []
@@ -356,14 +375,11 @@ class HeatSourceInterface(ExcelDocument):
                 elevation.append(self.multiplier(elev, average))
         # We have to set the emergent vegetation, so we strip those off of the iterator
         # before we record the zones.
-        if len(self.Reach) == len(vheight[0]):
-            for i in xrange(len(keys)):
-                node = self.Reach[keys[i]]
-                node.VHeight = vheight[0][i]
-                node.VDensity = vdensity[0][i]
-                node.Overhang = overhang[0][i]
-        else:
-            print len(vheight[0]), len(self.Reach)
+        for i in xrange(len(keys)):
+            node = self.Reach[keys[i]]
+            node.VHeight = vheight[0][i]
+            node.VDensity = vdensity[0][i]
+            node.Overhang = overhang[0][i]
 
         topo_w = self.multiplier(self.GetColumn(4, "TTools Data")[5:], average)
         topo_s = self.multiplier(self.GetColumn(5, "TTools Data")[5:], average)
@@ -434,9 +450,12 @@ class HeatSourceInterface(ExcelDocument):
             self.PB("Building VegZones", h, len(keys))
     def BuildZonesLidar(self):
         """Build zones if we are using LiDAR data"""
+        self.CheckEarlyQuit()
+        raise NotImplementedError("LiDAR not yet implemented")
 
     def GetLandCoverCodes(self):
         """Return the codes from the Land Cover Codes worksheet as a dictionary of dictionaries"""
+        self.CheckEarlyQuit()
         # GetValue() returns a tuple, but we want a list because we have to reverse it
         codes = self.GetColumn(1, "Land Cover Codes")[3:]
         height = self.GetColumn(2, "Land Cover Codes")[3:]

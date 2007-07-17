@@ -214,7 +214,7 @@ class StreamChannel(object):
     def SetBankfullMorphology(self):
         """Calculate initial morphological characteristics in terms of W_bf, z and WD"""
         if self.z >= self.WD/2:
-            raise Warning("Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.z, self.WD))
+            warn("Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.z, self.WD))
             self.z = 0.99 * (self.WD/2)
 
         # Average depth of the trapazoid from the width/depth ratio

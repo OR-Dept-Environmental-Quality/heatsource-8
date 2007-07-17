@@ -42,7 +42,6 @@ class ExcelDocument(object):
         # is that we want to be able to catch unsaved changes, which is possible only if we catch
         # a reference to the active workbook.
         self.app = Dispatch("Excel.Application")
-        self.app.Visible = True
         self.quit_excel = False
         self.PBtext = TextPB()
         # If we don't have an active workbook, open one

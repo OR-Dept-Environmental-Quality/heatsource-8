@@ -1,7 +1,7 @@
 from __future__ import division
 
 import cProfile, sys, time, traceback, itertools
-from os.path import join
+from os.path import join, exists
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from win32gui import PumpWaitingMessages
@@ -48,7 +48,6 @@ class HSProfile(object):
         else:
             timesteps = ((stop-start).days*86400)/Chronos.dt.seconds
         count = itertools.count()
-        count.next() # start at one, not zero
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
@@ -75,8 +74,13 @@ class HSProfile(object):
 
 #            self.Output.Store(time)
             time = Chronos.Tick()
-            self.HS.PB("%i of %i timesteps"% (count.next(),int(timesteps)))
+            n = count.next()
+            self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
             PumpWaitingMessages()
+            if not n%60: # every hour
+                if exists("c:\\quitHS"):
+                    self.HS.PB("Simulation stopped by user")
+                    return
         total_time = (datetime.today()-time1).seconds
         self.HS.PB("Finished in %i seconds (%0.3f seconds per timestep)"%
                    (total_time, total_time/timesteps))
@@ -84,36 +88,38 @@ def RunHS(sheet):
     try:
         HSP = HSProfile(sheet).run()
     except Exception:
-        f = open("c:\HSError.txt","w")
+        f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        raise
+        raise Exception("See error log: c:\\HSError.txt")
 def RunSH(sheet):
     try:
         HSP = HSProfile(sheet,"SH").run()
     except Exception:
-        f = open("c:\HSError.txt","w")
+        f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        raise
+        raise Exception("See error log: c:\\HSError.txt")
 def RunHY(sheet):
     try:
         HSP = HSProfile(sheet,"HY").run()
     except Exception:
-        f = open("c:\HSError.txt","w")
+        f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        raise
+        raise Exception("See error log: c:\\HSError.txt")
 
 if __name__ == "__main__":
     #Profile()
 
     try:
-        HSP = HSProfile("C:\eclipse\HeatSource\HS8_Example_River.xls","HS")
+        #HSP = HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\Evans.xls","HY")
+        HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HY")
+        HSP.run()
     except Exception:
-        f = open("c:\HSError.txt","w")
+        f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
         raise
 
-    cProfile.runctx('HSP.run()',globals(), locals())
+#    cProfile.runctx('HSP.run()',globals(), locals())
