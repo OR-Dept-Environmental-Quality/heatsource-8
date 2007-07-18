@@ -340,10 +340,10 @@ class HeatSourceInterface(ExcelDocument):
         # if we end up with a fraction, that means that there's a node at the end that
         # is not a perfect multiple of the sample distance.
         num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
-        for i in range(1, num_nodes):
+        for i in range(0, num_nodes):
             node = StreamNode()
             for k,v in data.iteritems():
-                setattr(node,k,v[i])# Add one to ignore boundary node
+                setattr(node,k,v[i+1])# Add one to ignore boundary node
             self.InitializeNode(node)
             self.Reach[node.km] = node
             self.PB("Building Stream Nodes", i, self.Num_Q_Var/self.multiple)

@@ -44,10 +44,11 @@ class ExcelDocument(object):
         self.app = Dispatch("Excel.Application")
         self.quit_excel = False
         self.PBtext = TextPB()
-        # If we don't have an active workbook, open one
-        if not self.app.ActiveWorkbook:
-            self.quit_excel = True
-            self.Open(filename)
+#        # If we don't have an active workbook, open one
+#        if not self.app.ActiveWorkbook:
+#            self.quit_excel = True
+        self.Open(filename)
+        self.app.Visible = True
 
     def __del__(self):
         if self.quit_excel:

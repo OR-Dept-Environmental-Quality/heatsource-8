@@ -113,13 +113,13 @@ if __name__ == "__main__":
     #Profile()
 
     try:
-        #HSP = HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\Evans.xls","HY")
-        HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HY")
+        #HSP = HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\Evans.xls","HS")
+        HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HS")
         HSP.run()
+#        cProfile.runctx('HSP.run()',globals(), locals())
     except Exception:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
         raise
 
-#    cProfile.runctx('HSP.run()',globals(), locals())
