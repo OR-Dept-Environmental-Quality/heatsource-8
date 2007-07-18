@@ -165,7 +165,7 @@ class HeatSourceInterface(ExcelDocument):
         data = self.GetUsedRange("Flow Data")[3:]
         for site in xrange(int(IniParams["inflowsites"])):
             # Get the stream node corresponding to the kilometer of this inflow site.
-            km = data[site][1]
+            km = data[site][9]
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
 
