@@ -48,8 +48,7 @@ class Output(object):
             for node in sorted(self.reach.iterkeys(),reverse=True):
                 aaa = "%0.3f" % node
                 self.files[key][0].write(aaa.ljust(14))
-                if node == 0:
-                    self.files[key][0].write("\n")
+            self.files[key][0].write("\n")
 
 
     def __del__(self):
