@@ -191,7 +191,7 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
 	double D_est = 0.0;
 	if (!PyArg_ParseTuple(args, "dddddddd", &Q_est, &W_b, &z, &n, &S, &D_est, &dx, &dt))
 		return NULL;
-	if (1) //D_est == 0.0)
+	if (D_est == 0.0)
 	{
 	    while (Converge > 1e-8)
 		{
@@ -201,13 +201,13 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
 	        dFy = (Fyy - Fy) / dy;
 	        if (dFy <= 0) {dFy = 0.99;}
 	        D_est -= Fy / dFy;
-	/*        if ((D_est < 0) || (D_est > 5000) || (count > 10000))
+	        if ((D_est < 0) || (D_est > 5000) || (count > 10000))
 	        {
 	        	D_est = (double)rand();
 	        	Converge = 0;
 	        	count = 0;
 	        }
-	*/        Converge = fabs(Fy/dFy);
+	        Converge = fabs(Fy/dFy);
 	        count += 1;
 		}
 	}
@@ -222,14 +222,15 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
     } else {
         Shear_Velocity = sqrt(9.8 * D_est * S);
     }
-    Dispersion = 0.011 * pow(U,2.0) * pow(Ww,2.0) / (D_est * Shear_Velocity);
-    if ((Dispersion * dt / pow(dx,2.0)) > 0.5);
+    Dispersion = (0.011 * pow(U,2.0) * pow(Ww,2.0)) / (D_est * Shear_Velocity);
+    double DD = Dispersion;
+    if ((Dispersion * dt / pow(dx,2.0)) > 0.5)
     {
        Dispersion = (0.45 * pow(dx,2)) / dt;
     }
 
 
-    return Py_BuildValue("fffffff",D_est,A,Pw,Rh,Ww,U,Dispersion);
+    return Py_BuildValue("ffffffff",D_est,A,Pw,Rh,Ww,U,Dispersion,DD);
 }
 
 static char heatsource_CalcMuskingum__doc__[] =
