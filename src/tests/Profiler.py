@@ -32,8 +32,8 @@ class HSProfile(object):
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start, dt, stop, spin)
-#        dt_out = timedelta(minutes=60)
-#        self.Output = O(dt_out, self.Reach, start)
+        dt_out = timedelta(minutes=60)
+        self.Output = O(dt_out, self.Reach, start)
         ##########################################################
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
@@ -55,7 +55,8 @@ class HSProfile(object):
             if not time.minute and not time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
                 hydro_time = time
                 solar_time = time
-                for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
+                if not time.hour:
+                    for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 if solar_time < start:
                     hydro_time = start
                     solar_time += timedelta(days=start.day-solar_time.day)
@@ -72,7 +73,7 @@ class HSProfile(object):
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
             else: raise Exception("Invalid run_type")
 
-#            self.Output.Store(time)
+            self.Output.Store(time)
             time = Chronos.Tick()
             n = count.next()
             self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
@@ -116,7 +117,7 @@ if __name__ == "__main__":
         #HSP = HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\Evans.xls","HS")
         HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HS")
         HSP.run()
-#        cProfile.runctx('HSP.run()',globals(), locals())
+        #cProfile.runctx('HSP.run()',globals(), locals())
     except Exception:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
