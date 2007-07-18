@@ -223,14 +223,13 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
         Shear_Velocity = sqrt(9.8 * D_est * S);
     }
     Dispersion = (0.011 * pow(U,2.0) * pow(Ww,2.0)) / (D_est * Shear_Velocity);
-    double DD = Dispersion;
     if ((Dispersion * dt / pow(dx,2.0)) > 0.5)
     {
        Dispersion = (0.45 * pow(dx,2)) / dt;
     }
 
 
-    return Py_BuildValue("ffffffff",D_est,A,Pw,Rh,Ww,U,Dispersion,DD);
+    return Py_BuildValue("fffffff",D_est,A,Pw,Rh,Ww,U,Dispersion);
 }
 
 static char heatsource_CalcMuskingum__doc__[] =

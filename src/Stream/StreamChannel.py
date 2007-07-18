@@ -171,7 +171,7 @@ class StreamChannel(object):
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
-            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp, D = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, self.d_cont, self.dx, self.dt)
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, self.d_cont, self.dx, self.dt)
     def CalcHydroStability(self):
         """Ensure stability of the timestep using the technique from pg 82 of the HS manual
 
