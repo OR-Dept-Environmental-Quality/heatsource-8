@@ -56,7 +56,7 @@ class Output(object):
             filename[0].close()
 
 
-    def Store(self, TheTime):
+    def __call__(self, TheTime):
         if TheTime < self.write_time:
             return
         elif TheTime >= self.write_time:

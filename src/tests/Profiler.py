@@ -43,19 +43,26 @@ class HSProfile(object):
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
+        flush = start-timedelta(days=IniParams["flushdays"])
         if (stop-start).seconds:
-            timesteps = (stop-start).seconds/Chronos.dt.seconds
+            timesteps = (stop-flush).seconds/Chronos.dt.seconds
         else:
-            timesteps = ((stop-start).days*86400)/Chronos.dt.seconds
+            timesteps = ((stop-flush).days*86400)/Chronos.dt.seconds
         count = itertools.count()
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
             offset = Chronos.TZOffset(time)
-            if not time.minute and not time.second:  #TODO: Would this work if an hour is not divisable by our timestep?
+            n = count.next()
+            if not n%60: # every hour
+                self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
+                PumpWaitingMessages()
+                if exists("c:\\quitHS"):
+                    self.HS.PB("Simulation stopped by user")
+                    return
                 hydro_time = time
                 solar_time = time
-                if not time.hour:
+                if not n%1440:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 if solar_time < start:
                     hydro_time = start
@@ -73,18 +80,14 @@ class HSProfile(object):
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
             else: raise Exception("Invalid run_type")
 
-            self.Output.Store(time)
+            self.Output(time)
             time = Chronos.Tick()
-            n = count.next()
-            self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
-            PumpWaitingMessages()
-            if not n%60: # every hour
-                if exists("c:\\quitHS"):
-                    self.HS.PB("Simulation stopped by user")
-                    return
         total_time = (datetime.today()-time1).seconds
-        self.HS.PB("Finished in %i seconds (%0.3f seconds per timestep)"%
-                   (total_time, total_time/timesteps))
+        total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
+        message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day)" %\
+                    (total_time, total_time/timesteps, total_days)
+        self.HS.PB(message)
+        print message
 def RunHS(sheet):
     try:
         HSP = HSProfile(sheet).run()
@@ -116,8 +119,8 @@ if __name__ == "__main__":
     try:
         #HSP = HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\Evans.xls","HS")
         HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HS")
-        HSP.run()
-        #cProfile.runctx('HSP.run()',globals(), locals())
+        #HSP.run()
+        cProfile.runctx('HSP.run()',globals(), locals())
     except Exception:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)

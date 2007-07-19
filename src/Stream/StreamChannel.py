@@ -41,7 +41,7 @@ class StreamChannel(object):
                     "Q_prev", # Discharge at previous timestep, previous space step is taken from another node
                     "Q_cont", # Control discharge
                     "V", # Total volume, based on current flow
-                    "Q_tribs", # Inputs from tribs. This is a TimeList class object
+                    "Q_tribs", # Inputs from tribs.
                     "Q_in", # Inputs from "accretion" in cubic meters per second
                     "Q_out", # Withdrawls from the stream, in cubic meters per second
                     "Q_hyp", # Hyporheic flow
@@ -76,23 +76,16 @@ class StreamChannel(object):
     def __gt__(self, other): return self.km > other.km
     def __ge__(self, other): return self.km >= other.km
 
-    def GetInputs(self, hour):
-        """Returns a value for inputs-outputs to the channel at the time=t"""
-        Q = 0
-        Q += self.Q_in # Input volume
-        Q -= self.Q_out # Output volume
-        if len(self.Q_tribs):
-            Q += self.Q_tribs[hour]# Tributary volume
-        Q -= self.E # Evaporation loss
-        return Q
-
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
-        Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
+
+        inputs = self.Q_in + self.Q_tribs.get(time,0) - self.Q_out - self.E
+
+        Q2 = self.prev_km.Q_prev + inputs
 
         C1,C2,C3 = self.GetMuskingum(Q2, self.U, self.W_w, self.S, self.dx, self.dt)
         # Calculate the new Q
-        Q = C1*(self.prev_km.Q + self.GetInputs(hour)) + C2*Q2 + C3*self.Q
+        Q = C1*(self.prev_km.Q + inputs) + C2*Q2 + C3*self.Q
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q
         self.Q = Q
@@ -132,13 +125,15 @@ class StreamChannel(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
+        inputs = self.Q_in + self.Q_tribs.get(hour,0) - self.Q_out - self.E
+
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             # Get all of the discharges that we know about.
             # (t, x-1) = flow from the upstream channel at this timestep
-            Q1 = self.prev_km.Q + self.GetInputs(hour)
+            Q1 = self.prev_km.Q + inputs
             # (t-1, x-1) = flow from the upstream channel's previous timestep.
-            Q2 = self.prev_km.Q_prev + self.GetInputs(hour)
+            Q2 = self.prev_km.Q_prev + inputs
             # (t-1, x) = flow from the previous timestep in this channel (it is the previous timestep
             # because we have not yet assigned a new value for this timesetp)
             Q3 = self.Q
@@ -157,7 +152,7 @@ class StreamChannel(object):
             # TODO: Might want some error checking here.
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
-            Q = self.prev_km.Q_prev + self.GetInputs(hour) # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
+            Q = self.prev_km.Q_prev + inputs # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
             self.MacCormick = Utils.heatsource.CalcMacCormick # We're not a boundary node, so reset MacCormick.
 
         else: raise Exception("WTF?")

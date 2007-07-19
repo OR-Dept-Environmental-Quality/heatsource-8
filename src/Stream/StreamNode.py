@@ -14,7 +14,7 @@ class StreamNode(StreamChannel):
         # Define members in __slots__ to ensure that later member names cannot be added accidentally
         s = ["Latitude", "Longitude", "Elevation", # Geographic params
              "FLIR_Temp", "FLIR_Time", # FLIR data
-             "T_cont", "T_sed", "T_in", "T_tribs", # Temperature attrs
+             "T_sed", "T_in", "T_tribs", # Temperature attrs
              "VHeight", "VDensity", #Vegetation params
              "Wind", "Humidity", "T_air", # Continuous data
              "Zone", "T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
@@ -116,6 +116,7 @@ class StreamNode(StreamChannel):
         # spreadsheet is. Thus, something must be propigated backward to the parent class
         # to fiddle with the spreadsheet. Perhaps we can write a report to a text file or
         # something. I'm very hesitant to connect this too tightly with the interface.
+#        return
         if self.W_w > self.W_bf:
             if not IniParams["channelwidth"]:
                 self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
@@ -134,8 +135,7 @@ class StreamNode(StreamChannel):
         self.SetBankfullMorphology()
     def CalcHeat(self, hour, min, sec, time,JD,JDC,offset):
         # Reset temperatures
-        self.T_prev = self.T
-        self.T = None
+        self.T_prev, self.T = self.T, None
 
         # Calculate solar position (C module)
         Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
@@ -185,26 +185,20 @@ class StreamNode(StreamChannel):
             self.T_prev = self.T_bc[time]
             return
 
-        T2 = self.next_km.T_prev if self.next_km else self.T_prev
-        self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[time], self.T_tribs[time],
+        self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs.get(time,0), self.T_tribs.get(time,0),
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
-                                          False, 0.0, self.prev_km.T_prev, self.T_prev, T2, self.Q_in, self.T_in)
+                                          False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
 #        T, S1 = self.MacCormick_THW(time)
 
     def MacCormick2(self, time):
         #===================================================
         #Set control temps
-        if self.T_cont:
-            self.T = self.T_cont
-            return
         if not self.prev_km:
             return
         #===================================================
-        T2 = self.next_km.T if self.next_km else self.T
-
         self.T, S = self.MacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
-                                    self.Q_tribs[time], self.T_tribs[time], self.prev_km.Q, self.Delta_T, self.Disp,
-                                    True, self.S1, self.prev_km.T, self.T, T2, self.Q_in, self.T_in)
+                                    self.Q_tribs.get(time,0), self.T_tribs.get(time,0), self.prev_km.Q, self.Delta_T, self.Disp,
+                                    True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
 
     def CalcDispersion(self):
         dx = self.dx

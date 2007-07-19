@@ -45,20 +45,6 @@ class HeatSourceInterface(ExcelDocument):
         IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
         ######################################################
 
-        # Page names- maybe a useless tuple, we'll see
-        self.pages = ("TTools Data", "Land Cover Codes", "Morphology Data", "Flow Data",
-                      "Continuous Data", "Chart-Diel Temp","Validation Data", "Chart-TIR",
-                      "Chart-Shade","Output - Hydraulics","Chart-Heat Flux","Chart-Long Temp",
-                      "Chart-Solar Flux","Output - Temperature", "Output - Solar Potential",
-                      "Output - Solar Surface","Output - Solar Recieved","Output - Longwave",
-                      "Output - Evaporation","Output - Convection","Output - Conduction",
-                      "Output - Total Heat","Output - Evaporation Rate", "Output - Daily Heat Flux")
-        self.startingRow = {"TTools Data": 5,
-                            "Land Cover Codes": 3,
-                            "Morphology Data": 5,
-                            "Flow Data": 3,
-                            "Continuous Data": 4}
-#        self.SetupSheets1()
 
         # from VB: Apparently, only one day is simulated for the shadelator
         # TODO: Check if we need to run for only one day during shadelator-only run.
@@ -106,7 +92,13 @@ class HeatSourceInterface(ExcelDocument):
             else: self.Reach[key].prev_km = self.Reach[l[i-1]] # At first node, there's no previous
             try:
                 self.Reach[key].next_km = self.Reach[l[i+1]]
-            except IndexError: pass # At final node, there's no next
+            except IndexError:
+            ##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ## For last node (mouth) we set the downstream node equal to self, this is because
+            ## we want to access the node's temp if there's no downstream, and this safes us an
+            ## if statement.
+                self.Reach[key].next_km = self.Reach[key]
+
 
     def CheckEarlyQuit(self):
         PumpWaitingMessages()
@@ -129,11 +121,15 @@ class HeatSourceInterface(ExcelDocument):
         # Get the columns, which is faster than accessing cells
         self.PB("Reading boundary conditions")
         C = Chronos
-        data = self.GetUsedRange("Continuous Data")[4:]
-        time_col = [x[5] for x in data]
-        flow_col = [x[6] for x in data]
-        temp_col = [x[7] for x in data]
-        cloud_col = [x[8] for x in data]
+        Rstart,Cstart = 5,5
+        Rend = Rstart+self.Hours-1
+        Cend = 8
+        rng = ((Rstart,Cstart),(Rend,Cend))
+        data = self.GetValue(rng,"Continuous Data")
+        time_col = [x[0] for x in data]
+        flow_col = [x[1] for x in data]
+        temp_col = [x[2] for x in data]
+        cloud_col = [x[3] for x in data]
 
         for I in xrange(self.Hours):
             time = C.MakeDatetime(time_col[I])
@@ -162,15 +158,18 @@ class HeatSourceInterface(ExcelDocument):
         timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
         timelist.reverse()
         timelist = [Chronos.MakeDatetime(i) for i in timelist]
-        data = self.GetUsedRange("Flow Data")[3:]
+        Rstart,Cstart = 4,12
+        Rend = Rstart+self.Hours-1
+        Cend = int((IniParams["inflowsites"]-1)*2 + Cstart+3)
+        rng = ((Rstart,Cstart),(Rend,Cend))
+        data = self.GetValue(rng,"Flow Data")
         for site in xrange(int(IniParams["inflowsites"])):
             # Get the stream node corresponding to the kilometer of this inflow site.
-            km = data[site][9]
+            km = self.GetValue((site + 4, 9),"Flow Data")
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
-
-            flow_col = [x[12+site*2] for x in data]
-            temp_col = [x[13+site*2] for x in data]
+            flow_col = [x[site*2] for x in data]
+            temp_col = [x[1+(site*2)] for x in data]
             for hour in xrange(self.Hours):
                 try:  #already a tributary, need to mass balance for T
                     node.T_tribs[timelist[hour]] = (temp_col[hour]*flow_col[hour] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + flow_col[hour])
@@ -178,20 +177,7 @@ class HeatSourceInterface(ExcelDocument):
                 except:# KeyError:
                     node.Q_tribs[timelist[hour]] = flow_col[hour]
                     node.T_tribs[timelist[hour]] = temp_col[hour]
-                self.PB("Reading inflow data")
-        # Here, we set the Q_tribs list to zeros if it's not listed above. This way
-        # We don't have to do an if statement later.
-        for key in l:
-            node = self.Reach[key]
-            for hour in xrange(self.Hours):
-                try:
-                    test = node.Q_tribs[timelist[hour]]
-                    test = node.T_tribs[timelist[hour]]
-                except KeyError:
-                    node.Q_tribs[timelist[hour]] = 0.0
-                    node.T_tribs[timelist[hour]] = 0.0
-
-                    self.PB("Clearing blank inflow nodes")
+            self.PB("Reading inflow data",site, IniParams["inflowsites"])
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
@@ -204,13 +190,19 @@ class HeatSourceInterface(ExcelDocument):
         timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
         timelist.reverse()
         timelist = [Chronos.MakeDatetime(i) for i in timelist]
+        Rstart,Cstart = 5,10
+        Rend = Rstart+self.Hours-1
+        Cend = int((IniParams["contsites"])*4 + Cstart-1)
+        rng = ((Rstart,Cstart),(Rend,Cend))
+        data = self.GetValue(rng,"Continuous Data")
         for site in xrange(int(IniParams["contsites"])):
-            km = self.GetValue((site + 4, 3),"Continuous Data")
+            km = self.GetValue((site + 5, 3),"Continuous Data")
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
-            wind_col = self.GetColumn(10+site*4,"Continuous Data")[4:]
-            humid_col = self.GetColumn(11+site*4,"Continuous Data")[4:]
-            air_col = self.GetColumn(12+site*4,"Continuous Data")[4:]
+
+            wind_col = [x[site*4] for x in data]
+            humid_col = [x[1+(site*4)] for x in data]
+            air_col =  [x[2+(site*4)] for x in data]
             for hour in xrange(self.Hours):
                 node.Wind[timelist[hour]] = wind_col[hour]
                 node.Humidity[timelist[hour]] = humid_col[hour]
