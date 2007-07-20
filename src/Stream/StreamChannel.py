@@ -79,7 +79,7 @@ class StreamChannel(object):
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
 
-        inputs = self.Q_in + self.Q_tribs.get(time,0) - self.Q_out - self.E
+        inputs = self.Q_in + self.Q_tribs.get(hour,0) - self.Q_out - self.E
 
         Q2 = self.prev_km.Q_prev + inputs
 
