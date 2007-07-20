@@ -50,6 +50,12 @@ class HeatSourceInterface(ExcelDocument):
         # TODO: Check if we need to run for only one day during shadelator-only run.
         self.Hours = int(IniParams["simperiod"] * 24)
 
+        timelist = [i for i in self.GetColumn(11,"Flow Data")[3:]]
+        timelist.reverse()
+        timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
+        timelist.reverse()
+        self.timelist = [Chronos.MakeDatetime(i) for i in timelist]
+
         # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
         # and incrementing a counter if the value was not blank. With the
@@ -153,11 +159,7 @@ class HeatSourceInterface(ExcelDocument):
         self.PB("Reading Inflow Data")
         l = self.Reach.keys()
         l.sort()
-        timelist = [i for i in self.GetColumn(11,"Flow Data")[3:]]
-        timelist.reverse()
-        timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
-        timelist.reverse()
-        timelist = [Chronos.MakeDatetime(i) for i in timelist]
+        timelist = self.timelist
         Rstart,Cstart = 4,12
         Rend = Rstart+self.Hours-1
         Cend = int((IniParams["inflowsites"]-1)*2 + Cstart+3)
@@ -185,11 +187,7 @@ class HeatSourceInterface(ExcelDocument):
         self.PB("Reading Continuous Data")
         l = self.Reach.keys()
         l.sort()
-        timelist = [i for i in self.GetColumn(5,"Continuous Data")[4:]]
-        timelist.reverse()
-        timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
-        timelist.reverse()
-        timelist = [Chronos.MakeDatetime(i) for i in timelist]
+        timelist = self.timelist
         Rstart,Cstart = 5,10
         Rend = Rstart+self.Hours-1
         Cend = int((IniParams["contsites"])*4 + Cstart-1)
@@ -462,6 +460,10 @@ class HeatSourceInterface(ExcelDocument):
 
     def InitializeNode(self, node):
         """Perform some initialization of the StreamNode, and write some values to spreadsheet"""
+        timelist = self.timelist
+        for hour in xrange(self.Hours):
+            node.Q_tribs[timelist[hour]] = 0.0
+            node.T_tribs[timelist[hour]] = 0.0
         ##############################################################
         #Now that we have a stream node, we set the node's dx value, because
         # we have most nodes that are long-sample-distance times multiple,
