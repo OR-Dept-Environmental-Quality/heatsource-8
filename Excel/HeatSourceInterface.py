@@ -20,9 +20,9 @@ from Excel.ExcelDocument import ExcelDocument
 
 class HeatSourceInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface"""
-    def __init__(self, filename=None, gauge=None):
+    def __init__(self, filename=None, gauge=None, run_type=0):
         ExcelDocument.__init__(self, filename)
-        #self.PB = gauge
+        self.run_type = run_type
         self.Reach = {}
         # Make empty Dictionaries for the boundary conditions
         self.Q_bc = {}
@@ -267,7 +267,7 @@ class HeatSourceInterface(ExcelDocument):
             for i in n: del l[i]
         # Make sure there are no zero length lists because they'll fail if we average
         for i in xrange(len(lst)):
-            if len(lst[i]) == 0: lst[i].append(0)
+            if len(lst[i]) == 0: lst[i].append(0.0)
         return lst
 
     def multiplier(self, iterable, predicate=lambda x:x):
@@ -277,7 +277,7 @@ class HeatSourceInterface(ExcelDocument):
 
     def zeroOutList(self, lst):
         """Replace blank values in a list with zeros"""
-        test = lambda x: 0 if x=="" else x
+        test = lambda x: 0.0 if x=="" else x
         return [test(i) for i in lst]
     def GetColumnarData(self):
         """return a dictionary of attributes that are averaged or summed as appropriate"""
@@ -315,7 +315,7 @@ class HeatSourceInterface(ExcelDocument):
         self.CheckEarlyQuit()
 
         data = self.GetColumnarData()
-        node = StreamNode()
+        node = StreamNode(run_type=self.run_type)
 
         for k,v in data.iteritems():
             setattr(node,k,v[0])
@@ -331,14 +331,14 @@ class HeatSourceInterface(ExcelDocument):
         # is not a perfect multiple of the sample distance.
         num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
         for i in range(0, num_nodes):
-            node = StreamNode()
+            node = StreamNode(run_type=self.run_type)
             for k,v in data.iteritems():
                 setattr(node,k,v[i+1])# Add one to ignore boundary node
             self.InitializeNode(node)
             self.Reach[node.km] = node
             self.PB("Building Stream Nodes", i, self.Num_Q_Var/self.multiple)
         mouth = self.Reach[min(self.Reach.keys())]
-        mouth_dx = (self.Num_Q_Var-1)%self.multiple or 1 # number of extra variables if we're not perfectly divisible
+        mouth_dx = (self.Num_Q_Var-1)%self.multiple or 1.0 # number of extra variables if we're not perfectly divisible
         mouth.dx = IniParams["longsample"] * mouth_dx
 
     def BuildZonesNormal(self):
@@ -358,9 +358,12 @@ class HeatSourceInterface(ExcelDocument):
             elev = self.GetColumn(i+28,"TTools Data")[5:]
             # Make a list from the LC codes from the column, then send that to the multiplier
             # with a lambda function that averages them appropriately
-            vheight.append(self.multiplier([LC[x][0] for x in col], average))
-            vdensity.append(self.multiplier([LC[x][1] for x in col], average))
-            overhang.append(self.multiplier([LC[x][2] for x in col], average))
+            try:
+                vheight.append(self.multiplier([LC[x][0] for x in col], average))
+                vdensity.append(self.multiplier([LC[x][1] for x in col], average))
+                overhang.append(self.multiplier([LC[x][2] for x in col], average))
+            except KeyError:
+                raise Exception("At least one land cover code from the 'TTools Data' worksheet is not in 'Land Cover Codes' worksheet.")
             if i>7:  #We don't want to read in column AJ
                 elevation.append(self.multiplier(elev, average))
         # We have to set the emergent vegetation, so we strip those off of the iterator
@@ -473,9 +476,14 @@ class HeatSourceInterface(ExcelDocument):
         node.C_bc = self.C_bc
         # Find the earliest temperature condition
         mindate = min(self.T_bc.keys())
-        node.T = self.T_bc[mindate]
-        node.T_prev = self.T_bc[mindate]
-        node.T_sed = self.T_bc[mindate]
+        if self.run_type == 2: # Running hydraulics only
+            node.T, node.T_prev, node.T_sed = 0.0, 0.0, 0.0
+        else:
+            if self.T_bc[mindate] is None:
+                raise Exception("Boundary temperature conditions cannot be blank")
+            node.T = self.T_bc[mindate]
+            node.T_prev = self.T_bc[mindate]
+            node.T_sed = self.T_bc[mindate]
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
         node.T_alluv = IniParams["alluviumtemp"] if IniParams["calcalluvium"] else 0.0

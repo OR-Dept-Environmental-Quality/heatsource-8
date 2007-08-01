@@ -106,7 +106,11 @@ class Output(object):
             if node.km == first:
                 Excel_time = "%0.6f" % (TheTime.toordinal() - 693594 + (TheTime.hour +  (TheTime.minute + TheTime.second / 60) / 60 ) / 24)
                 self.files[key][0].write(Excel_time.ljust(14))
-            dataf = "%0.4f" % variables[key]
+            try:
+                dataf = "%0.4f" % variables[key]
+            except:
+                print variables[key], type(variables[key]), key
+                raise
             self.files[key][0].write(dataf.ljust(14))
             if node.km == last:
                 self.files[key][0].write("\n")

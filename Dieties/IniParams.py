@@ -8,4 +8,4 @@ class IniParamsDiety(dict):
     def __init__(self, *args):
         dict.__init__(self, *args)
 
-IniParams = IniParamsDiety()
+IniParams = IniParamsDiety({'catchwidth':True})

@@ -39,11 +39,10 @@ class StreamNode(StreamChannel):
         for attr in ["F_Conduction","F_Convection","F_Longwave","F_Evaporation"]:
             setattr(self, attr, 0)
         self.F_Solar = [0]*8
-#        self.F_DailySum = [0]*5
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
-
+        self.catchwidth = True # raise message if there's a stream going dry
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
         return self.km == cmp
@@ -118,17 +117,16 @@ class StreamNode(StreamChannel):
         # something. I'm very hesitant to connect this too tightly with the interface.
 #        return
         if self.W_w > self.W_bf:
-            if not IniParams["channelwidth"]:
-                self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
+            self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
+            if IniParams["catchwidth"]:
+                from Utils.easygui import indexbox
                 msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
-                dlg = wx.MessageDialog(None, msg, 'HeatSource question', wx.YES_NO | wx.ICON_INFORMATION)
-                if dlg.ShowModal() == wx.ID_YES:
+                if not indexbox(message=msg, title="HeatSource Question", choices=["Yes","No"]):
                     # Put this in a public place so we don't ask again.
-                    IniParams["channelwidth"] = True
+                    IniParams["catchwidth"] = False
                 else:    #Stop Model Run and Change Input Data
                     import sys
                     sys.exit(1)
-                dlg.Destroy()
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""

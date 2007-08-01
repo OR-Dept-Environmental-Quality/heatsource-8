@@ -15,17 +15,17 @@ from Utils.Output import Output as O
 from __version__ import version_info
 
 class HSProfile(object):
-    def __init__(self,worksheet,run_type="HS"):
+    def __init__(self,worksheet,run_type=0):
         self.ErrLog = Logger
         self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
-        self.HS = HeatSourceInterface(join(worksheet), self.ErrLog)
+        self.HS = HeatSourceInterface(join(worksheet), self.ErrLog, run_type)
         self.Reach = self.HS.Reach
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams["dt"])
         start = IniParams["date"]
-        if self.run_type=="SH":
+        if self.run_type==1:
             stop = start + timedelta(days=1)
         else:
             stop = start + timedelta(days=IniParams["simperiod"])
@@ -70,13 +70,13 @@ class HSProfile(object):
             elif time.hour != solar_time.hour:
                 raise NotImplementedError("Not divisible by timestep")
 
-            if self.run_type=="HS":
+            if self.run_type==0:
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
                 [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
                 [x.MacCormick2(solar_time) for x in self.reachlist]
-            elif self.run_type=="SH":
+            elif self.run_type==1:
                 [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
-            elif self.run_type=="HY":
+            elif self.run_type==2:
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
             else: raise Exception("Invalid run_type")
 
@@ -98,7 +98,7 @@ def RunHS(sheet):
         raise Exception("See error log: c:\\HSError.txt")
 def RunSH(sheet):
     try:
-        HSP = HSProfile(sheet,"SH").run()
+        HSP = HSProfile(sheet,1).run()
     except Exception:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
@@ -106,7 +106,7 @@ def RunSH(sheet):
         raise Exception("See error log: c:\\HSError.txt")
 def RunHY(sheet):
     try:
-        HSP = HSProfile(sheet,"HY").run()
+        HSP = HSProfile(sheet,2).run()
     except Exception:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
@@ -117,10 +117,10 @@ if __name__ == "__main__":
     #Profile()
 
     try:
-        #HSP = HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\Evans.xls","HS")
-        #HSP = HSProfile("C:\\eclipse\\HSStable\\HS8_Example_River.xls","HS")
+        HSP = HSProfile("C:\\Rogue\\Evans.xls",2)
+        #HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HS")
         HSP.run()
-        cProfile.runctx('HSP.run()',globals(), locals())
+        #cProfile.runctx('HSP.run()',globals(), locals())
     except Exception:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
