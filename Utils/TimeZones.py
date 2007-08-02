@@ -112,7 +112,7 @@ class USTimeZone(tzinfo):
             return self.stdname
 
     def utcoffset(self, dt):
-        return self.stdoffset + self.dst(dt)
+        return self.stdoffset # + self.dst(dt)
 
     def dst(self, dt): return ZERO
 

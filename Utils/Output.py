@@ -1,7 +1,7 @@
 from __future__ import division
 from datetime import datetime, timedelta
 import time
-from Dieties.IniParams import IniParams
+from ..Dieties import IniParams
 from os import path
 import os
 

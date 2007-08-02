@@ -1,11 +1,11 @@
 from __future__ import division
 import math, wx, bisect
 from warnings import warn
-from Dieties.Chronos import Chronos
-from Dieties.IniParams import IniParams
+from ..Dieties import Chronos
+from ..Dieties import IniParams
 from StreamChannel import StreamChannel
-from Utils.Logger import Logger
-
+from ..Utils.Logger import Logger
+from ..Utils.easygui import indexbox
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
@@ -119,7 +119,6 @@ class StreamNode(StreamChannel):
         if self.W_w > self.W_bf:
             self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
             if IniParams["catchwidth"]:
-                from Utils.easygui import indexbox
                 msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
                 if not indexbox(message=msg, title="HeatSource Question", choices=["Yes","No"]):
                     # Put this in a public place so we don't ask again.

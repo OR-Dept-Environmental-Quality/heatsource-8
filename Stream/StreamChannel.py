@@ -1,9 +1,9 @@
 from __future__ import division
 import math, decimal
 from warnings import warn
-import Utils.heatsource
-from Dieties.Chronos import Chronos as Clock
-from Dieties.IniParams import IniParams
+from ..Utils import heatsource as _HS
+from ..Dieties import Chronos as Clock
+from ..Dieties import IniParams
 
 class StreamChannel(object):
     """Class that describes the geometry of a stream channel
@@ -61,11 +61,11 @@ class StreamChannel(object):
         self.starttime = Clock.MakeDatetime(IniParams["date"])
 
         # Make the C module's functions part of the class
-        self.CalcSolarPosition = Utils.heatsource.CalcSolarPosition
-        self.CalcSolarFlux = Utils.heatsource.CalcSolarFlux
-        self.CalcGroundFluxes = Utils.heatsource.CalcGroundFluxes
-        self.GetStreamGeometry = Utils.heatsource.GetStreamGeometry
-        self.GetMuskingum = Utils.heatsource.CalcMuskingum
+        self.CalcSolarPosition = _HS.CalcSolarPosition
+        self.CalcSolarFlux = _HS.CalcSolarFlux
+        self.CalcGroundFluxes = _HS.CalcGroundFluxes
+        self.GetStreamGeometry = _HS.GetStreamGeometry
+        self.GetMuskingum = _HS.CalcMuskingum
 
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
@@ -153,7 +153,7 @@ class StreamChannel(object):
         elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
             Q = self.prev_km.Q_prev + inputs # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
-            self.MacCormick = Utils.heatsource.CalcMacCormick # We're not a boundary node, so reset MacCormick.
+            self.MacCormick = _HS.CalcMacCormick # We're not a boundary node, so reset MacCormick.
 
         else: raise Exception("WTF?")
 

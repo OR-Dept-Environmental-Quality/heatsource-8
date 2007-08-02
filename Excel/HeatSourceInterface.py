@@ -8,11 +8,11 @@ from os.path import exists
 from sys import exit
 from win32gui import PumpWaitingMessages
 
-from Stream.StreamNode import StreamNode
-from Stream.Zonator import Zonator
-from Dieties.IniParams import IniParams
-from Dieties.Chronos import Chronos
-from Excel.ExcelDocument import ExcelDocument
+from ..Stream.StreamNode import StreamNode
+from ..Stream.Zonator import Zonator
+from ..Dieties import IniParams
+from ..Dieties import Chronos
+from ExcelDocument import ExcelDocument
 #Flag_HS values:
 #    0: Flow Router
 #    1: Heat Source
@@ -35,7 +35,7 @@ class HeatSourceInterface(ExcelDocument):
         lst = ("name", "date", "dt","dx", "length", "longsample", "transsample", "inflowsites",
                "contsites", "flushdays", "timezone", "simperiod","outputdir","evapmethod",
                "wind_a", "wind_b", "calcevap", "calcalluvium","alluviumtemp","emergent",
-                "lidar", "lcdensity","knob")
+                "lidar", "lcdensity","daylightsavings")
         vals = [i[0] for i in self.GetValue("B3:B25","Heat Source Inputs")]
         for i in xrange(len(lst)):
             IniParams[lst[i]] = vals[i]
