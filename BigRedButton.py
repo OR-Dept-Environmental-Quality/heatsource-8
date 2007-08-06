@@ -89,6 +89,13 @@ class HSProfile(object):
                     (total_time, total_time/timesteps, total_days)
         self.HS.PB(message)
         print message
+
+class MyError(SystemExit):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return "'%s'\nSee c:\HSError.txt for full error message." % self.value
+
 def RunHS(sheet):
     try:
         HSP = HSProfile(sheet).run()
@@ -100,11 +107,12 @@ def RunHS(sheet):
 def RunSH(sheet):
     try:
         HSP = HSProfile(sheet,1).run()
-    except Exception:
+    except Exception, stderr:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        raise Exception("See error log: c:\\HSError.txt")
+        sys.tracebacklimit = 1
+        raise
 def RunHY(sheet):
     try:
         HSP = HSProfile(sheet,2).run()
@@ -118,7 +126,7 @@ if __name__ == "__main__":
     #Profile()
 
     try:
-        HSP = HSProfile("C:\\Rogue\\Evans.xls",2)
+        HSP = HSProfile("C:\\Rogue\\Evans.xls",1)
         #HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HS")
         HSP.run()
         #cProfile.runctx('HSP.run()',globals(), locals())
@@ -126,5 +134,7 @@ if __name__ == "__main__":
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
+        sys.tracebacklimit = 1
+        print sys.tracebacklimit
         raise
 

@@ -124,8 +124,7 @@ class StreamNode(StreamChannel):
                     # Put this in a public place so we don't ask again.
                     IniParams["catchwidth"] = False
                 else:    #Stop Model Run and Change Input Data
-                    import sys
-                    sys.exit(1)
+                    raise SystemExit
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
