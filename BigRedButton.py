@@ -20,6 +20,7 @@ class HSProfile(object):
         self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
         self.HS = HeatSourceInterface(join(worksheet), self.ErrLog, run_type)
         self.Reach = self.HS.Reach
+        self.cur_hour = None
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         ##########################################################
         # Create a Chronos iterator that controls all model time
@@ -60,9 +61,6 @@ class HSProfile(object):
         else:
             timesteps = ((stop-flush).days*86400)/Chronos.dt.seconds
         count = itertools.count()
-
-        print time
-
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
@@ -79,6 +77,7 @@ class HSProfile(object):
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 if solar_time < start:
                     solar_time += timedelta(days=start.day-solar_time.day)
+            print time
 
             if self.run_type==0:
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
@@ -92,7 +91,6 @@ class HSProfile(object):
 
             self.Output(time)
             time = Chronos.Tick()
-            print time
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day)" %\

@@ -48,9 +48,10 @@ class ChronosDiety(object):
     def Tick(self):
         self.__current += self.__dt
         if self.__current < self.__start: # If we're still in the spin-up period
-            if (self.__spin_current-self.__spin_start).days: #Make sure we don't advance to next day (i.e. just run the first day over and over)
+            if ((self.__spin_current+self.__dt)-self.__spin_start).days: #Make sure we don't advance to next day (i.e. just run the first day over and over)
                 self.__spin_current = self.__spin_start
-            self.__spin_current += self.__dt
+            else:
+                self.__spin_current += self.__dt
             self.TheTime = self.__spin_current
         else:
             self.TheTime = self.__current

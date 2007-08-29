@@ -6,6 +6,7 @@ from ..Dieties import IniParams
 from StreamChannel import StreamChannel
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox
+from heatsource.heatsource import HeatSourceError
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
@@ -107,24 +108,12 @@ class StreamNode(StreamChannel):
         return attrDict
 
     def CalcHydraulics(self, time, hour):
-        self.CalculateDischarge(time, hour)
-        #===================================================
-        #Check to see if wetted widths exceed bankfull widths
-        #TODO: This has to be reimplemented somehow, because Excel is involved
-        # connected to the backend. Meaning this class has NO understanding of what the Excel
-        # spreadsheet is. Thus, something must be propigated backward to the parent class
-        # to fiddle with the spreadsheet. Perhaps we can write a report to a text file or
-        # something. I'm very hesitant to connect this too tightly with the interface.
-#        return
+        try:
+            self.CalculateDischarge(time, hour)
+        except HeatSourceError, (stderr):
+            print stderr.message
         if self.W_w > self.W_bf:
             self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
-            if IniParams["catchwidth"]:
-                msg = "The wetted width is exceeding the bankfull width at StreamNode km: %0.2f .  To accomodate flows, the BF X-area should be or greater. Select 'Yes' to continue the model run (and use calc. wetted widths) or select 'No' to stop this model run (suggested X-Area values will be recorded in Column Z in the Morphology Data worksheet)  Do you want to continue this model run?" % self.km
-                if not indexbox(message=msg, title="HeatSource Question", choices=["Yes","No"]):
-                    # Put this in a public place so we don't ask again.
-                    IniParams["catchwidth"] = False
-                else:    #Stop Model Run and Change Input Data
-                    raise SystemExit
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""

@@ -724,9 +724,9 @@ initheatsource()
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
-	HeatSourceError = PyString_FromString("HeatSource Error");
+	HeatSourceError = PyString_FromString("HeatSourceError");
 	Py_INCREF(HeatSourceError);
-	PyDict_SetItemString(d, "heatsource.error", HeatSourceError);
+	PyDict_SetItemString(d, "heatsource.HSError", HeatSourceError);
 
 	/* XXXX Add constants here */
 	PyDict_SetItemString(d, "__file__", PyString_FromString("heatsource.py"));

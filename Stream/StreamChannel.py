@@ -1,7 +1,7 @@
 from __future__ import division
 import math, decimal
 from warnings import warn
-from ..Utils import heatsource as _HS
+import heatsource.heatsource as _HS
 from ..Dieties import Chronos as Clock
 from ..Dieties import IniParams
 
