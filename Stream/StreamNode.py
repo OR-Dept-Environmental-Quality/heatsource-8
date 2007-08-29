@@ -6,7 +6,9 @@ from ..Dieties import IniParams
 from StreamChannel import StreamChannel
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox
-from heatsource.heatsource import HeatSourceError
+import heatsource.heatsource as HSTEST
+
+print dir(HSTEST)
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
