@@ -37,16 +37,23 @@ class ChronosDiety(object):
         self.__dt = dt or self.minute
         self.dst = timedelta(hours=0) # whether we're in daylight savings time or not
         self.__stop = stop or self.__start + self.year
-        self.__spin = timedelta(days=spin)
-        self.__current = self.__start - self.__spin if self.__spin else self.__start
+        self.__current = self.__start - timedelta(days=spin) if spin else self.__start
+        self.__spin_start = self.__start
+        self.__spin_current = self.__start
         self.__dayone = datetime(self.__start.year,1,1,tzinfo=TZ[tz])
         self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
         self.__jd = None # Placeholder for current julian day
-        self.TheTime = self.__current
+        self.TheTime = self.__spin_current
 
     def Tick(self):
         self.__current += self.__dt
-        self.TheTime = self.__current
+        if self.__current < self.__start: # If we're still in the spin-up period
+            if (self.__spin_current-self.__spin_start).days: #Make sure we don't advance to next day (i.e. just run the first day over and over)
+                self.__spin_current = self.__spin_start
+            self.__spin_current += self.__dt
+            self.TheTime = self.__spin_current
+        else:
+            self.TheTime = self.__current
         return self.TheTime
     def __iter__(self):
         if not self.__start or not self.__dt:

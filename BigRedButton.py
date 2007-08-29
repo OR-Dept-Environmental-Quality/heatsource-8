@@ -39,6 +39,16 @@ class HSProfile(object):
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
 
+    def trip(self, time):
+        """Set tripline if we are at, or the first timestep after, the top of the hour"""
+        if time.minute: # We are not the top of the hour
+            if time.hour == self.cur_hour: # Same hour as last timestep
+                return time
+            else: # We've advanced an hour, reset
+                self.cur_hour = time.hour
+                return time
+        else: # we've landed at the top of the hour, return
+            return time
     def run(self): # Argument allows profiling and testing
         time1 = datetime.today()
         time = Chronos.TheTime
@@ -50,6 +60,9 @@ class HSProfile(object):
         else:
             timesteps = ((stop-flush).days*86400)/Chronos.dt.seconds
         count = itertools.count()
+
+        print time
+
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
@@ -61,15 +74,11 @@ class HSProfile(object):
                 if exists("c:\\quitHS"):
                     self.HS.PB("Simulation stopped by user")
                     return
-                hydro_time = time
-                solar_time = time
+                hydro_time = solar_time = self.trip(time)
                 if not n%1440:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 if solar_time < start:
-                    hydro_time = start
                     solar_time += timedelta(days=start.day-solar_time.day)
-            elif time.hour != solar_time.hour:
-                raise NotImplementedError("Not divisible by timestep")
 
             if self.run_type==0:
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
@@ -83,6 +92,7 @@ class HSProfile(object):
 
             self.Output(time)
             time = Chronos.Tick()
+            print time
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day)" %\
@@ -126,8 +136,8 @@ if __name__ == "__main__":
     #Profile()
 
     try:
-        HSP = HSProfile("C:\\Rogue\\Evans.xls",1)
-        #HSP = HSProfile("C:\\eclipse\\HeatSource\\HS8_Example_River.xls","HS")
+        #HSP = HSProfile("C:\\Rogue\\Evans.xls",1)
+        HSP = HSProfile("C:\\Python25\\HS8_Example_River.xls","HS")
         HSP.run()
         #cProfile.runctx('HSP.run()',globals(), locals())
     except Exception:
