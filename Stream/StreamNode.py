@@ -5,10 +5,8 @@ from ..Dieties import Chronos
 from ..Dieties import IniParams
 from StreamChannel import StreamChannel
 from ..Utils.Logger import Logger
-from ..Utils.easygui import indexbox
-import heatsource.heatsource as HSTEST
-
-print dir(HSTEST)
+from ..Utils.easygui import indexbox, msgbox
+from heatsource.heatsource import HeatSourceError
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
@@ -113,7 +111,8 @@ class StreamNode(StreamChannel):
         try:
             self.CalculateDischarge(time, hour)
         except HeatSourceError, (stderr):
-            print stderr.message
+            msgbox(stderr+"\nStopping The Model. You may ignore any further error messages.")
+            raise SystemExit
         if self.W_w > self.W_bf:
             self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
 
@@ -155,14 +154,17 @@ class StreamNode(StreamChannel):
 #        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
 #            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
 #            self.GroundFlux_THW(time)
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-            self.CalcGroundFluxes(cloud, self.Humidity[bc_hour], self.T_air[bc_hour], self.Wind[bc_hour], Elev,
-                                self.phi, VHeight, VTS, self.SedDepth, dx,
-                                dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
-                                self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
-                                IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
-
+        try:
+            self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
+                self.CalcGroundFluxes(cloud, self.Humidity[bc_hour], self.T_air[bc_hour], self.Wind[bc_hour], Elev,
+                                    self.phi, VHeight, VTS, self.SedDepth, dx,
+                                    dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
+                                    self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
+                                    IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
+        except HeatSourceError, (stderr):
+            msgbox(stderr+"\nStopping The Model. You may ignore any further error messages.")
+            raise SystemExit
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
 
