@@ -4,8 +4,9 @@ class LoggerDiety(object):
     def __init__(self):
         self._last = None
         self._file = None
+    def __del__(self): self._file.close()
     def SetFile(self, filename):
-        self._file = filename
+        self._file = open(filename,"w")
     def __call__(self, message, n=None,t=None): self.write(message)
     def write(self, message):
         if message != self._last:

@@ -560,7 +560,7 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
     //Calculate the temperature of the substrate conduction layer
     float T_sed_new = T_sed + DT_Sed;
     if ((T_sed_new > 50.0f) || (T_sed_new < 0.0f))
-	  	PyErr_SetString(HeatSourceError, "Sediment temperature calculations causing an unstable model in CalcGroundFluxes()");
+	  	PyErr_SetString(HeatSourceError, "Sediment temperature not bounded in 0<=temp<=50.");
     // End Conduction Flux
 	//###########################################################################################
 	//##############################################################################

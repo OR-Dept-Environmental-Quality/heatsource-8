@@ -17,7 +17,6 @@ from __version__ import version_info
 class HSProfile(object):
     def __init__(self,worksheet,run_type=0):
         self.ErrLog = Logger
-        self.ErrLog.SetFile(sys.stdout) # Set the logger to the stdout
         self.HS = HeatSourceInterface(join(worksheet), self.ErrLog, run_type)
         self.Reach = self.HS.Reach
         self.cur_hour = None
@@ -40,16 +39,6 @@ class HSProfile(object):
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
 
-    def trip(self, time):
-        """Set tripline if we are at, or the first timestep after, the top of the hour"""
-        if time.minute: # We are not the top of the hour
-            if time.hour == self.cur_hour: # Same hour as last timestep
-                return time
-            else: # We've advanced an hour, reset
-                self.cur_hour = time.hour
-                return time
-        else: # we've landed at the top of the hour, return
-            return time
     def run(self): # Argument allows profiling and testing
         time1 = datetime.today()
         time = Chronos.TheTime
@@ -72,12 +61,11 @@ class HSProfile(object):
                 if exists("c:\\quitHS"):
                     self.HS.PB("Simulation stopped by user")
                     return
-                hydro_time = solar_time = self.trip(time)
                 if not n%1440:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
-                if solar_time < start:
-                    solar_time += timedelta(days=start.day-solar_time.day)
-            print time
+                hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
+                if time < start:
+                    solar_time = (time + timedelta(days=start.day-solar_time.day)).isoformat(" ")[:-12]+":00:00"
 
             if self.run_type==0:
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]

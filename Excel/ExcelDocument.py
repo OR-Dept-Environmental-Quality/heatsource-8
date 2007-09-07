@@ -2,6 +2,7 @@ from __future__ import division
 from win32com.client import constants, Dispatch
 from pythoncom import CoInitialize,CoUninitialize
 from itertools import dropwhile
+from pywintypes import com_error
 import os
 
 borderTop = 3
@@ -54,7 +55,10 @@ class ExcelDocument(object):
         if self.quit_excel:
             self.app.Quit()
     def PB(self, message, num=None, divisor=None):
-        self.app.StatusBar = self.PBtext(message, num, divisor)
+        try:
+            self.app.StatusBar = self.PBtext(message, num, divisor)
+        except com_error: # win32 throws an exception if we are playing with excel and try to update the statusbar
+            pass
 
     def New(self, filename=None):
         """

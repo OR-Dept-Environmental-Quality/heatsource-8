@@ -4,7 +4,7 @@ import math, time, operator, bisect
 from itertools import chain, ifilterfalse
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
-from os.path import exists
+from os.path import exists, join, split, normpath
 from sys import exit
 from win32gui import PumpWaitingMessages
 
@@ -20,9 +20,10 @@ from ExcelDocument import ExcelDocument
 
 class HeatSourceInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface"""
-    def __init__(self, filename=None, gauge=None, run_type=0):
+    def __init__(self, filename=None, log=None, run_type=0):
         ExcelDocument.__init__(self, filename)
         self.run_type = run_type
+        self.log = log
         self.Reach = {}
         # Make empty Dictionaries for the boundary conditions
         self.Q_bc = {}
@@ -43,6 +44,8 @@ class HeatSourceInterface(ExcelDocument):
         # Make the date a datetime instance
         IniParams["date"] = Chronos.MakeDatetime(IniParams["date"])
         IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
+        # Set up the log file in the outputdir
+        self.log.SetFile(normpath(join(IniParams["outputdir"],"outfile.log")))
         ######################################################
 
 
@@ -52,9 +55,9 @@ class HeatSourceInterface(ExcelDocument):
 
         timelist = [i for i in self.GetColumn(11,"Flow Data")[3:]]
         timelist.reverse()
-        timelist = [i for i in dropwhile(lambda x:x=='',timelist)]
+        timelist = [i for i in dropwhile(lambda x:x=='' or x==None,timelist)]
         timelist.reverse()
-        self.timelist = [Chronos.MakeDatetime(i) for i in timelist]
+        self.timelist = [Chronos.MakeDatetime(i).isoformat(" ")[:-12]+":00:00" for i in timelist]
 
         # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
@@ -138,7 +141,7 @@ class HeatSourceInterface(ExcelDocument):
         cloud_col = [x[3] for x in data]
 
         for I in xrange(self.Hours):
-            time = C.MakeDatetime(time_col[I])
+            time = C.MakeDatetime(time_col[I]).isoformat(" ")[:-6]
             # Get the flow boundary condition
             val = flow_col[I]
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
@@ -200,6 +203,9 @@ class HeatSourceInterface(ExcelDocument):
 
             wind_col = [x[site*4] for x in data]
             humid_col = [x[1+(site*4)] for x in data]
+            for hum_val in humid_col:
+                print hum_val
+                if hum_val >1 or hum_val < 0: raise Exception("Humidity of %s not bounded in 0<=x<=1" % `hum_val`)
             air_col =  [x[2+(site*4)] for x in data]
             for hour in xrange(self.Hours):
                 node.Wind[timelist[hour]] = wind_col[hour]
@@ -362,8 +368,8 @@ class HeatSourceInterface(ExcelDocument):
                 vheight.append(self.multiplier([LC[x][0] for x in col], average))
                 vdensity.append(self.multiplier([LC[x][1] for x in col], average))
                 overhang.append(self.multiplier([LC[x][2] for x in col], average))
-            except KeyError:
-                raise Exception("At least one land cover code from the 'TTools Data' worksheet is not in 'Land Cover Codes' worksheet.")
+            except KeyError, (stderr):
+                raise Exception("At least one land cover code from the 'TTools Data' worksheet is not in 'Land Cover Codes' worksheet (%s)." % stderr.message)
             if i>7:  #We don't want to read in column AJ
                 elevation.append(self.multiplier(elev, average))
         # We have to set the emergent vegetation, so we strip those off of the iterator

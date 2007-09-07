@@ -111,10 +111,11 @@ class StreamNode(StreamChannel):
         try:
             self.CalculateDischarge(time, hour)
         except HeatSourceError, (stderr):
-            msgbox(stderr+"\nStopping The Model. You may ignore any further error messages.")
+            msg = "At %s and time %s\n"%(self,time.isoformat(" ") )
+            msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
             raise SystemExit
         if self.W_w > self.W_bf:
-            self.Log.write("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
+            self.Log("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
@@ -163,7 +164,8 @@ class StreamNode(StreamChannel):
                                     self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
                                     IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
         except HeatSourceError, (stderr):
-            msgbox(stderr+"\nStopping The Model. You may ignore any further error messages.")
+            msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
+            msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
             raise SystemExit
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
