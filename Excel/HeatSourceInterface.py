@@ -175,6 +175,9 @@ class HeatSourceInterface(ExcelDocument):
             node = self.Reach[l[key]] # Index by kilometer
             flow_col = [x[site*2] for x in data]
             temp_col = [x[1+(site*2)] for x in data]
+            for i in xrange(len(flow_col)):
+                if flow_col[i] is None or temp_col[i] is None:
+                    raise Exception("Cannot have a tributary with blank flow or temperature conditions")
             for hour in xrange(self.Hours):
                 try:  #already a tributary, need to mass balance for T
                     node.T_tribs[timelist[hour]] = (temp_col[hour]*flow_col[hour] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + flow_col[hour])

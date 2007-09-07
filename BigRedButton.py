@@ -5,6 +5,7 @@ from os.path import join, exists
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from win32gui import PumpWaitingMessages
+from Utils.easygui import msgbox
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties import Chronos
@@ -86,20 +87,19 @@ class HSProfile(object):
         self.HS.PB(message)
         print message
 
-class MyError(SystemExit):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return "'%s'\nSee c:\HSError.txt for full error message." % self.value
+class MyErrorClass:
+    def write(self,msg):
+        msgbox(msg)
+MyError = MyErrorClass()
 
 def RunHS(sheet):
     try:
         HSP = HSProfile(sheet).run()
-    except Exception:
+    except Exception, stderr:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        raise Exception("See error log: c:\\HSError.txt")
+        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\n%s"%stderr)
 def RunSH(sheet):
     try:
         HSP = HSProfile(sheet,1).run()
@@ -116,21 +116,4 @@ def RunHY(sheet):
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        raise Exception("See error log: c:\\HSError.txt")
-
-if __name__ == "__main__":
-    #Profile()
-
-    try:
-        #HSP = HSProfile("C:\\Rogue\\Evans.xls",1)
-        HSP = HSProfile("C:\\Python25\\HS8_Example_River.xls","HS")
-        HSP.run()
-        #cProfile.runctx('HSP.run()',globals(), locals())
-    except Exception:
-        f = open("c:\\HSError.txt","w")
-        traceback.print_exc(file=f)
-        f.close()
-        sys.tracebacklimit = 1
-        print sys.tracebacklimit
-        raise
-
+        raise Exception("EEEEEEEEEEEEEEESee error log: c:\\HSError.txt")
