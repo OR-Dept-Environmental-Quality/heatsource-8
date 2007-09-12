@@ -1,5 +1,5 @@
 from __future__ import division
-import math, wx, bisect
+import math, bisect
 from warnings import warn
 from ..Dieties import Chronos
 from ..Dieties import IniParams
