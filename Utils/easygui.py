@@ -141,18 +141,18 @@ def indexbox(message="Shall I continue?", title="", choices=["Yes","No"]):
 #-------------------------------------------------------------------
 # msgbox
 #-------------------------------------------------------------------
-def msgbox(message="Shall I continue?", title="", buttonMessage="OK"):
+def msgbox(message="Shall I continue?", title="", buttonMessage="OK",err=False):
 	"""Display a messagebox
 	"""
 	choices = [buttonMessage]
-	reply = buttonbox(message, title, choices)
+	reply = buttonbox(message, title, choices,err)
 	return reply
 
 
 #-------------------------------------------------------------------
 # buttonbox
 #-------------------------------------------------------------------
-def buttonbox(message="Shall I continue?", title="", choices = ["Button1", "Button2", "Button3"]):
+def buttonbox(message="Shall I continue?", title="", choices = ["Button1", "Button2", "Button3"], err=False):
 	"""Display a message, a title, and a set of buttons.
 	The buttons are defined by the members of the choices list.
 	Return the text of the button that the user selected.
@@ -182,7 +182,8 @@ def buttonbox(message="Shall I continue?", title="", choices = ["Button1", "Butt
 	buttonsFrame.pack(side=BOTTOM, fill=BOTH)
 
 	# -------------------- place the widgets in the frames -----------------------
-	messageWidget = Message(messageFrame, text=message, width=400)
+	messageWidth = 600 if err else 400
+	messageWidget = Message(messageFrame, text=message, width=messageWidth)
 	messageWidget.configure(font=(DEFAULT_FONT_FAMILY,DEFAULT_FONT_SIZE))
 	messageWidget.pack(side=TOP, expand=YES, fill=X, padx='3m', pady='3m')
 

@@ -205,11 +205,14 @@ class HeatSourceInterface(ExcelDocument):
             node = self.Reach[l[key]] # Index by kilometer
 
             wind_col = [x[site*4] for x in data]
+            for i in xrange(len(wind_col)):
+                if wind_col[i] is None: wind_col[i] = 0.0
             humid_col = [x[1+(site*4)] for x in data]
             for hum_val in humid_col:
-                print hum_val
-                if hum_val >1 or hum_val < 0: raise Exception("Humidity of %s not bounded in 0<=x<=1" % `hum_val`)
+                if hum_val >1 or hum_val < 0: raise Exception("Humidity value of %s (Continuous Data) not bounded in 0<=x<=1" % `hum_val`)
             air_col =  [x[2+(site*4)] for x in data]
+            for air_val in air_col:
+                if air_val is None: raise Exception("Must have values for Air Temp in Continuous Data sheet")
             for hour in xrange(self.Hours):
                 node.Wind[timelist[hour]] = wind_col[hour]
                 node.Humidity[timelist[hour]] = humid_col[hour]

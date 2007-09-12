@@ -113,6 +113,7 @@ class StreamNode(StreamChannel):
         except HeatSourceError, (stderr):
             msg = "At %s and time %s\n"%(self,time.isoformat(" ") )
             msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
+            msgbox(msg)
             raise SystemExit
         if self.W_w > self.W_bf:
             self.Log("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
@@ -166,6 +167,7 @@ class StreamNode(StreamChannel):
         except HeatSourceError, (stderr):
             msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
             msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
+            msgbox(msg)
             raise SystemExit
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)

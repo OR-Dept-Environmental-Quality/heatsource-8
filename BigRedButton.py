@@ -99,7 +99,7 @@ def RunHS(sheet):
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\n%s"%stderr)
+        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 def RunSH(sheet):
     try:
         HSP = HSProfile(sheet,1).run()
@@ -107,13 +107,11 @@ def RunSH(sheet):
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        sys.tracebacklimit = 1
-        raise
+        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error")
 def RunHY(sheet):
     try:
         HSP = HSProfile(sheet,2).run()
     except Exception:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
-        f.close()
-        raise Exception("EEEEEEEEEEEEEEESee error log: c:\\HSError.txt")
+        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error")
