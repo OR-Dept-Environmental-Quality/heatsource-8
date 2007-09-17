@@ -112,7 +112,16 @@ class StreamNode(StreamChannel):
             self.CalculateDischarge(time, hour)
         except HeatSourceError, (stderr):
             msg = "At %s and time %s\n"%(self,time.isoformat(" ") )
-            msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
+            if isinstance(stderr,tuple):
+                msg += """%s\n\tVariables causing this affliction:
+    dt: %4.0f
+    dx: %4.0f
+    K: %4.4f
+    X: %3.4f
+    c_k: %3.4f""" % stderr
+            else: msg += stderr
+
+            msg += "\nThe model run has been halted. You may ignore any further error messages."
             msgbox(msg)
             raise SystemExit
         if self.W_w > self.W_bf:

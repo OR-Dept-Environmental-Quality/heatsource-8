@@ -249,9 +249,11 @@ heatsource_CalcMuskingum(PyObject *self, PyObject *args)
     float K = dx / c_k;
 
     // Check the celerity to ensure stability. These tests are from the VB code.
-    if ((dt >= (2 * K * (1 - X))) || (dt > (dx/c_k)))  //Unstable - Decrease dt or increase dx
-        PyErr_SetString(HeatSourceError, "Unstable celerity. Decrease dt or increase dx");
-
+    if (dt >= (2 * K * (1 - X)))
+		{
+			PyObject *msg = PyString_FromString("Unstable celerity. Decrease dt or increase dx");
+			PyErr_SetObject(HeatSourceError, Py_BuildValue("(Offfff)", msg, dt, dx, K, X, c_k));
+		}
     // These calculations are from Chow's "Applied Hydrology"
     float D = K * (1 - X) + 0.5 * dt;
     float C1 = (0.5*dt - K * X) / D;
