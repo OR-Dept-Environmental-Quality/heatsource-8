@@ -657,15 +657,33 @@ static PyObject *
 heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 {
 	float dt, dx, U, T_sed, T_prev;
-	float Q_up, T_up, Q_in, T_in;
+	float Q_in, T_in, Q_up, T_up;
 	float Q_hyp, Q_accr, T_accr;
 	float Delta_T, Disp, S1_value, Temp;
 	int S1;
+	PyObject *Q_tup;
+	PyObject *T_tup;
 	float T0, T1, T2; // Grid cells for prev, this, next
-	if (!PyArg_ParseTuple(args, "fffffffffffiffffff", &dt, &dx, &U, &T_sed, &T_prev, &Q_hyp, &Q_in,
-												 &T_in, &Q_up, &Delta_T, &Disp,
-												 &S1, &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr))
+	if (!PyArg_ParseTuple(args, "ffffffOOfffiffffff", &dt, &dx, &U, &T_sed,
+														  &T_prev, &Q_hyp, &Q_tup, &T_tup,
+												 		  &Q_up, &Delta_T, &Disp, &S1,
+												 		  &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr))
 		return NULL;
+	Q_in = 0;
+	T_in = 0;
+	int size = PyTuple_Size(Q_tup);
+	int i;
+	for (i=0; i<size; i++)
+	{
+		float Q = PyFloat_AsDouble(PyTuple_GetItem(Q_tup,i));
+		float T = PyFloat_AsDouble(PyTuple_GetItem(T_tup,i));
+		if (Q > 0)
+		{
+			Q_in += Q;
+			T_in += T;
+		}
+	}
+
 	T_up = T0;
     // This is basically MixItUp from the VB code
     float T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in);
@@ -675,7 +693,7 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
     // Q_hyp is commented out because we are not currently sure if it should be added to the flow. This
     // is because adding it will cause overestimation of the discharge if Q_hyp is not subtracted from
     // the total discharge (Q_in) somewhere else, which it is not. We should check this eventually.
-    T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in /*+ Q_hyp*/))) / (Q_accr + Q_up + Q_in /*+ Q_hyp*/);
+    T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp);
 	T_mix -= T_up;
 	T0 += T_mix;
 

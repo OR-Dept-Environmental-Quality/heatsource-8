@@ -79,7 +79,7 @@ class StreamChannel(object):
 
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
-        inputs = self.Q_in + self.Q_tribs[hour] - self.Q_out - self.E
+        inputs = self.Q_in + sum([i for i in self.Q_tribs[hour]]) - self.Q_out - self.E
         self.Q_mass += inputs
         Q2 = self.prev_km.Q_prev + inputs
 
@@ -126,7 +126,7 @@ class StreamChannel(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
-        inputs = self.Q_in + self.Q_tribs[hour] - self.Q_out - self.E
+        inputs = self.Q_in + sum([i for i in self.Q_tribs[hour]]) - self.Q_out - self.E
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             self.Q_mass += inputs

@@ -180,12 +180,8 @@ class HeatSourceInterface(ExcelDocument):
                 if flow_col[i] is None or temp_col[i] is None:
                     raise Exception("Cannot have a tributary with blank flow or temperature conditions")
             for hour in xrange(self.Hours):
-                try:  #already a tributary, need to mass balance for T
-                    node.T_tribs[timelist[hour]] = (temp_col[hour]*flow_col[hour] + node.T_tribs[timelist[hour]]*node.Q_tribs[timelist[hour]]) / (node.Q_tribs[timelist[hour]] + flow_col[hour])
-                    node.Q_tribs[timelist[hour]] += flow_col[hour]
-                except:# KeyError:
-                    node.Q_tribs[timelist[hour]] = flow_col[hour]
-                    node.T_tribs[timelist[hour]] = temp_col[hour]
+                node.Q_tribs[timelist[hour]] += flow_col[hour],
+                node.T_tribs[timelist[hour]] += temp_col[hour],
             self.PB("Reading inflow data",site, IniParams["inflowsites"])
 
     def GetContinuousData(self):
@@ -478,8 +474,8 @@ class HeatSourceInterface(ExcelDocument):
         """Perform some initialization of the StreamNode, and write some values to spreadsheet"""
         timelist = self.timelist
         for hour in xrange(self.Hours):
-            node.Q_tribs[timelist[hour]] = 0.0
-            node.T_tribs[timelist[hour]] = 0.0
+            node.Q_tribs[timelist[hour]] = ()
+            node.T_tribs[timelist[hour]] = ()
         ##############################################################
         #Now that we have a stream node, we set the node's dx value, because
         # we have most nodes that are long-sample-distance times multiple,

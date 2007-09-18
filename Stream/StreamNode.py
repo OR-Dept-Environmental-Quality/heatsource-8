@@ -192,7 +192,7 @@ class StreamNode(StreamChannel):
         self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
                                           False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
-#        T, S1 = self.MacCormick_THW(time)
+#        self.T, self.S1 = self.MacCormick_THW(bc_hour)
 
     def MacCormick2(self, hour):
         #===================================================
@@ -203,6 +203,7 @@ class StreamNode(StreamChannel):
         self.T, S = self.MacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
                                     self.Q_tribs[hour], self.T_tribs[hour], self.prev_km.Q, self.Delta_T, self.Disp,
                                     True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
+#        self.T = self.MacCormick2_THW(hour)
 
     def CalcDispersion(self):
         dx = self.dx
@@ -222,7 +223,7 @@ class StreamNode(StreamChannel):
         SkipNode = False
         if self.prev_km:
             if not SkipNode:
-                mix = self.MixItUp(hour,self.prev_km.Q_prev, self.prev_km.T_prev)
+                mix = self.MixItUp(hour,self.prev_km.Q_prev, self.prev_km.T_prev) if self.Q else 0
                 T0 = self.prev_km.T_prev + mix
                 T1 = self.T_prev
                 T2 = self.next_km.T_prev if self.next_km else self.T_prev
@@ -249,7 +250,7 @@ class StreamNode(StreamChannel):
         SkipNode = False
         if self.prev_km:
             if not SkipNode:
-                mix = self.MixItUp(hour, self.prev_km.Q, self.prev_km.T)
+                mix = self.MixItUp(hour, self.prev_km.Q, self.prev_km.T) if self.Q else 0
                 T0 = self.prev_km.T + mix
                 T1 = self.T
                 T2 = self.next_km.T if self.next_km else self.T
@@ -265,31 +266,28 @@ class StreamNode(StreamChannel):
         else: T = self.T_prev
         if T > 50 or T < 0:
             raise Exception("Unstable model")
-        self.T = T
+        return T
 
     def MixItUp(self, hour, Q_up, T_up):
-        # Get any point-source inflow data
-        if self.Q:
-            try:
-                Q_in = self.Q_tribs[hour]
-                T_in = self.T_tribs[hour]
-            except KeyError:
-                Q_in = 0
-                T_in = 0
-            # Hyporheic flows if available
-            Q_hyp = self.Q_hyp or 0
-            # And accretionary flows
-            Q_accr = self.Q_in or 0
-            T_accr = self.T_in or 0
-            #Calculate temperature change from mass transfer from point inflows
-            T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in)
-            #Calculate temperature change from mass transfer from hyporheic zone
-            T_mix = ((self.T_sed * Q_hyp) + (T_mix * (Q_up + Q_in))) / (Q_hyp + Q_up + Q_in)
-            #Calculate temperature change from accretion inflows
-            T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp)
+        Q_in = 0
+        T_in = 0
+        for i in xrange(len(self.Q_tribs[hour])):
+            Q_in += self.Q_tribs[hour][i] if self.Q_tribs[hour][i] > 0 else 0
+            T_in += self.T_tribs[hour][i] if self.Q_tribs[hour][i] > 0 else 0
+
+        # Hyporheic flows if available
+        Q_hyp = self.Q_hyp or 0
+        # And accretionary flows
+        Q_accr = self.Q_in or 0
+        T_accr = self.T_in or 0
+        #Calculate temperature change from mass transfer from point inflows
+        T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in)
+        #Calculate temperature change from mass transfer from hyporheic zone
+        T_mix = ((self.T_sed * Q_hyp) + (T_mix * (Q_up + Q_in))) / (Q_hyp + Q_up + Q_in)
+        #Calculate temperature change from accretion inflows
+        T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp)
 #            T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in))) / (Q_accr + Q_up + Q_in)
-            return T_mix - T_up
-        else: return 0
+        return T_mix - T_up
 
     def Solar_THW(self,JD,time,hour, Altitude,Zenith,Direction,SampleDist):
         """Old method, now pushed down to a C module. This is left for testing only"""
