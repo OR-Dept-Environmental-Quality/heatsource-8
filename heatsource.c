@@ -641,13 +641,12 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
         }
     }
     F_conv = F_evap * Bowen;
-    float V_evap = 0.0;
-    if (calcevap) {
-		V_evap = K_evap * (dx * W_w);
-    }
+    float R_evap = 0.0;
+    if (calcevap)
+		R_evap = K_evap * W_w;
 	// End Evap and Conv Flux
 	//##############################################################################################
-	return Py_BuildValue("fffffffff",F_Conduction,T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_evap, F_conv, V_evap);
+	return Py_BuildValue("fffffffff",F_Conduction,T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_evap, F_conv, R_evap);
 }
 
 static char heatsource_CalcMacCormick__doc__[] =

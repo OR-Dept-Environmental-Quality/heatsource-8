@@ -54,12 +54,13 @@ class StreamChannel(object):
                     "phi", # Porosity of the bed
                     "K_h", # Horizontal bed conductivity
                     "Log",  # Global logging class
-                    "Disp" # Dispersion due to shear stress
+                    "Disp", # Dispersion due to shear stress
+                    "Q_mass" # Local mass balance variable (StreamChannel level)
                     ]
         for attr in self.slots:
             setattr(self,attr,None)
+        self.Q_mass = 0
         self.starttime = Clock.MakeDatetime(IniParams["date"])
-
         # Make the C module's functions part of the class
         self.CalcSolarPosition = _HS.CalcSolarPosition
         self.CalcSolarFlux = _HS.CalcSolarFlux
@@ -78,9 +79,8 @@ class StreamChannel(object):
 
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
-
         inputs = self.Q_in + self.Q_tribs[hour] - self.Q_out - self.E
-
+        self.Q_mass += inputs
         Q2 = self.prev_km.Q_prev + inputs
 
         C1,C2,C3 = self.GetMuskingum(Q2, self.U, self.W_w, self.S, self.dx, self.dt)
@@ -99,6 +99,7 @@ class StreamChannel(object):
 
     def CalcDischarge_BoundaryNode(self, time, hour):
         Q = self.Q_bc[hour] # Get the value at this time, or the closest previous time
+        self.Q_mass += self.Q_bc[hour]
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q
         self.Q = Q
@@ -126,9 +127,9 @@ class StreamChannel(object):
         the timestep in minutes, which cannot be None.
         """
         inputs = self.Q_in + self.Q_tribs[hour] - self.Q_out - self.E
-
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
+            self.Q_mass += inputs
             # Get all of the discharges that we know about.
             # (t, x-1) = flow from the upstream channel at this timestep
             Q1 = self.prev_km.Q + inputs
@@ -147,6 +148,7 @@ class StreamChannel(object):
         elif not self.prev_km: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
             Q = self.Q_bc[hour]
+            self.Q_mass += self.Q_bc[hour]
             self.CalculateDischarge = self.CalcDischarge_BoundaryNode
             self.MacCormick = self.MacCormick_BoundaryNode # We're a boundary node, so go ahead and reset MacCormick.
             # TODO: Might want some error checking here.

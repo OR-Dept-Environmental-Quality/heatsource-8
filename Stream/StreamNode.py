@@ -26,7 +26,7 @@ class StreamNode(StreamChannel):
              "ShaderList", # List of angles and attributes to determine sun shading.
              "F_DailySum", # Specific sums of solar fluxes
              "F_Solar", # List of important solar fluxes
-             ]
+             "Q_mb"]
         # Set all the attributes to bare lists, or set from the constructor
         for attr in s:
             x = kwargs[attr] if attr in kwargs.keys() else None
@@ -108,6 +108,7 @@ class StreamNode(StreamChannel):
         return attrDict
 
     def CalcHydraulics(self, time, hour):
+        self.Q_mass = 0
         try:
             self.CalculateDischarge(time, hour)
         except HeatSourceError, (stderr):
@@ -124,6 +125,7 @@ class StreamNode(StreamChannel):
             msg += "\nThe model run has been halted. You may ignore any further error messages."
             msgbox(msg)
             raise SystemExit
+        self.Q_mb += self.Q_mass # Add mass balance from the stream node
         if self.W_w > self.W_bf:
             self.Log("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
 
@@ -563,5 +565,5 @@ class StreamNode(StreamChannel):
                 Bowen = 1
             F_Conv = F_Evap * Bowen
         F_Conv = F_Evap * Bowen
-        E = Evap_Rate*self.dt*self.W_w if IniParams["calcevap"] else 0
+        E = Evap_Rate*self.W_w if IniParams["calcevap"] else 0
         return F_Cond, T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_Evap, F_Conv, E

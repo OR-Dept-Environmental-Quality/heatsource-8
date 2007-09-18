@@ -26,6 +26,7 @@ class HeatSourceInterface(ExcelDocument):
         self.log = log
         self.Reach = {}
         # Make empty Dictionaries for the boundary conditions
+        self.Q_mb = 0 # mass balance of discharge
         self.Q_bc = {}
         self.T_bc = {}
         self.C_bc = {}
@@ -327,7 +328,7 @@ class HeatSourceInterface(ExcelDocument):
         self.CheckEarlyQuit()
 
         data = self.GetColumnarData()
-        node = StreamNode(run_type=self.run_type)
+        node = StreamNode(run_type=self.run_type,Q_mb=self.Q_mb)
 
         for k,v in data.iteritems():
             setattr(node,k,v[0])
@@ -343,7 +344,7 @@ class HeatSourceInterface(ExcelDocument):
         # is not a perfect multiple of the sample distance.
         num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
         for i in range(0, num_nodes):
-            node = StreamNode(run_type=self.run_type)
+            node = StreamNode(run_type=self.run_type,Q_mb=self.Q_mb)
             for k,v in data.iteritems():
                 setattr(node,k,v[i+1])# Add one to ignore boundary node
             self.InitializeNode(node)

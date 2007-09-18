@@ -51,6 +51,7 @@ class HSProfile(object):
         else:
             timesteps = ((stop-flush).days*86400)/Chronos.dt.seconds
         count = itertools.count()
+        out = 0
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
@@ -78,6 +79,7 @@ class HSProfile(object):
                 [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
             else: raise Exception("Invalid run_type")
 
+            out += self.reachlist[-1].Q
             self.Output(time)
             time = Chronos.Tick()
         total_time = (datetime.today()-time1).seconds
@@ -86,6 +88,7 @@ class HSProfile(object):
                     (total_time, total_time/timesteps, total_days)
         self.HS.PB(message)
         print message
+        print out, self.reachlist[0].Q_mb
 
 class MyErrorClass:
     def write(self,msg):
