@@ -84,11 +84,11 @@ class HSProfile(object):
             time = Chronos.Tick()
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
-        message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day)" %\
-                    (total_time, total_time/timesteps, total_days)
+        total_inflow = sum([x.Q_mb for x in self.reachlist])
+        message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day). Water Balance: %0.3f/%0.3f" %\
+                    (total_time, total_time/timesteps, total_days, total_inflow, out)
         self.HS.PB(message)
         print message
-        print out, self.reachlist[0].Q_mb
 
 class MyErrorClass:
     def write(self,msg):
