@@ -126,15 +126,16 @@ class StreamNode(StreamChannel):
             msgbox(msg)
             raise SystemExit
         self.Q_mb += self.Q_mass # Add mass balance from the stream node
-        if self.W_w > self.W_bf:
-            self.Log("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
+#        if self.W_w > self.W_bf:
+#            self.Log("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
         self.SetBankfullMorphology()
     def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
         # Reset temperatures
-        self.T_prev, self.T = self.T, None
+        self.T_prev = self.T
+        self.T = None
 
         # Calculate solar position (C module)
         Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)

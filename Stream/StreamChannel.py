@@ -79,7 +79,7 @@ class StreamChannel(object):
 
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
-        inputs = self.Q_in + sum([i for i in self.Q_tribs[hour]]) - self.Q_out - self.E
+        inputs = self.Q_in + sum(self.Q_tribs[hour]) - self.Q_out - self.E
         self.Q_mass += inputs
         Q2 = self.prev_km.Q_prev + inputs
 
@@ -126,7 +126,7 @@ class StreamChannel(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
-        inputs = self.Q_in + sum([i for i in self.Q_tribs[hour]]) - self.Q_out - self.E
+        inputs = self.Q_in + sum(self.Q_tribs[hour]) - self.Q_out - self.E
         # Check if we are a spatial or temporal boundary node
         if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
             self.Q_mass += inputs
@@ -211,7 +211,7 @@ class StreamChannel(object):
     def SetBankfullMorphology(self):
         """Calculate initial morphological characteristics in terms of W_bf, z and WD"""
         if self.z >= self.WD/2:
-            warn("Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.z, self.WD))
+            print "Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.z, self.WD)
             self.z = 0.99 * (self.WD/2)
 
         # Average depth of the trapazoid from the width/depth ratio
@@ -229,7 +229,11 @@ class StreamChannel(object):
         # is equal to the average area (average depth times bankful width). The purpose of this is to
         # find the channel's bottom width.
         #TODO: Find out whether we need bankful depth, and remove it from the class if not.
+        f = open("C:\\test.csv","w")
+        from itertools import count
+        c = count()
         while (Xarea - Trap_area) > 0.001:
-            self.d_bf = self.d_bf + 0.01
+            f.write("%i,%0.5f\n" %(c.next(), Trap_area))
+            self.d_bf += + 0.01
             self.W_b = self.W_bf - 2*self.z*self.d_bf
             Trap_area = self.d_bf * (self.W_b + self.W_bf)/2

@@ -322,6 +322,7 @@ class HeatSourceInterface(ExcelDocument):
 
     def BuildNodes(self):
         self.CheckEarlyQuit()
+        self.PB("Building Stream Nodes")
 
         data = self.GetColumnarData()
         node = StreamNode(run_type=self.run_type,Q_mb=self.Q_mb)
