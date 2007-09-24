@@ -126,12 +126,14 @@ class StreamNode(StreamChannel):
             msgbox(msg)
             raise SystemExit
         self.Q_mb += self.Q_mass # Add mass balance from the stream node
-#        if self.W_w > self.W_bf:
-#            self.Log("Wetted width (%0.2f) at StreamNode %0.2f km exceeds bankfull width (%0.2f)" %(self.W_w, self.km, self.W_bf))
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
-        self.SetBankfullMorphology()
+        # This was emptied, but kept in case we want unanticipated initialization later.
+        # ...
+        # (Say "unanticipated initialization" 3 times, fast.)
+        # ...
+        pass
     def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
         # Reset temperatures
         self.T_prev = self.T
@@ -190,10 +192,16 @@ class StreamNode(StreamChannel):
             self.T_prev = self.T_bc[bc_hour]
             return
 
-        self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
+        try:
+            self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
                                           False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
-#        self.T, self.S1 = self.MacCormick_THW(bc_hour)
+#            self.T, self.S1 = self.MacCormick_THW(bc_hour)
+        except HeatSourceError, (stderr):
+            msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
+            msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
+            msgbox(msg)
+            raise SystemExit
 
     def MacCormick2(self, hour):
         #===================================================

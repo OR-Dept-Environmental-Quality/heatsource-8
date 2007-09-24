@@ -33,25 +33,24 @@ class HeatSourceInterface(ExcelDocument):
         self.AtmosphericData = [[],[],[]]
         #######################################################
         # Grab the initialization parameters from the Excel file.
-        # TODO: Ensure that this data doesn't have to come directly from the MainMenu to work
-        lst = ("name", "date", "dt","dx", "length", "longsample", "transsample", "inflowsites",
-               "contsites", "flushdays", "timezone", "simperiod","outputdir","evapmethod",
-               "wind_a", "wind_b", "calcevap", "calcalluvium","alluviumtemp","emergent",
-                "lidar", "lcdensity","daylightsavings")
+        lst = ("name", "length", "date", "end", "flushdays", "timezone", "daylightsavings",
+               "dt", "dx", "longsample", "transsample", "inflowsites", "contsites",
+               "calcevap", "evapmethod", "wind_a", "wind_b", "calcalluvium",
+               "alluviumtemp", "emergent", "lidar", "lcdensity", "outputdir")
+
         vals = [i[0] for i in self.GetValue("B3:B25","Heat Source Inputs")]
         for i in xrange(len(lst)):
             IniParams[lst[i]] = vals[i]
         IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
         # Make the date a datetime instance
         IniParams["date"] = Chronos.MakeDatetime(IniParams["date"])
+        IniParams["end"] = Chronos.MakeDatetime(IniParams["end"])
         IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
         # Set up the log file in the outputdir
         self.log.SetFile(normpath(join(IniParams["outputdir"],"outfile.log")))
         ######################################################
 
-
-        # from VB: Apparently, only one day is simulated for the shadelator
-        # TODO: Check if we need to run for only one day during shadelator-only run.
+        IniParams["simperiod"] = (IniParams["end"]-IniParams["date"]).days + 1
         self.Hours = int(IniParams["simperiod"] * 24)
 
         timelist = [i for i in self.GetColumn(11,"Flow Data")[3:]]
@@ -178,6 +177,7 @@ class HeatSourceInterface(ExcelDocument):
             temp_col = [x[1+(site*2)] for x in data]
             for i in xrange(len(flow_col)):
                 if flow_col[i] is None or temp_col[i] is None:
+                    if i > Rend: continue # Don't worry about blanks in later date/times if we're not modeling during that time
                     raise Exception("Cannot have a tributary with blank flow or temperature conditions")
             for hour in xrange(self.Hours):
                 node.Q_tribs[timelist[hour]] += flow_col[hour],
@@ -293,13 +293,13 @@ class HeatSourceInterface(ExcelDocument):
         self.CheckEarlyQuit()
         # Pages we grab columns from
         ttools = ["km","Longitude","Latitude"]
-        morph = ["Elevation","S","W_bf","WD","z","n","SedThermCond","SedThermDiff","SedDepth",
+        morph = ["Elevation","S","W_b","z","n","SedThermCond","SedThermDiff","SedDepth",
                  "hyp_exch","phi","FLIR_time","FLIR_temp","Q_cont","d_cont"]
         flow = ["Q_in","T_in","Q_out"]
         # Ways that we grab the columns
         sums = ["hyp_exch","Q_in","Q_out"] # These are summed, not averaged
         mins = ["km"]
-        aves = ["Longitude","Latitude","Elevation","S","W_bf","WD","z","n","SedThermCond",
+        aves = ["Longitude","Latitude","Elevation","S","W_b","z","n","SedThermCond",
                 "SedThermDiff","SedDepth","phi", "Q_cont","d_cont","T_in"]
         ignore = ["FLIR_temp","FLIR_time"] # Ignore in the loop, set them manually
 
@@ -373,7 +373,7 @@ class HeatSourceInterface(ExcelDocument):
                 vdensity.append(self.multiplier([LC[x][1] for x in col], average))
                 overhang.append(self.multiplier([LC[x][2] for x in col], average))
             except KeyError, (stderr):
-                raise Exception("At least one land cover code from the 'TTools Data' worksheet is not in 'Land Cover Codes' worksheet (%s)." % stderr.message)
+                raise Exception("At least one land cover code from the 'TTools Data' worksheet is blank or not in 'Land Cover Codes' worksheet (Code: %s)." % stderr.message)
             if i>7:  #We don't want to read in column AJ
                 elevation.append(self.multiplier(elev, average))
         # We have to set the emergent vegetation, so we strip those off of the iterator
@@ -407,7 +407,10 @@ class HeatSourceInterface(ExcelDocument):
                 T_None = () # Highest angle necessary for full shade
                 rip = ()
                 for j in xrange(4):
-                    Vheight = vheight[i*4+j+1][h]
+                    try:
+                        Vheight = vheight[i*4+j+1][h]
+                    except:
+                        pass
                     Vdens = vdensity[i*4+j+1][h]
                     Overhang = overhang[i*4+j+1][h]
                     Elev = elevation[i*4+j][h]
@@ -497,5 +500,3 @@ class HeatSourceInterface(ExcelDocument):
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
         node.T_alluv = IniParams["alluviumtemp"] if IniParams["calcalluvium"] else 0.0
-
-        node.SetBankfullMorphology()

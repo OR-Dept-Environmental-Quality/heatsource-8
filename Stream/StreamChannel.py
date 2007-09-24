@@ -2,7 +2,7 @@ from __future__ import division
 import math, decimal
 from warnings import warn
 import heatsource.heatsource as _HS
-from ..Dieties import Chronos as Clock
+from ..Dieties import Chronos
 from ..Dieties import IniParams
 
 class StreamChannel(object):
@@ -22,19 +22,15 @@ class StreamChannel(object):
     # at some point, and access self.S at another point.
         self.slots = ["S",        # Slope
                     "n",        # Manning's n
-                    "W_bf",     # Bankfull width (surface)
                     "z", # z factor: Ration of run to rise of the side of a trapazoidal channel
-                    "d_bf", # Bankfull Depth, See below or HeatSource manual
-                    "d_ave", # Average bankfull depth, calculated as W_bf/WD
                     "d_w", # Wetted depth. Calculated in GetWettedDepth()
                     "d_w_prev", # Wetted depth for the previous timestep
                     "d_cont", # Control depth
-                    "W_b", # Bottom width, calculated as W_bf - (2 * d_bf * z)
+                    "W_b", # Bottom width
                     "W_w", # Wetted width, calculated as W_b + 2*z*d_w
                     "A", # Cross-sectional Area, calculated d_w * (W_b + z * d_w)
                     "P_w", # Wetted Perimeter, calculated as W_b + 2 * d_w * sqrt(1 + z**2)
                     "R_h", # Hydraulic Radius, calculated as A_x/P_w
-                    "WD", # Width/Depth ratio, constant
                     "dx", # Length of this stream reach.
                     "U", # Velocity from Manning's relationship
                     "Q", # Discharge, from Manning's relationship
@@ -60,7 +56,7 @@ class StreamChannel(object):
         for attr in self.slots:
             setattr(self,attr,None)
         self.Q_mass = 0
-        self.starttime = Clock.MakeDatetime(IniParams["date"])
+        self.starttime = Chronos.MakeDatetime(IniParams["date"])
         # Make the C module's functions part of the class
         self.CalcSolarPosition = _HS.CalcSolarPosition
         self.CalcSolarFlux = _HS.CalcSolarFlux
@@ -207,33 +203,3 @@ class StreamChannel(object):
         C3 = (K * (1 - X) - 0.5*dt) / D
         # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
         return C1, C2, C3
-
-    def SetBankfullMorphology(self):
-        """Calculate initial morphological characteristics in terms of W_bf, z and WD"""
-        if self.z >= self.WD/2:
-            print "Reach %s has no bottom width. Z: %0.3f, WD:%0.3f. Recalculating Channel angle." % (self, self.z, self.WD)
-            self.z = 0.99 * (self.WD/2)
-
-        # Average depth of the trapazoid from the width/depth ratio
-        self.d_ave = self.W_bf/self.WD
-        # Calculate the maximum depth of the channel and the bottom width by iterating to a solution where
-        # the cross-sectional area (Xarea) = trapezoidal area (Tarea)
-        Xarea = self.d_ave * self.W_bf
-        #Initialize maximum depth and bottom width
-        self.d_bf = self.d_ave
-        self.W_b = self.W_bf - 2*self.z*self.d_bf
-        Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
-        self.d_w = self.d_ave # Initialize wetted depth to bankfull wetted depth
-        # We have to iterate to find the bottom width and bankful depth because we have two equations
-        # and two unknowns, so we iterate until the area of the trapazoid (cross-sectional flow area)
-        # is equal to the average area (average depth times bankful width). The purpose of this is to
-        # find the channel's bottom width.
-        #TODO: Find out whether we need bankful depth, and remove it from the class if not.
-        f = open("C:\\test.csv","w")
-        from itertools import count
-        c = count()
-        while (Xarea - Trap_area) > 0.001:
-            f.write("%i,%0.5f\n" %(c.next(), Trap_area))
-            self.d_bf += + 0.01
-            self.W_b = self.W_bf - 2*self.z*self.d_bf
-            Trap_area = self.d_bf * (self.W_b + self.W_bf)/2
