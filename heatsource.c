@@ -8,7 +8,7 @@
 #include <stdlib.h>
 
 static PyObject *HeatSourceError;
-
+/* This function is used only in CalcSolarPosition when the Python call is used. the functionality is currently inlined in C within that method.
 static int
 internal_bisect_right(PyObject *list, PyObject *item, Py_ssize_t lo, Py_ssize_t hi)
 {
@@ -36,6 +36,7 @@ internal_bisect_right(PyObject *list, PyObject *item, Py_ssize_t lo, Py_ssize_t 
 	}
 	return lo;
 }
+*/
 /* ----------------------------------------------------- */
 
 static char heatsource_CalcSolarPosition__doc__[] =
@@ -149,7 +150,13 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
     }
     Zenith = Zenith - RefractionCorrection;
     Altitude = 90 - Zenith;
+	int Daytime = 0;
+	if (Altitude > 0.0)
+	{
+		Daytime = 1;
+	}
 
+	/* Original code using a Python call. Left for documentation only. This would return "direction"
 	PyObject *AzimuthBreaks = Py_BuildValue("(fffffff)",0.0,67.5,112.5,157.5,202.5,247.5,292.5);
 	PyObject *Az = Py_BuildValue("f",Azimuth);
 	int direction = internal_bisect_right(AzimuthBreaks, Az, 0, -1)-1;
@@ -157,13 +164,27 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
 	// De-reference all unused Python objects
 	Py_DECREF(AzimuthBreaks);
 	Py_DECREF(Az);
-	int Daytime = 0;
-	if (Altitude > 0.0)
-	{
-		Daytime = 1;
-	}
+	*/
+	// Same code as above, but inlined in C, "lo" is our value of concern
+	float AzimuthBreaks_C[] = {0.0,67.5,112.5,157.5,202.5,247.5,292.5};
+	int lo = 0;
+	int hi = 7;
+	int mid;
+	float *litem;
 
-	return Py_BuildValue("ddii",Altitude,Zenith,Daytime,direction);
+	while (lo < hi) {
+		mid = (lo + hi) / 2;
+		litem = &AzimuthBreaks_C[mid];
+		if (&litem == NULL)
+		  	PyErr_SetString(HeatSourceError, "Bad value in SetSolarPosition (WTF? Better call for help.)");
+		if ( Azimuth < *litem) { hi = mid;}
+		else if (Azimuth >= *litem) {lo = mid + 1;}
+		else {PyErr_SetString(HeatSourceError, "Bad value in SetSolarPosition (WTF? Better call for help.)");}
+
+	}
+	lo -= 1;
+
+	return Py_BuildValue("ddii",Altitude,Zenith,Daytime,lo);
 }
 
 
@@ -193,7 +214,7 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
 		return NULL;
 	if (D_est == 0.0)
 	{
-	    while (Converge > 1e-8)
+	    while (Converge > 1e-6)
 		{
 	        Fy = (D_est * (W_b + z * D_est)) * pow(((D_est * (W_b + z * D_est)) / (W_b + 2 * D_est * sqrt(1+ pow(z,2)))),power) - ((n * Q_est) / sqrt(S));
 	        thed = D_est + dy;

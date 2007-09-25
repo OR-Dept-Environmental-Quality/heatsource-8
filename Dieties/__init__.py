@@ -1,3 +1,3 @@
 import ChronosDiety, IniParamsDiety
 Chronos = ChronosDiety.ChronosDiety()
-IniParams = IniParamsDiety.IniParamsDiety({'catchwidth':True})
+IniParams = IniParamsDiety.IniParamsDiety({'ave_lat_lon': True})

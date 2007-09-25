@@ -6,7 +6,7 @@ from ..Dieties import IniParams
 from StreamChannel import StreamChannel
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
-from heatsource.heatsource import HeatSourceError
+Outfile = open("E:\evans.out","w")
 
 class StreamNode(StreamChannel):
     """Definition of an individual stream segment"""
@@ -43,7 +43,6 @@ class StreamNode(StreamChannel):
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
-        self.catchwidth = True # raise message if there's a stream going dry
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
         return self.km == cmp
@@ -134,14 +133,14 @@ class StreamNode(StreamChannel):
         # (Say "unanticipated initialization" 3 times, fast.)
         # ...
         pass
-    def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
+
+    def CalcHeat_Opt(self, hour, min, sec, bc_hour,JD,JDC,offset):
+        """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
-
         # Calculate solar position (C module)
-        Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
-
+        Altitude, Zenith, Daytime, dir = self.head.SolarPos
         # Set some local variables if they're used more than once
         Elev = self.Elevation
         VTS = self.ViewToSky
@@ -170,19 +169,67 @@ class StreamNode(StreamChannel):
 #        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
 #            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
 #            self.GroundFlux_THW(time)
-        try:
-            self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
                 self.CalcGroundFluxes(cloud, self.Humidity[bc_hour], self.T_air[bc_hour], self.Wind[bc_hour], Elev,
                                     self.phi, VHeight, VTS, self.SedDepth, dx,
                                     dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
                                     self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
                                     IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
-        except HeatSourceError, (stderr):
-            msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
-            msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
-            msgbox(msg)
-            raise SystemExit
+        self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
+        self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
+
+        self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
+                                          self.prev_km.Q_prev, self.Delta_T, self.Disp,
+                                          False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
+#            self.T, self.S1 = self.MacCormick_THW(bc_hour)
+
+    def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
+        # Reset temperatures
+        self.T_prev = self.T
+        self.T = None
+        # Calculate solar position (C module)
+        if self.prev_km: # Get position from headwater boundary node
+            Altitude, Zenith, Daytime, dir = self.head.SolarPos
+            self.CalcHeat = self.CalcHeat_Opt
+        else: # Calculate position and store to a tuple
+            Altitude, Zenith, Daytime, dir = self.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+            self.SolarPos = Altitude, Zenith, Daytime, dir
+        # Set some local variables if they're used more than once
+        Elev = self.Elevation
+        VTS = self.ViewToSky
+        emerg = IniParams["emergent"]
+        VHeight = self.VHeight
+        cloud = self.C_bc[bc_hour]
+        dt = self.dt
+        dx = self.dx
+        T_sed = self.T_sed
+        T_prev = self.T_prev
+        Q_hyp = self.Q_hyp
+        ############################################
+        ## Solar Flux Calculation, C-style
+        # Testing method, these should return the same (to 1.0e-6 or so) result
+#       self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"], Daytime)
+        if Daytime:
+            self.F_Solar = self.CalcSolarFlux(hour, JD, Altitude, Zenith, cloud, self.d_w,
+                                              self.W_b, Elev, self.TopoFactor, VTS,
+                                              IniParams["transsample"], self.phi, emerg,
+                                              self.VDensity, VHeight, self.ShaderList[dir])
+            self.F_DailySum[1] += self.F_Solar[1]
+            self.F_DailySum[4] += self.F_Solar[4]
+        else:
+            self.F_Solar = [0]*8
+        #Testing method, these should return the same (to 1.0e-6 or so) result
+#        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+#            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
+#            self.GroundFlux_THW(time)
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
+                self.CalcGroundFluxes(cloud, self.Humidity[bc_hour], self.T_air[bc_hour], self.Wind[bc_hour], Elev,
+                                    self.phi, VHeight, VTS, self.SedDepth, dx,
+                                    dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
+                                    self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
+                                    IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
 
@@ -192,16 +239,10 @@ class StreamNode(StreamChannel):
             self.T_prev = self.T_bc[bc_hour]
             return
 
-        try:
-            self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
+        self.T, self.S1 = self.MacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
                                           False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
 #            self.T, self.S1 = self.MacCormick_THW(bc_hour)
-        except HeatSourceError, (stderr):
-            msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
-            msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
-            msgbox(msg)
-            raise SystemExit
 
     def MacCormick2(self, hour):
         #===================================================

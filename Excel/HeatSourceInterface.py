@@ -91,9 +91,15 @@ class HeatSourceInterface(ExcelDocument):
         self.SetAtmosphericData()
         self.PB("Initializing StreamNodes")
         [x.Initialize() for x in self.Reach.itervalues()]
+
         # Now we manually set each nodes next and previous kilometer values
         l = self.Reach.keys()
         l.sort(reverse=True) # Sort descending, because streams are numbered from the mouth up
+        # calculate an average latitude and longitude to use to calculate solar position once per timestep
+        head = self.Reach[max(l)]
+        head.ave_Latitude = sum([x.Latitude for x in self.Reach.itervalues()])/len(self.Reach)
+        head.ave_Longitude = sum([x.Longitude for x in self.Reach.itervalues()])/len(self.Reach)
+        # Set the previous and next kilometer of each node.
         for i in xrange(len(l)):
             key = l[i] # The current node's key
             # Then, set pointers to the next and previous nodes
@@ -107,7 +113,8 @@ class HeatSourceInterface(ExcelDocument):
             ## we want to access the node's temp if there's no downstream, and this safes us an
             ## if statement.
                 self.Reach[key].next_km = self.Reach[key]
-
+            # Set a headwater node
+            self.Reach[key].head = head
 
     def CheckEarlyQuit(self):
         PumpWaitingMessages()

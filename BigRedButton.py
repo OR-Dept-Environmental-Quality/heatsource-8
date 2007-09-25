@@ -12,8 +12,11 @@ from Dieties import Chronos
 from Dieties import IniParams
 from Utils.Logger import Logger
 from Utils.Output import Output as O
+from heatsource import HeatSourceError
 
 from __version__ import version_info
+
+force_quit = False
 
 class HSProfile(object):
     def __init__(self,worksheet,run_type=0):
@@ -22,6 +25,10 @@ class HSProfile(object):
         self.Reach = self.HS.Reach
         self.cur_hour = None
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
+        if run_type == 0: self.run_all = self.run_hs
+        elif run_type == 1: self.run_all = self.run_hy
+        elif run_type == 2: self.run_all = self.run_sh
+        else: raise Exception("Bad run_type: %i" %`run_type`)
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams["dt"])
@@ -40,8 +47,18 @@ class HSProfile(object):
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
 
+    def __del__(self):
+        print "HSProfile deleted"
+    def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
+        [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
+        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
+        [x.MacCormick2(solar_time) for x in self.reachlist]
+    def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
+        [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
+    def run_sh(self,time,hydro_time, solar_time, JD, JDC, offset):
+        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
     def run(self): # Argument allows profiling and testing
-        time1 = datetime.today()
+        global force_quit
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
@@ -52,6 +69,7 @@ class HSProfile(object):
             timesteps = ((stop-flush).days*86400)/Chronos.dt.seconds
         count = itertools.count()
         out = 0
+        time1 = datetime.today()
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
@@ -60,7 +78,7 @@ class HSProfile(object):
             if not n%60: # every hour
                 self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
                 PumpWaitingMessages()
-                if exists("c:\\quitHS"):
+                if force_quit:
                     self.HS.PB("Simulation stopped by user")
                     return
                 if not n%1440:
@@ -68,16 +86,13 @@ class HSProfile(object):
                 hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
                 if time < start:
                     solar_time = (time + timedelta(days=start.day-solar_time.day)).isoformat(" ")[:-12]+":00:00"
-
-            if self.run_type==0:
-                [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
-                [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
-                [x.MacCormick2(solar_time) for x in self.reachlist]
-            elif self.run_type==1:
-                [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
-            elif self.run_type==2:
-                [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
-            else: raise Exception("Invalid run_type")
+            try:
+                self.run_all(time,hydro_time, solar_time, JD, JDC, offset)
+            except HeatSourceError, (stderr):
+                msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
+                msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
+                msgbox(msg)
+                raise SystemExit
 
             out += self.reachlist[-1].Q
             self.Output(time)
@@ -90,11 +105,6 @@ class HSProfile(object):
                     (total_time, total_time/timesteps, total_days, total_inflow, out)
         self.HS.PB(message)
         print message
-
-class MyErrorClass:
-    def write(self,msg):
-        msgbox(msg)
-MyError = MyErrorClass()
 
 def RunHS(sheet):
     try:
@@ -119,3 +129,7 @@ def RunHY(sheet):
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error")
+
+def quit():
+    global force_quit
+    force_quit = True

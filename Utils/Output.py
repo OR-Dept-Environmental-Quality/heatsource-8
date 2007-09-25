@@ -11,6 +11,7 @@ class Output(object):
         self.dt_out = dt_out
         self.reach = reach
         self.write_time = write_time
+        self.nodes = sorted(self.reach.itervalues(),reverse=True)
         #In the dictionary below the value is a list, the first item will contain file information and the second
         #item is a love note.  Still need to put in date created.
         self.files = {
@@ -32,7 +33,8 @@ class Output(object):
                         "Shade.txt": [None, "Effective Shade"],
                         "Temp_H20.txt": [None, "Stream Temperature (*C)"],
                         "Temp_Sed.txt": [None, "Sediment Temperature (*C)"],
-                        "VTS.txt": [None, "View to Sky"]
+                        "VTS.txt": [None, "View to Sky"],
+                        "Hyd_Disp.txt": [None, "Hydraulic Dispersion (units/units)"]
                     }
 
         for key in self.files.iterkeys():
@@ -55,12 +57,11 @@ class Output(object):
         for filename in self.files.itervalues():
             filename[0].close()
 
-
     def __call__(self, TheTime):
         if TheTime < self.write_time:
             return
-        elif TheTime >= self.write_time:
-            for node in sorted(self.reach.itervalues(),reverse=True):
+        else:
+            for node in self.nodes:
                 try:
                     test =  node.E / node.dx / node.W_w * 3600 * 1000,  #TODO: Check
                 except:
@@ -83,11 +84,12 @@ class Output(object):
                     "Rate_Evap.txt": test, #TODO: Check
                     "Temp_H20.txt": node.T,
                     "Temp_Sed.txt": node.T_sed,
+                    "Hyd_Disp.txt": node.Disp
                 }
                 self.append(TheTime, variables, node)
             self.write_time += self.dt_out
             if TheTime.hour > self.write_time.hour:  #new day, print daily outputs
-                for node in sorted(self.reach.itervalues(),reverse=True):
+                for node in self.nodes:
                     # TODO: What are we trying to accomplish here?
                     try:
                         shade = (node.F_DailySum[1] - node.F_DailySum[4]) / node.F_DailySum[1]
@@ -100,10 +102,9 @@ class Output(object):
                     self.append(TheTime, variables, node)
 
     def append(self, TheTime, variables, node):
-        last = min(self.reach.keys())
-        first = max(self.reach.keys())
+
         for key in variables.iterkeys():
-            if node.km == first:
+            if not node.prev_km: # upstream most node has no previous kilometer
                 Excel_time = "%0.6f" % (TheTime.toordinal() - 693594 + (TheTime.hour +  (TheTime.minute + TheTime.second / 60) / 60 ) / 24)
                 self.files[key][0].write(Excel_time.ljust(14))
             try:
@@ -112,7 +113,7 @@ class Output(object):
                 print variables[key], type(variables[key]), key
                 raise
             self.files[key][0].write(dataf.ljust(14))
-            if node.km == last:
+            if not node.km: # Mouth node is km=0.0 or, another way, km=False
                 self.files[key][0].write("\n")
             #self.files[key][0].flush()
 

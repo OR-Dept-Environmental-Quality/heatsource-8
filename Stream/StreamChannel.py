@@ -77,18 +77,24 @@ class StreamChannel(object):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
         inputs = self.Q_in + sum(self.Q_tribs[hour]) - self.Q_out - self.E
         self.Q_mass += inputs
-        Q2 = self.prev_km.Q_prev + inputs
+        # Localize some variables
+        up = self.prev_km
+        dt = self.dt
+        dx = self.dx
+        S = self.S
 
-        C1,C2,C3 = self.GetMuskingum(Q2, self.U, self.W_w, self.S, self.dx, self.dt)
+        Q2 = up.Q_prev + inputs
+
+        C1,C2,C3 = self.GetMuskingum(Q2, self.U, self.W_w, S, dx, dt)
         # Calculate the new Q
-        Q = C1*(self.prev_km.Q + inputs) + C2*Q2 + C3*self.Q
+        Q = C1*(up.Q + inputs) + C2*Q2 + C3*self.Q
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q
         self.Q = Q
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
         if Q > 0.0071: #Channel is not going dry
-            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, self.S, self.d_cont, self.dx, self.dt)
+            self.d_w, self.A,self.P_w,self.R_h,self.W_w,self.U, self.Disp = self.GetStreamGeometry(self.Q, self.W_b, self.z, self.n, S, self.d_cont, dx, dt)
         else:# That's it for discharge, let's recalculate our channel geometry, hyporheic flow, etc.
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
             self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U = [0]*6  # Set variables to zero (from VB code)
