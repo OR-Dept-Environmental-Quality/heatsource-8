@@ -1,7 +1,7 @@
 from __future__ import division
 from itertools import imap, dropwhile, izip, chain, repeat
 import math, time, operator, bisect
-from itertools import chain, ifilterfalse
+from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from os.path import exists, join, split, normpath
@@ -29,8 +29,7 @@ class HeatSourceInterface(ExcelDocument):
         self.Q_mb = 0 # mass balance of discharge
         self.Q_bc = {}
         self.T_bc = {}
-        self.C_bc = {}
-        self.AtmosphericData = [[],[],[]]
+        self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
         #######################################################
         # Grab the initialization parameters from the Excel file.
         lst = ("name", "length", "date", "end", "flushdays", "timezone", "daylightsavings",
@@ -117,19 +116,36 @@ class HeatSourceInterface(ExcelDocument):
             self.Reach[key].head = head
 
     def CheckEarlyQuit(self):
+        """Placeholder for future functionality allowing someone to quit during model setup"""
         PumpWaitingMessages()
-        if exists("c:\\quitHS"):
-            self.PB("Simulation stopped by user")
-            raise Exception("User forced quit")
+#        if some_damn_thing_that_does_not_exist:
+#            self.PB("Simulation stopped by user")
+#            raise Exception("User forced quit")
 
     def SetAtmosphericData(self):
+        """For each node without continuous data, use closest (up or downstream) node's data"""
         self.CheckEarlyQuit()
-        for node in self.Reach.itervalues():
-            if not node.T_air:
-                node.Wind, node.Humidity, node.T_air = self.AtmosphericData
-            else:
-                self.AtmosphericData = node.Wind, node.Humidity, node.T_air
-
+        self.PB("Setting Atmospheric Data")
+        from bisect import bisect
+        sites = self.ContDataSites # Localize the variable for speed
+        sites.sort() #Sort is necessary for the bisect module
+        c = count()
+        l = self.Reach.keys()
+        for km, node in self.Reach.iteritems():
+            if km not in sites:
+                # Kilometer's downstream and upstream
+                lower = bisect(sites,km)-1 if bisect(sites,km)-1 is True else 0 # zero is the lowest (protect against value of -1]
+                # bisect returns the length of a list when the bisecting number is greater than the greatest value.
+                # Here we protect by max-ing out at the length of the list.
+                upper = min([bisect(sites,km),len(sites)-1])
+                # Use the indexes to get the kilometers from the sites list
+                down = sites[lower]
+                up = sites[upper]
+                datasite = self.Reach[up] # Initialize to upstream's continuous data
+                if km-down < up-km: # Only if the distance to the downstream node is closer do we use that
+                    datasite = self.Reach[down]
+                self.Reach[km].T_air, self.Reach[km].Humidity, self.Reach[km].Wind, self.Reach[km].Cloud = datasite.T_air, datasite.Humidity, datasite.Wind, datasite.Cloud
+                self.PB("Setting Atmospheric Data", c.next(), len(l))
 
     def GetBoundaryConditions(self):
         """Get the boundary conditions from the "Continuous Data" page"""
@@ -145,7 +161,6 @@ class HeatSourceInterface(ExcelDocument):
         time_col = [x[0] for x in data]
         flow_col = [x[1] for x in data]
         temp_col = [x[2] for x in data]
-        cloud_col = [x[3] for x in data]
 
         for I in xrange(self.Hours):
             time = C.MakeDatetime(time_col[I]).isoformat(" ")[:-6]
@@ -157,8 +172,6 @@ class HeatSourceInterface(ExcelDocument):
             t_val = temp_col[I]
             #if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
             self.T_bc[time] = t_val
-            # Cloudiness boundary condition
-            self.C_bc[time] = cloud_col[I]
             self.PB("Reading boundary conditions",I,self.Hours)
 
     def GetInflowData(self):
@@ -198,32 +211,36 @@ class HeatSourceInterface(ExcelDocument):
         l = self.Reach.keys()
         l.sort()
         timelist = self.timelist
-        Rstart,Cstart = 5,10
+        Rstart,Cstart = 5,9
         Rend = Rstart+self.Hours-1
-        Cend = int((IniParams["contsites"])*4 + Cstart-1)
+        Cend = int((IniParams["contsites"])*5 + Cstart-1)
         rng = ((Rstart,Cstart),(Rend,Cend))
         data = self.GetValue(rng,"Continuous Data")
         for site in xrange(int(IniParams["contsites"])):
             km = self.GetValue((site + 5, 3),"Continuous Data")
+            if km is None or not isinstance(km, float):
+                raise Exception("Must have a stream kilometer (e.g. 15.3) for each continuous data node!")
             key = bisect.bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
+            self.ContDataSites.append(node.km)
 
-            wind_col = [x[site*4] for x in data]
+            cloud_col = [x[site*5] for x in data]
+            for i in xrange(len(cloud_col)):
+                if cloud_col[i] is None: cloud_col[i] = 0.0
+            wind_col = [x[1+(site*5)] for x in data]
             for i in xrange(len(wind_col)):
                 if wind_col[i] is None: wind_col[i] = 0.0
-            humid_col = [x[1+(site*4)] for x in data]
+            humid_col = [x[2+(site*5)] for x in data]
             for hum_val in humid_col:
                 if hum_val >1 or hum_val < 0: raise Exception("Humidity value of %s (Continuous Data) not bounded in 0<=x<=1" % `hum_val`)
-            air_col =  [x[2+(site*4)] for x in data]
+            air_col =  [x[3+(site*5)] for x in data]
             for air_val in air_col:
                 if air_val is None: raise Exception("Must have values for Air Temp in Continuous Data sheet")
             for hour in xrange(self.Hours):
                 node.Wind[timelist[hour]] = wind_col[hour]
                 node.Humidity[timelist[hour]] = humid_col[hour]
                 node.T_air[timelist[hour]] = air_col[hour]
-            # The VB code essentially uses the last continuous node's
-            if not site:
-                self.AtmosphericData = [node.Wind, node.Humidity, node.T_air]
+                node.Cloud[timelist[hour]] = cloud_col[hour]
             self.PB("Reading continuous data", site, IniParams["contsites"])
 
     def ScanMorphology(self):
@@ -338,7 +355,6 @@ class HeatSourceInterface(ExcelDocument):
             setattr(node,k,v[0])
         node.Q_bc = self.Q_bc
         node.T_bc = self.T_bc
-        node.C_bc = self.C_bc
         self.InitializeNode(node)
         node.dx = IniParams["longsample"]
         self.Reach[node.km] = node
@@ -492,8 +508,6 @@ class HeatSourceInterface(ExcelDocument):
         # we have most nodes that are long-sample-distance times multiple,
         node.dx = IniParams["dx"] # Nodes distance step.
         node.dt = IniParams["dt"] # Set the node's timestep... this may have to be adjusted to comply with stability
-        # Cloudiness is not used as a boundary condition, even though it is only measured at the boundary node
-        node.C_bc = self.C_bc
         # Find the earliest temperature condition
         mindate = min(self.T_bc.keys())
         if self.run_type == 2: # Running hydraulics only

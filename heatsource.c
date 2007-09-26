@@ -8,36 +8,6 @@
 #include <stdlib.h>
 
 static PyObject *HeatSourceError;
-/* This function is used only in CalcSolarPosition when the Python call is used. the functionality is currently inlined in C within that method.
-static int
-internal_bisect_right(PyObject *list, PyObject *item, Py_ssize_t lo, Py_ssize_t hi)
-{
-	PyObject *litem;
-	Py_ssize_t mid, res;
-
-	if (hi == -1) {
-		hi = PySequence_Size(list);
-		if (hi < 0)
-			return -1;
-	}
-	while (lo < hi) {
-		mid = (lo + hi) / 2;
-		litem = PySequence_GetItem(list, mid);
-		if (litem == NULL)
-			return -1;
-		res = PyObject_RichCompareBool(item, litem, Py_LT);
-		Py_DECREF(litem);
-		if (res < 0)
-			return -1;
-		if (res)
-			hi = mid;
-		else
-			lo = mid + 1;
-	}
-	return lo;
-}
-*/
-/* ----------------------------------------------------- */
 
 static char heatsource_CalcSolarPosition__doc__[] =
 "Calculates relative position of sun"
@@ -156,17 +126,8 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
 		Daytime = 1;
 	}
 
-	/* Original code using a Python call. Left for documentation only. This would return "direction"
-	PyObject *AzimuthBreaks = Py_BuildValue("(fffffff)",0.0,67.5,112.5,157.5,202.5,247.5,292.5);
-	PyObject *Az = Py_BuildValue("f",Azimuth);
-	int direction = internal_bisect_right(AzimuthBreaks, Az, 0, -1)-1;
-	/////////////////////////////////////////////////////////
-	// De-reference all unused Python objects
-	Py_DECREF(AzimuthBreaks);
-	Py_DECREF(Az);
-	*/
-	// Same code as above, but inlined in C, "lo" is our value of concern
-	float AzimuthBreaks_C[] = {0.0,67.5,112.5,157.5,202.5,247.5,292.5};
+	/* Implementation of a bisect routine, inlined for speed. Look at the Python bisect code for details */
+	float AzimuthBreaks[] = {0.0,67.5,112.5,157.5,202.5,247.5,292.5};
 	int lo = 0;
 	int hi = 7;
 	int mid;
@@ -174,12 +135,12 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
 
 	while (lo < hi) {
 		mid = (lo + hi) / 2;
-		litem = &AzimuthBreaks_C[mid];
+		litem = &AzimuthBreaks[mid];
 		if (&litem == NULL)
-		  	PyErr_SetString(HeatSourceError, "Bad value in SetSolarPosition (WTF? Better call for help.)");
+		  	PyErr_SetString(HeatSourceError, "Bad value in SetSolarPosition's bisect routine (WTF? Better call for help.)");
 		if ( Azimuth < *litem) { hi = mid;}
 		else if (Azimuth >= *litem) {lo = mid + 1;}
-		else {PyErr_SetString(HeatSourceError, "Bad value in SetSolarPosition (WTF? Better call for help.)");}
+		else {PyErr_SetString(HeatSourceError, "Bad value in SetSolarPosition's bisect routine (WTF? Better call for help.)");}
 
 	}
 	lo -= 1;

@@ -17,8 +17,8 @@ class StreamNode(StreamChannel):
              "FLIR_Temp", "FLIR_Time", # FLIR data
              "T_sed", "T_in", "T_tribs", # Temperature attrs
              "VHeight", "VDensity", #Vegetation params
-             "Wind", "Humidity", "T_air", # Continuous data
-             "Zone", "T_bc", "C_bc", # Initialization parameters, Zonator and boundary conditions
+             "Wind", "Humidity", "T_air","Cloud", # Continuous data
+             "Zone", "T_bc", # Initialization parameters, Zonator and boundary conditions
              "Delta_T", # Current temperature calculated from only local fluxes
              "T", "T_prev", # Current and previous stream temperature
              "Flux", # Dictionary to hold heat flux values
@@ -33,7 +33,7 @@ class StreamNode(StreamChannel):
             setattr(self, attr, x)
         self.T = 0.0
         self.slots += s
-        for attr in ["Wind", "Humidity", "T_air", "T_tribs", "Q_tribs"]:
+        for attr in ["Wind", "Humidity", "T_air","Cloud", "T_tribs", "Q_tribs"]:
             setattr(self, attr, {})
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
         # and other things the C module needs
@@ -146,7 +146,7 @@ class StreamNode(StreamChannel):
         VTS = self.ViewToSky
         emerg = IniParams["emergent"]
         VHeight = self.VHeight
-        cloud = self.C_bc[bc_hour]
+        cloud = self.Cloud[bc_hour]
         dt = self.dt
         dx = self.dx
         T_sed = self.T_sed
@@ -200,7 +200,10 @@ class StreamNode(StreamChannel):
         VTS = self.ViewToSky
         emerg = IniParams["emergent"]
         VHeight = self.VHeight
-        cloud = self.C_bc[bc_hour]
+        try:
+            cloud = self.Cloud[bc_hour]
+        except:
+            print self
         dt = self.dt
         dx = self.dx
         T_sed = self.T_sed
@@ -364,7 +367,7 @@ class StreamNode(StreamChannel):
             exp(-0.0001184 * self.Elevation)
         Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10)) + 0.8
         #Calculate Diffuse Fraction
-        F_Direct[1] = F_Direct[0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.C_bc[time] ** 2)
+        F_Direct[1] = F_Direct[0] * (Trans_Air ** Air_Mass) * (1 - 0.65 * self.Cloud[time] ** 2)
         if F_Direct[0] == 0:
             Clearness_Index = 1
         else:
@@ -377,7 +380,7 @@ class StreamNode(StreamChannel):
             (sin(2 * pi * (JD - 40) / 365)) * \
             (0.009 - 0.078 * Clearness_Index)
         F_Direct[1] = Dummy * (1 - Diffuse_Fraction)
-        F_Diffuse[1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.C_bc[time] ** 2)
+        F_Diffuse[1] = Dummy * (Diffuse_Fraction) * (1 - 0.65 * self.Cloud[time] ** 2)
 
         ########################################################
         #======================================================
@@ -543,7 +546,7 @@ class StreamNode(StreamChannel):
         Sat_Vapor = 6.1275 * exp(17.27 * Air_T / (237.3 + Air_T)) #mbar (Chapra p. 567)
         Air_Vapor = self.Humidity[hour] * Sat_Vapor
         Sigma = 5.67e-8 #Stefan-Boltzmann constant (W/m2 K4)
-        Emissivity = 1.72 * (((Air_Vapor * 0.1) / (273.2 + Air_T)) ** (1 / 7)) * (1 + 0.22 * self.C_bc[hour] ** 2) #Dingman p 282
+        Emissivity = 1.72 * (((Air_Vapor * 0.1) / (273.2 + Air_T)) ** (1 / 7)) * (1 + 0.22 * self.Cloud[hour] ** 2) #Dingman p 282
         #======================================================
         #Calcualte the atmospheric longwave flux
         F_LW_Atm = 0.96 * self.ViewToSky * Emissivity * Sigma * (Air_T + 273.2) ** 4
