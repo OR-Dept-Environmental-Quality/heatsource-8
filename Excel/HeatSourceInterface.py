@@ -52,7 +52,7 @@ class HeatSourceInterface(ExcelDocument):
         IniParams["simperiod"] = (IniParams["end"]-IniParams["date"]).days + 1
         self.Hours = int(IniParams["simperiod"] * 24)
 
-        timelist = [i for i in self.GetColumn(11,"Flow Data")[3:]]
+        timelist = [i for i in self.GetColumn(5,"Continuous Data")[4:]]
         timelist.reverse()
         timelist = [i for i in dropwhile(lambda x:x=='' or x==None,timelist)]
         timelist.reverse()
