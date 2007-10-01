@@ -26,8 +26,8 @@ class HSProfile(object):
         self.cur_hour = None
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         if run_type == 0: self.run_all = self.run_hs
-        elif run_type == 1: self.run_all = self.run_hy
-        elif run_type == 2: self.run_all = self.run_sh
+        elif run_type == 1: self.run_all = self.run_sh
+        elif run_type == 2: self.run_all = self.run_hy
         else: raise Exception("Bad run_type: %i" %`run_type`)
         ##########################################################
         # Create a Chronos iterator that controls all model time
@@ -121,14 +121,15 @@ def RunSH(sheet):
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
-        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error")
+        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 def RunHY(sheet):
     try:
         HSP = HSProfile(sheet,2).run()
-    except Exception:
+    except Exception, stderr:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
-        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error")
+        f.close()
+        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 
 def quit():
     global force_quit
