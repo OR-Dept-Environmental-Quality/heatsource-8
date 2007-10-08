@@ -97,6 +97,7 @@ class HSProfile(object):
             out += self.reachlist[-1].Q
             self.Output(time)
             time = Chronos.Tick()
+        self.Output.flush()
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         balances = [x.Q_mb for x in self.reachlist]

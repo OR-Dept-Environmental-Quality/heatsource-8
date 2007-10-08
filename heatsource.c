@@ -662,9 +662,11 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 		if (Q > 0)
 		{
 			Q_in += Q;
-			T_in += T;
+			numerator += Q*T;
 		}
 	}
+	if (numerator > 0)
+		T_in = numerator/Q_in;
 
 	T_up = T0;
     // This is basically MixItUp from the VB code

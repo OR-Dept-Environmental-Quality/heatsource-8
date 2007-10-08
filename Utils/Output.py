@@ -56,6 +56,10 @@ class Output(object):
     def __del__(self):
         for filename in self.files.itervalues():
             filename[0].close()
+    def flush(self):
+        for filename in self.files.itervalues():
+            filename[0].flush()
+            filename[0].close()
 
     def __call__(self, TheTime):
         if TheTime < self.write_time:
