@@ -2,6 +2,7 @@ from __future__ import division
 from datetime import datetime, timedelta
 import time
 from ..Dieties import IniParams
+from ..Dieties import Chronos
 from os import path
 import os
 
@@ -59,6 +60,8 @@ class Output(object):
 
     def __call__(self, TheTime):
         if TheTime < self.write_time:
+            return
+        elif Chronos.CurrentTime < Chronos.start:
             return
         else:
             for node in self.nodes:
