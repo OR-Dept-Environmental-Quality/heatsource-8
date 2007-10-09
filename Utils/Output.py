@@ -52,10 +52,6 @@ class Output(object):
                 self.files[key][0].write(aaa.ljust(14))
             self.files[key][0].write("\n")
 
-
-    def __del__(self):
-        for filename in self.files.itervalues():
-            filename[0].close()
     def flush(self):
         for filename in self.files.itervalues():
             filename[0].flush()

@@ -134,7 +134,7 @@ class HeatSourceInterface(ExcelDocument):
         for km, node in self.Reach.iteritems():
             if km not in sites:
                 # Kilometer's downstream and upstream
-                lower = bisect(sites,km)-1 if bisect(sites,km)-1 is True else 0 # zero is the lowest (protect against value of -1]
+                lower = bisect(sites,km)-1 if bisect(sites,km)-1 > 0 else 0 # zero is the lowest (protect against value of -1]
                 # bisect returns the length of a list when the bisecting number is greater than the greatest value.
                 # Here we protect by max-ing out at the length of the list.
                 upper = min([bisect(sites,km),len(sites)-1])

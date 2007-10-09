@@ -642,7 +642,7 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 	float Q_in, T_in, Q_up, T_up;
 	float Q_hyp, Q_accr, T_accr;
 	float Delta_T, Disp, S1_value, Temp;
-	int S1;
+	int S1=0;
 	PyObject *Q_tup;
 	PyObject *T_tup;
 	float T0, T1, T2; // Grid cells for prev, this, next
@@ -655,6 +655,7 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 	T_in = 0;
 	int size = PyTuple_Size(Q_tup);
 	int i;
+	float numerator=0;
 	for (i=0; i<size; i++)
 	{
 		float Q = PyFloat_AsDouble(PyTuple_GetItem(Q_tup,i));
@@ -665,7 +666,7 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 			numerator += Q*T;
 		}
 	}
-	if (numerator > 0)
+	if ((numerator > 0) && (Q_in > 0))
 		T_in = numerator/Q_in;
 
 	T_up = T0;
