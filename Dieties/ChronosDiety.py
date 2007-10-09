@@ -105,12 +105,17 @@ class ChronosDiety(object):
             self.__dayone = datetime(self.__current.year,1,1,tzinfo=self.tz)
         return (self.__current - self.__dayone).days
     def SetJDay(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
+    def GetCurrent(self): return self.__current
+    def SetCurrent(self, value): raise AttributeError("You can't tell Chronos the time, he only tells you!")
+
     start = property(GetStart, SetStart)
     dt = property(GetDT, SetDT)
     stop = property(GetStop, SetStop)
     JD = property(GetJD, SetJD)
     JDC = property(GetJDC, SetJDC)
     JDay = property(GetJDay, SetJDay)
+    CurrentTime = property(GetCurrent, SetCurrent)
+
     def FracJD(self, t=None):
         """Takes a datetime object in UTC and returns a fractional julian date"""
         t = t or self.__current
