@@ -89,7 +89,6 @@ class HeatSourceInterface(ExcelDocument):
         self.GetContinuousData()
         self.SetAtmosphericData()
         self.PB("Initializing StreamNodes")
-        [x.Initialize() for x in self.Reach.itervalues()]
 
         # Now we manually set each nodes next and previous kilometer values
         l = self.Reach.keys()
@@ -114,6 +113,7 @@ class HeatSourceInterface(ExcelDocument):
                 self.Reach[key].next_km = self.Reach[key]
             # Set a headwater node
             self.Reach[key].head = head
+            self.Reach[key].Initialize()
 
     def CheckEarlyQuit(self):
         """Placeholder for future functionality allowing someone to quit during model setup"""
@@ -144,7 +144,7 @@ class HeatSourceInterface(ExcelDocument):
                 datasite = self.Reach[up] # Initialize to upstream's continuous data
                 if km-down < up-km: # Only if the distance to the downstream node is closer do we use that
                     datasite = self.Reach[down]
-                self.Reach[km].T_air, self.Reach[km].Humidity, self.Reach[km].Wind, self.Reach[km].Cloud = datasite.T_air, datasite.Humidity, datasite.Wind, datasite.Cloud
+                self.Reach[km].ContData = datasite.ContData
                 self.PB("Setting Atmospheric Data", c.next(), len(l))
 
     def GetBoundaryConditions(self):
@@ -237,10 +237,7 @@ class HeatSourceInterface(ExcelDocument):
             for air_val in air_col:
                 if air_val is None: raise Exception("Must have values for Air Temp in Continuous Data sheet")
             for hour in xrange(self.Hours):
-                node.Wind[timelist[hour]] = wind_col[hour]
-                node.Humidity[timelist[hour]] = humid_col[hour]
-                node.T_air[timelist[hour]] = air_col[hour]
-                node.Cloud[timelist[hour]] = cloud_col[hour]
+                node.ContData[timelist[hour]] = cloud_col[hour], wind_col[hour], humid_col[hour], air_col[hour]
             self.PB("Reading continuous data", site, IniParams["contsites"])
 
     def ScanMorphology(self):

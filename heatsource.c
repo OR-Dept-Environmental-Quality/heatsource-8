@@ -6,6 +6,28 @@
 #include "Python.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
+
+struct MacCormickStruct
+{
+	double Value[2];
+};
+struct MuskingumStruct
+{
+	double Value[3];
+};
+struct GeometryStruct
+{
+	double Value[7];
+};
+struct SolarStruct
+{
+	double Value[8];
+};
+struct GroundStruct
+{
+	double Value[9];
+};
 
 static PyObject *HeatSourceError;
 
@@ -148,20 +170,9 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
 	return Py_BuildValue("ddii",Altitude,Zenith,Daytime,lo);
 }
 
-
-static char heatsource_GetStreamGeometry__doc__[] =
-"Return a stream's geometry\n\nGiven the known parameters for bottom width, Z factor, Manning\'s n and slope\nas well as the estimated Discharge, this function returns the\nwetted depth (found in a Newton-Raphson iteration or as optional D_est keyword),\narea, wetted perimeter, hydraulic radius, wetted width and velocity."
-;
-
-static PyObject *
-heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
+struct GeometryStruct
+GetStreamGeometry(float Q_est, float W_b, float z, float n, float S, float D_est, float dx, float dt)
 {
-	double Q_est;
-	double W_b;
-	double z;
-	double n;
-	double S;
-	double dt,dx;
     double Converge = 10.0;
     double dy = 0.01;
     int count = 0;
@@ -170,9 +181,6 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
 	double dFy;
 	double thed;
 	double power = 2.0/3.0;
-	double D_est = 0.0;
-	if (!PyArg_ParseTuple(args, "dddddddd", &Q_est, &W_b, &z, &n, &S, &D_est, &dx, &dt))
-		return NULL;
 	if (D_est == 0.0)
 	{
 	    while (Converge > 1e-6)
@@ -206,24 +214,21 @@ heatsource_GetStreamGeometry(PyObject *self, PyObject *args, PyObject *keywds)
     }
     Dispersion = (0.011 * pow(U,2.0) * pow(Ww,2.0)) / (D_est * Shear_Velocity);
     if ((Dispersion * dt / pow(dx,2.0)) > 0.5)
-    {
        Dispersion = (0.45 * pow(dx,2)) / dt;
-    }
 
-
-    return Py_BuildValue("fffffff",D_est,A,Pw,Rh,Ww,U,Dispersion);
+	struct GeometryStruct result;
+	result.Value[0] = D_est;
+	result.Value[1] = A;
+	result.Value[2] = Pw;
+	result.Value[3] = Rh;
+	result.Value[4] = Ww;
+	result.Value[5] = U;
+	result.Value[6] = Dispersion;
+	return result;
 }
 
-static char heatsource_CalcMuskingum__doc__[] =
-"Calculate the Muskingum coefficients for routing"
-;
-
-static PyObject *
-heatsource_CalcMuskingum(PyObject *self, PyObject *args)
+struct MuskingumStruct CalcMuskingum(float Q_est, float U, float W_w, float S, float dx, float dt)
 {
-	float Q_est, U, W_w, S, dx, dt;
-	if (!PyArg_ParseTuple(args, "ffffff", &Q_est, &U, &W_w, &S, &dx, &dt))
-		return NULL;
     float c_k = (5.0/3.0) * U;  // Wave celerity
     float X = 0.5 * (1.0 - Q_est / (W_w * S * dx * c_k));
     if (X > 0.5) { X = 0.5; }
@@ -242,43 +247,80 @@ heatsource_CalcMuskingum(PyObject *self, PyObject *args)
     float C2 = (0.5*dt + K * X) / D;
     float C3 = (K * (1 - X) - 0.5*dt) / D;
     // TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
-    return Py_BuildValue("fff",C1, C2, C3);
-
+	struct MuskingumStruct result;
+	result.Value[0] = C1;
+	result.Value[1] = C2;
+	result.Value[2] = C3;
+    return result;
 }
 
-
-static char heatsource_CalcSolarFlux__doc__[] =
-"Calculate the flux from incoming solar radiation."
+static char heatsource_CalcFlows__doc__[] =
+"Calculate all of the flows"
 ;
 
-static PyObject *
-heatsource_CalcSolarFlux(PyObject *self, PyObject *args)
+static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
 {
-	int hour, JD, emergent;
-	double Altitude, Zenith, cloud, d_w, W_b;
-	double Elevation, TopoFactor, ViewToSky;
-	double SampleDist, phi, VDensity, VHeight;
-	PyObject *ShaderList;
-	if (!PyArg_ParseTuple(args, "iiddddddddddiddO", &hour, &JD, &Altitude,
-														&Zenith, &cloud, &d_w, &W_b,
-														&Elevation, &TopoFactor, &ViewToSky,
-														&SampleDist, &phi, &emergent,
-														&VDensity, &VHeight, &ShaderList))
-        return NULL;
+	double U, W_w, S, dx, dt, W_b, z, n, D_est;
+	double inputs, Q_up_prev, Q_up, Q, Q_bc;
+	if (!PyArg_ParseTuple(args, "dddddddddddddd", &U, &W_w, &W_b, &S, &dx, &dt, &z, &n, &D_est,
+											  	  &Q, &Q_up, &Q_up_prev, &inputs, &Q_bc))
+		return NULL;
 
-	double FullSunAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,0));   // Angle at which full sun hits stream
-	double TopoShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,1)); // Angle at which stream is shaded by distant topography
-	double BankShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,2)); // Angle at which stream is shaded by bank
-	PyObject *RipExtinction = PyTuple_GetItem(ShaderList,3); // 4 element tuple of extinction cooefficients by zone
-	PyObject *VegetationAngle = PyTuple_GetItem(ShaderList,4); // 4 element tuple of top-of-vegetation angles by zone
+	struct GeometryStruct Geom;
+	double Q_new;
+	if (Q_bc >= 0)
+	{
+		Q_new = Q_bc;
+	} else {
+		double Q1 = Q_up + inputs;
+		double Q2 = Q_up_prev + inputs;
+		struct MuskingumStruct C = CalcMuskingum(Q2, U, W_w, S, dx, dt);
+		Q_new = C.Value[0]*Q1 + C.Value[1]*Q2 + C.Value[2]*Q;
+	}
+	if (Q_new > 0.0071)
+	{
+		Geom = GetStreamGeometry(Q_new, W_b, z, n, S, D_est, dx, dt);
+	} else {
+		int i;
+		for (i=0; i<7; i++)
+			Geom.Value[i] = 0.0;
+	}
+	return Py_BuildValue("ffffffff", Q_new, Geom.Value[0],Geom.Value[1],Geom.Value[2],
+						 Geom.Value[3],Geom.Value[4],Geom.Value[5],Geom.Value[6]);
+}
+
+struct SolarStruct CalcSolarFlux(int hour, int JD, double Altitude, double Zenith, double cloud,
+								double d_w, double W_b, double Elevation, double TopoFactor, double ViewToSky,
+								double SampleDist, double phi, int emergent, double VDensity, double VHeight,
+								PyObject *ShaderList)
+{
+
+	PyObject *item0 = PySequence_GetItem(ShaderList,0);
+	PyObject *item1 = PySequence_GetItem(ShaderList,1);
+	PyObject *item2 = PySequence_GetItem(ShaderList,2);
+	double FullSunAngle = PyFloat_AsDouble(item0);
+	double TopoShadeAngle = PyFloat_AsDouble(item1);
+	double BankShadeAngle = PyFloat_AsDouble(item2);
+	Py_DECREF(item0);
+	Py_DECREF(item1);
+	Py_DECREF(item2);
+	PyObject *RipExtinction = PySequence_GetItem(ShaderList,3); // 4 element tuple of extinction cooefficients by zone
+	PyObject *VegetationAngle = PySequence_GetItem(ShaderList,4); // 4 element tuple of top-of-vegetation angles by zone
+
 	double rip[4];
 	double veg[4];
 	int i;
 	for (i=0; i<4; i++)
 	{
-		rip[i] = PyFloat_AsDouble(PyTuple_GetItem(RipExtinction,i));
-		veg[i] = PyFloat_AsDouble(PyTuple_GetItem(VegetationAngle,i));
+		item0 = PySequence_GetItem(RipExtinction,i);
+		item1 = PySequence_GetItem(VegetationAngle,i);
+		rip[i] = PyFloat_AsDouble(item0);
+		veg[i] = PyFloat_AsDouble(item1);
+		Py_DECREF(item0);
+		Py_DECREF(item1);
 	}
+	Py_DECREF(RipExtinction);
+	Py_DECREF(VegetationAngle);
 	// Constants
 	float pi = 3.14159265358979323846f;
 	float radians = pi/180.0;
@@ -478,44 +520,26 @@ heatsource_CalcSolarFlux(PyObject *self, PyObject *args)
     diffuse_6 = Dummy1 + Dummy4 + Dummy6;
     diffuse_7 = Dummy3 - Dummy4;
 
-	float solar_0 = diffuse_0 + direct_0;
-	float solar_1 = diffuse_1 + direct_1;
-	float solar_2 = diffuse_2 + direct_2;
-	float solar_3 = diffuse_3 + direct_3;
-	float solar_4 = diffuse_4 + direct_4;
-	float solar_5 = diffuse_5 + direct_5;
-	float solar_6 = diffuse_6 + direct_6;
-	float solar_7 = diffuse_7 + direct_7;
+	struct SolarStruct Solar;
+	Solar.Value[0] = diffuse_0 + direct_0;
+	Solar.Value[1] = diffuse_1 + direct_1;
+	Solar.Value[2] = diffuse_2 + direct_2;
+	Solar.Value[3] = diffuse_3 + direct_3;
+	Solar.Value[4] = diffuse_4 + direct_4;
+	Solar.Value[5] = diffuse_5 + direct_5;
+	Solar.Value[6] = diffuse_6 + direct_6;
+	Solar.Value[7] = diffuse_7 + direct_7;
 
-//	return Py_BuildValue("(ffffffff)(ffffffff)(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7,
-//														  direct_0,direct_1,direct_2,direct_3,direct_4,direct_5,direct_6,direct_7,
-//														  diffuse_0,diffuse_1,diffuse_2,diffuse_3,diffuse_4,diffuse_5,diffuse_6,diffuse_7);
-	return Py_BuildValue("(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7);
+	return Solar;
 }
 
-static char heatsource_CalcGroundFluxes__doc__[] =
-"Calculate the flux from bed conduction, longwave (atmospheric, vegetation and stream), evaporation and convection."
-;
-
-static PyObject *
-heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
+struct GroundStruct
+CalcGroundFluxes(double Cloud, double Humidity, double T_air, double Wind, double Elevation,
+				  double phi, double VHeight, double ViewToSky, double SedDepth, double dx, double dt,
+				  double SedThermCond, double SedThermDiff, double T_alluv, double P_w,
+				  double W_w, int emergent, int penman, double wind_a, double wind_b,
+				  double calcevap, double T_prev, double T_sed, double Q_hyp, double F_Solar5, double F_Solar7)
 {
-	double Cloud, Humidity, T_air, Wind;
-	double Elevation, phi, VHeight, ViewToSky, SedDepth;
-	double dx, dt, SedThermCond, SedThermDiff, FAlluvium;
-	double P_w, W_w;
-	int emergent, penman, calcevap;
-	double wind_a, wind_b, T_prev, T_sed, Q_hyp;
-	double F_Solar5, F_Solar7;
-
-	if (!PyArg_ParseTuple(args, "ddddddddddddddddiiddiddddd",
-								&Cloud, &Humidity, &T_air, &Wind, &Elevation,
-								&phi, &VHeight, &ViewToSky, &SedDepth, &dx,
-								&dt, &SedThermCond, &SedThermDiff, &FAlluvium, &P_w,
-								&W_w, &emergent, &penman, &wind_a, &wind_b,
-								&calcevap, &T_prev, &T_sed, &Q_hyp, &F_Solar5,
-								&F_Solar7))
-        return NULL;
 	//#################################################################
 	// Bed Conduction Flux
     //======================================================
@@ -529,9 +553,9 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
     //Calculate the conduction flux between deeper alluvium & substrate
 	float Flux_Conduction_Alluvium = 0.0;
 
-    if (FAlluvium > 0)
+    if (T_alluv > 0)
     {
-        Flux_Conduction_Alluvium = SedThermCond * (T_sed - FAlluvium) / (SedDepth / 2);
+        Flux_Conduction_Alluvium = SedThermCond * (T_sed - T_alluv) / (SedDepth / 2);
     }
     //======================================================
     //Calculate the changes in temperature in the substrate conduction layer
@@ -628,50 +652,54 @@ heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
 		R_evap = K_evap * W_w;
 	// End Evap and Conv Flux
 	//##############################################################################################
-	return Py_BuildValue("fffffffff",F_Conduction,T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_evap, F_conv, R_evap);
+	struct GroundStruct Ground;
+	Ground.Value[0] = F_Conduction;
+	Ground.Value[1] = T_sed_new;
+	Ground.Value[2] = F_Longwave;
+	Ground.Value[3] = F_LW_Atm;
+	Ground.Value[4] = F_LW_Stream;
+	Ground.Value[5] = F_LW_Veg;
+	Ground.Value[6] = F_evap;
+	Ground.Value[7] = F_conv;
+	Ground.Value[8] = R_evap;
+	return Ground;
 }
 
-static char heatsource_CalcMacCormick__doc__[] =
-"Calculate central difference, first iteration"
-;
-
-static PyObject *
-heatsource_CalcMacCormick(PyObject *self, PyObject *args)
+PyObject *
+MacCormick(double dt, double dx, double U, double T_sed, double T_prev, double Q_hyp,
+		   PyObject *Q_tup, PyObject *T_tup, double Q_up, double Delta_T, double Disp, int S1,
+		   double S1_value, double T0, double T1, double T2, double Q_accr, double T_accr)
 {
-	float dt, dx, U, T_sed, T_prev;
-	float Q_in, T_in, Q_up, T_up;
-	float Q_hyp, Q_accr, T_accr;
-	float Delta_T, Disp, S1_value, Temp;
-	int S1=0;
-	PyObject *Q_tup;
-	PyObject *T_tup;
-	float T0, T1, T2; // Grid cells for prev, this, next
-	if (!PyArg_ParseTuple(args, "ffffffOOfffiffffff", &dt, &dx, &U, &T_sed,
-														  &T_prev, &Q_hyp, &Q_tup, &T_tup,
-												 		  &Q_up, &Delta_T, &Disp, &S1,
-												 		  &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr))
-		return NULL;
-	Q_in = 0;
-	T_in = 0;
-	int size = PyTuple_Size(Q_tup);
+	double T_up = T0;
+	double Temp=0;
+	double Q_in = 0.0;
+	double T_in = 0.0;
 	int i;
-	float numerator=0;
-	for (i=0; i<size; i++)
-	{
-		float Q = PyFloat_AsDouble(PyTuple_GetItem(Q_tup,i));
-		float T = PyFloat_AsDouble(PyTuple_GetItem(T_tup,i));
-		if (Q > 0)
-		{
-			Q_in += Q;
-			numerator += Q*T;
-		}
-	}
-	if ((numerator > 0) && (Q_in > 0))
-		T_in = numerator/Q_in;
+	double numerator = 0.0;
+	PyObject *Qitem, *Titem;
+	int size = PyTuple_Size(Q_tup);
 
-	T_up = T0;
+	if (size > 0)
+	{
+		for (i=0; i<size; i++)
+		{
+			Qitem = PySequence_GetItem(Q_tup, i);
+			Titem = PySequence_GetItem(T_tup, i);
+			if ((Qitem == NULL) || (Titem == NULL))
+				PyErr_SetString(HeatSourceError, "Null value in the tributary discharge or temperature");
+			if ((PyFloat_Check(Qitem)) && (PyFloat_Check(Titem)) && (PyFloat_AsDouble(Qitem) > 0))
+			{
+				Q_in += PyFloat_AsDouble(Qitem);
+				numerator += PyFloat_AsDouble(Qitem)*PyFloat_AsDouble(Titem);
+			}
+			Py_DECREF(Qitem);
+			Py_DECREF(Titem);
+		}
+		if ((numerator > 0) && (Q_in > 0))
+			T_in = numerator/Q_in;
+	}
     // This is basically MixItUp from the VB code
-    float T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in);
+    double T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in);
     //Calculate temperature change from mass transfer from hyporheic zone
     T_mix = ((T_sed * Q_hyp) + (T_mix * (Q_up + Q_in))) / (Q_hyp + Q_up + Q_in);
     //Calculate temperature change from accretion inflows
@@ -691,8 +719,218 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 	} else {
 		Temp = T1 + S * dt;
 	}
-	return Py_BuildValue("ff",Temp, S);
 
+	return Py_BuildValue("ff",Temp, S);
+}
+
+char *StrCat(char *str1, char *str2)
+{
+	char *str3;
+	// TODO: make sure this is not a memory leak in Windows
+	str3 = (char *)malloc((strlen(str1) + strlen(str2) + 1) * sizeof(char));
+	strcpy(str3, str1);
+	strcat(str3, str2);
+	return str3;
+}
+void GetSetError(char *message, char *attr)
+{
+	char *err = "Error in C module! ";
+	char *msg = StrCat(err, StrCat(message, attr));
+	PyErr_SetString(HeatSourceError, msg);
+}
+
+double GetStringDouble(PyObject *obj, char * str)
+{
+	PyObject *PyFloat = PyObject_GetAttr( obj, PyString_FromString(str));
+	if (!PyFloat_Check(PyFloat))
+	{
+		GetSetError("Error getting attribute: ", str);
+		Py_DECREF(PyFloat);
+	}
+	double val = PyFloat_AsDouble(PyFloat);
+	Py_XDECREF(PyFloat);
+	return val;
+}
+int GetStringInt(PyObject *obj, char * str)
+{
+	PyObject *PyInt = PyObject_GetAttr( obj, PyString_FromString(str));
+	if (!PyInt_Check(PyInt))
+	{
+		GetSetError("Error getting attribute: ", str);
+		Py_DECREF(PyInt);
+	}
+	long val = PyInt_AsLong(PyInt);
+	Py_XDECREF(PyInt);
+	return (int)val;
+}
+
+double GetDictItemDouble(PyObject *obj, PyObject *key, char *name)
+{
+	PyObject *dict = PyObject_GetAttr(obj, PyString_FromString(name));
+	if (!dict)
+	{
+		GetSetError((char *)"Error accessing dictionary: ", name);
+		Py_DECREF(dict);
+	}
+	PyObject *value = PyDict_GetItem(dict, key);
+	if (!value)
+	{
+		char *A = StrCat((char *)"Error accessing attribute ", PyString_AsString(key));
+		char *B = StrCat((char *)" in dictionary ", name);
+		GetSetError((char *)" ", StrCat(A,B));
+	}
+	double val = PyFloat_AsDouble(value);
+	Py_DECREF(dict);
+	return val;
+}
+
+PyObject *GetDictItemObject(PyObject *obj, PyObject *key, char *name)
+{
+	PyObject *dict = PyObject_GetAttr(obj, PyString_FromString(name));
+	if (!dict)
+	{
+		GetSetError((char *)"Error accessing dictionary: ", name);
+		Py_DECREF(dict);
+	}
+	PyObject *value = PyDict_GetItem(dict, key);
+	if (!value)
+	{
+		char *A = StrCat((char *)"Error accessing attribute ", PyString_AsString(key));
+		char *B = StrCat((char *)" in dictionary ", name);
+		GetSetError((char *)" ", StrCat(A,B));
+	}
+	// We increment the reference count here to give ownership to the calling function
+	Py_INCREF(value);
+	return value;
+}
+
+void SetStringDouble(PyObject *obj, char *str, double val)
+{
+	PyObject *v = PyFloat_FromDouble(val);
+	int ret = PyObject_SetAttrString(obj, str, v);
+	if (ret < 0)
+	{
+		GetSetError((char *)"Error setting attribute: ", str);
+		Py_DECREF(v);
+	}
+	Py_DECREF(v);
+}
+
+void SetStringInt(PyObject *obj, char *str, int val)
+{
+	PyObject *v = PyInt_FromLong(val);
+	int ret = PyObject_SetAttrString(obj, str, v);
+	if (ret < 0)
+	{
+		GetSetError((char *)"Error setting attribute: ", str);
+		Py_DECREF(v);
+	}
+	Py_DECREF(v);
+}
+
+void SetStringObject(PyObject *obj, char *str, PyObject *Val)
+{
+	int ret = PyObject_SetAttrString(obj, str, Val);
+	if (ret < 0)
+		GetSetError((char *)"Error setting attribute: ", str);
+}
+
+static char heatsource_CalcMacCormick__doc__[] =
+"Calculate central difference, first iteration"
+;
+
+static PyObject *
+heatsource_CalcMacCormick(PyObject *self, PyObject *args)
+{
+	float dt, dx, U, T_sed, T_prev, Q_up;
+	float Q_hyp, Q_accr, T_accr;
+	float Delta_T, Disp, S1_value;
+	int S1;
+	PyObject *Q_tup, *T_tup;
+	float T0, T1, T2; // Grid cells for prev, this, next
+	if (!PyArg_ParseTuple(args, "ffffffOOfffiffffff", &dt, &dx, &U, &T_sed,
+														  &T_prev, &Q_hyp, &Q_tup, &T_tup,
+												 		  &Q_up, &Delta_T, &Disp, &S1,
+												 		  &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr))
+		return NULL;
+	PyObject *result = MacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup,
+									  Q_up, Delta_T, Disp, S1, S1_value, T0, T1, T2, Q_accr, T_accr);
+
+	return Py_BuildValue("O",result);
+}
+
+static char heatsource_CalcFluxes__doc__[] =
+"Calculate all of the fluxes"
+;
+
+static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
+{
+	PyObject *ShaderList, *ContData, *C_args, *Q_tribs, *T_tribs;
+	double W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, SedDepth;
+	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt;
+	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w;
+	double U, T_alluv, T_prev, T_sed, Q_hyp, cloud, humidity, T_air, wind, Disp;
+	int hour, JD, daytime, has_prev, emergent, calcevap, penman;
+	if (!PyArg_ParseTuple(args, "OOdddddOOdddddOdiiidddd",
+								&ContData, &C_args, &d_w, &area, &P_w, &W_w, &U,
+								&Q_tribs, &T_tribs, &T_alluv, &T_prev, &T_sed, &Q_hyp,
+								&T_dn_prev, &ShaderList, &Disp, &hour, &JD, &daytime,
+								&Altitude, &Zenith, &Q_up_prev, &T_up_prev))
+		return NULL;
+	if (!PyArg_ParseTuple(ContData, "dddd", &cloud, &wind, &humidity, &T_air))
+		return NULL;
+	if (!PyArg_ParseTuple(C_args, "ddddddddddddddididdii",
+								  &W_b, &Elevation, &TopoFactor, &ViewToSky, &phi, &VDensity, &VHeight,
+								  &SedDepth, &dx, &dt, &SedThermCond, &SedThermDiff, &Q_accr, &T_accr,
+								  &has_prev, &SampleDist, &emergent, &wind_a, &wind_b, &calcevap, &penman))
+		return NULL;
+
+	//###################################################################
+	//## Calculate Solar Flux
+	struct SolarStruct F_Solar;
+	int i;
+	for (i=0; i<8; i++) {F_Solar.Value[i] = 0.0;}
+	if (daytime)
+	{
+		F_Solar = CalcSolarFlux(hour, JD, Altitude, Zenith, cloud,
+							    d_w, W_b, Elevation, TopoFactor, ViewToSky,
+							    SampleDist, phi, emergent, VDensity, VHeight, ShaderList);
+	}
+//	SetStringObject(node, (char *)"F_Solar", F_Solar);
+	//####################################################################
+	//## Calculate Ground Fluxes
+	struct GroundStruct F_Ground = CalcGroundFluxes(cloud, humidity, T_air, wind, Elevation,
+										  phi, VHeight, ViewToSky, SedDepth, dx, dt,
+										  SedThermCond, SedThermDiff, T_alluv, P_w,
+										  W_w, emergent, penman, wind_a, wind_b,
+										  calcevap, T_prev, T_sed, Q_hyp, F_Solar.Value[5], F_Solar.Value[7]);
+	// order: {F_Conduction,T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_evap, F_conv, R_evap}
+
+	//#### Calculate and set total flux (With lots of error and reference checking!)
+	double F_Total =  F_Solar.Value[6] + F_Ground.Value[0] + F_Ground.Value[2] + F_Ground.Value[6] + F_Ground.Value[7];
+	//////////////////////////////////////////
+
+	//#### Calculate and set delta T
+	double Delta_T = F_Total * dt / ((area / W_w) * 4182 * 998.2); // Vars are Cp (J/kg *C) and P (kgS/m3)
+	//##################################################################
+	//## Calculate first MacCormick run
+	T_sed = F_Ground.Value[1];
+	if (!has_prev)
+		return Py_BuildValue("(ffffffff)(fffffffff)ff", F_Solar.Value[0],F_Solar.Value[1],
+						 F_Solar.Value[2],F_Solar.Value[3],F_Solar.Value[4],F_Solar.Value[5],
+						 F_Solar.Value[6],F_Solar.Value[7],F_Ground.Value[0],F_Ground.Value[1],
+						 F_Ground.Value[2],F_Ground.Value[3],F_Ground.Value[4],F_Ground.Value[5],
+						 F_Ground.Value[6],F_Ground.Value[7],F_Ground.Value[8], F_Total, Delta_T);
+	PyObject *MacC = MacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
+								Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr);
+	return Py_BuildValue("(ffffffff)(fffffffff)Off", F_Solar.Value[0],F_Solar.Value[1],
+						 F_Solar.Value[2],F_Solar.Value[3],F_Solar.Value[4],F_Solar.Value[5],
+						 F_Solar.Value[6],F_Solar.Value[7],F_Ground.Value[0],F_Ground.Value[1],
+						 F_Ground.Value[2],F_Ground.Value[3],F_Ground.Value[4],F_Ground.Value[5],
+						 F_Ground.Value[6],F_Ground.Value[7],F_Ground.Value[8], MacC, F_Total, Delta_T);
+/*
+	return Py_BuildValue("fff",0.0,0.0,0.0);
+*/
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -701,10 +939,8 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
-	{"GetStreamGeometry", (PyCFunction) heatsource_GetStreamGeometry, METH_VARARGS,  heatsource_GetStreamGeometry__doc__},
-	{"CalcMuskingum", (PyCFunction) heatsource_CalcMuskingum, METH_VARARGS,  heatsource_CalcMuskingum__doc__},
-	{"CalcSolarFlux", (PyCFunction) heatsource_CalcSolarFlux, METH_VARARGS,  heatsource_CalcSolarFlux__doc__},
-	{"CalcGroundFluxes", (PyCFunction) heatsource_CalcGroundFluxes, METH_VARARGS,  heatsource_CalcGroundFluxes__doc__},
+	{"CalcFluxes", (PyCFunction) heatsource_CalcFluxes, METH_VARARGS, heatsource_CalcFluxes__doc__},
+	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},
 	{"CalcMacCormick", (PyCFunction) heatsource_CalcMacCormick, METH_VARARGS,  heatsource_CalcMacCormick__doc__},
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };

@@ -12,7 +12,7 @@ from Dieties import Chronos
 from Dieties import IniParams
 from Utils.Logger import Logger
 from Utils.Output import Output as O
-from heatsource import HeatSourceError
+from heatsource import HeatSourceError, CalcMacCormick
 
 from __version__ import version_info
 
@@ -50,9 +50,13 @@ class HSProfile(object):
     def __del__(self):
         print "HSProfile deleted"
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
-        [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
-        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
-        [x.MacCormick2(solar_time) for x in self.reachlist]
+        for node in self.reachlist:
+            node.CalcHydraulics(time,hydro_time)
+            node.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset)
+        for node in self.reachlist[1:]:
+            node.T, junk = CalcMacCormick(node.dt, node.dx, node.U, node.T_sed, node.T_prev, node.Q_hyp,
+                            node.Q_tribs[solar_time], node.T_tribs[solar_time], node.prev_km.Q, node.Delta_T, node.Disp,
+                            True, node.S1, node.prev_km.T, node.T, node.next_km.T, node.Q_in, node.T_in)
     def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
     def run_sh(self,time,hydro_time, solar_time, JD, JDC, offset):
