@@ -1,6 +1,6 @@
 from __future__ import division
 from itertools import imap, dropwhile, izip, chain, repeat
-import math, time, operator, bisect
+import math, time, operator, bisect, weakref
 from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
@@ -26,7 +26,6 @@ class HeatSourceInterface(ExcelDocument):
         self.log = log
         self.Reach = {}
         # Make empty Dictionaries for the boundary conditions
-        self.Q_mb = 0 # mass balance of discharge
         self.Q_bc = {}
         self.T_bc = {}
         self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
@@ -98,29 +97,33 @@ class HeatSourceInterface(ExcelDocument):
         head.ave_Latitude = sum([x.Latitude for x in self.Reach.itervalues()])/len(self.Reach)
         head.ave_Longitude = sum([x.Longitude for x in self.Reach.itervalues()])/len(self.Reach)
         # Set the previous and next kilometer of each node.
+        slope_problems = []
         for i in xrange(len(l)):
             key = l[i] # The current node's key
             # Then, set pointers to the next and previous nodes
             if i == 0: pass
-            else: self.Reach[key].prev_km = self.Reach[l[i-1]] # At first node, there's no previous
+            else: self.Reach[key].prev_km = weakref.ref(self.Reach[l[i-1]]) # At first node, there's no previous
             try:
-                self.Reach[key].next_km = self.Reach[l[i+1]]
+                self.Reach[key].next_km = weakref.ref(self.Reach[l[i+1]])
             except IndexError:
             ##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ## For last node (mouth) we set the downstream node equal to self, this is because
             ## we want to access the node's temp if there's no downstream, and this safes us an
             ## if statement.
-                self.Reach[key].next_km = self.Reach[key]
+                self.Reach[key].next_km = weakref.ref(self.Reach[key])
             # Set a headwater node
-            self.Reach[key].head = head
+            self.Reach[key].head = weakref.ref(head)
             self.Reach[key].Initialize()
+            if self.Reach[key].S <= 0.0: slope_problems.append(key)
+        if len(slope_problems):
+            raise Exception ("The following reaches have zero slope. Kilometers: %s" %",".join(['%0.3f'%i for i in slope_problems]))
+
+    def close(self):
+        del self.T_bc, self.Reach
 
     def CheckEarlyQuit(self):
         """Placeholder for future functionality allowing someone to quit during model setup"""
         PumpWaitingMessages()
-#        if some_damn_thing_that_does_not_exist:
-#            self.PB("Simulation stopped by user")
-#            raise Exception("User forced quit")
 
     def SetAtmosphericData(self):
         """For each node without continuous data, use closest (up or downstream) node's data"""
@@ -344,9 +347,9 @@ class HeatSourceInterface(ExcelDocument):
     def BuildNodes(self):
         self.CheckEarlyQuit()
         self.PB("Building Stream Nodes")
-
+        Q_mb = 0.0
         data = self.GetColumnarData()
-        node = StreamNode(run_type=self.run_type,Q_mb=self.Q_mb)
+        node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
 
         for k,v in data.iteritems():
             setattr(node,k,v[0])
@@ -361,7 +364,7 @@ class HeatSourceInterface(ExcelDocument):
         # is not a perfect multiple of the sample distance.
         num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
         for i in range(0, num_nodes):
-            node = StreamNode(run_type=self.run_type,Q_mb=self.Q_mb)
+            node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
             for k,v in data.iteritems():
                 setattr(node,k,v[i+1])# Add one to ignore boundary node
             self.InitializeNode(node)

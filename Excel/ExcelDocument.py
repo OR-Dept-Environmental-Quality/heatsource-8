@@ -54,6 +54,8 @@ class ExcelDocument(object):
     def __del__(self):
         if self.quit_excel:
             self.app.Quit()
+        del self.app
+        del self.PBtext
     def PB(self, message, num=None, divisor=None):
         try:
             self.app.StatusBar = self.PBtext(message, num, divisor)

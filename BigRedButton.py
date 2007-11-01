@@ -1,6 +1,6 @@
 from __future__ import division
 
-import cProfile, sys, time, traceback, itertools
+import cProfile, sys, time, traceback, itertools, weakref
 from os.path import join, exists
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
@@ -47,8 +47,10 @@ class HSProfile(object):
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
 
-    def __del__(self):
-        print "HSProfile deleted"
+    def close(self):
+        print "Deleting HSProfile"
+        self.HS.close()
+        del self.reachlist, self.Output, self.run_all, self.Reach, self.HS
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
         for node in self.reachlist:
             node.CalcHydraulics(time,hydro_time)
@@ -84,7 +86,7 @@ class HSProfile(object):
                 PumpWaitingMessages()
                 if force_quit:
                     self.HS.PB("Simulation stopped by user")
-                    return
+                    break
                 if not n%1440:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
@@ -101,6 +103,7 @@ class HSProfile(object):
             out += self.reachlist[-1].Q
             self.Output(time)
             time = Chronos.Tick()
+
         self.Output.flush()
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
@@ -109,11 +112,12 @@ class HSProfile(object):
         message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day). Water Balance: %0.3f/%0.3f" %\
                     (total_time, total_time/timesteps, total_days, total_inflow, out)
         self.HS.PB(message)
-        print message
 
 def RunHS(sheet):
     try:
-        HSP = HSProfile(sheet).run()
+        HSP = HSProfile(sheet)
+        HSP.run()
+        del HSP
     except Exception, stderr:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
@@ -121,7 +125,8 @@ def RunHS(sheet):
         msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 def RunSH(sheet):
     try:
-        HSP = HSProfile(sheet,1).run()
+        HSP = HSProfile(sheet,1)
+        HSP.run()
     except Exception, stderr:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
@@ -129,13 +134,17 @@ def RunSH(sheet):
         msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 def RunHY(sheet):
     try:
-        HSP = HSProfile(sheet,2).run()
+        HSP = HSProfile(sheet,2)
+        HSP.run()
     except Exception, stderr:
         f = open("c:\\HSError.txt","w")
         traceback.print_exc(file=f)
         f.close()
         msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 
-def quit():
+def quit(arg):
     global force_quit
-    force_quit = True
+    if arg:
+        force_quit = True
+    else:
+        force_quit = False

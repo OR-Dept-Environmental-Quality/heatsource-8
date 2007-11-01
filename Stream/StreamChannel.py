@@ -1,9 +1,13 @@
 from __future__ import division
-import math, decimal
+import math, decimal, weakref
 from warnings import warn
 import heatsource.heatsource as _HS
 from ..Dieties import Chronos
 from ..Dieties import IniParams
+
+class Nothing(object):
+    """Class that returns None when called"""
+    def __call__(self): return None
 
 class StreamChannel(object):
     """Class that describes the geometry of a stream channel
@@ -42,8 +46,6 @@ class StreamChannel(object):
                     "Q_out", # Withdrawls from the stream, in cubic meters per second
                     "Q_hyp", # Hyporheic flow
                     "km", # River kilometer, from mouth
-                    "next_km", # Reference to next (downstream) river channel instance (Set externally)
-                    "prev_km", # Reference to prevous (Upstream) river channel instance (also set externally)
                     "Q_bc", # Boundary conditions, in a TimeList class, for discharge.
                     "E", # Evaporation volume inm m^3
                     "dt", # This is the timestep (for kinematic wave movement, etc.)
@@ -51,12 +53,33 @@ class StreamChannel(object):
                     "K_h", # Horizontal bed conductivity
                     "Log",  # Global logging class
                     "Disp", # Dispersion due to shear stress
+#                    "next_km", "prev_km",
                     "Q_mass" # Local mass balance variable (StreamChannel level)
                     ]
         for attr in self.slots:
             setattr(self,attr,None)
         self.Q_mass = 0
         self.starttime = Chronos.MakeDatetime(IniParams["date"])
+        self.__next_km = self.__prev_km = self.__head = Nothing()
+
+    def GetNextKM(self): return self.__next_km()
+    def SetNextKM(self, val):
+        if not isinstance(val,weakref.ref):
+            raise Exception("References to other nodes must be weakref.ref instances")
+        self.__next_km = val
+    def GetPrevKM(self): return self.__prev_km()
+    def SetPrevKM(self, val):
+        if not isinstance(val,weakref.ref):
+            raise Exception("References to other nodes must be weakref.ref instances")
+        self.__prev_km = val
+    def GetHead(self): return self.__head()
+    def SetHead(self, val):
+        if not isinstance(val,weakref.ref):
+            raise Exception("References to other nodes must be weakref.ref instances")
+        self.__head = val
+    prev_km = property(GetPrevKM, SetPrevKM)
+    next_km = property(GetNextKM, SetNextKM)
+    head = property(GetHead, SetHead)
 
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
@@ -80,7 +103,7 @@ class StreamChannel(object):
         self.Q = Q
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
-        if Q < 0.0071: #Channel is not going dry
+        if Q < 0.003: #Channel is not going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
 
     def CalcDischarge_BoundaryNode(self, time, hour):
@@ -94,7 +117,7 @@ class StreamChannel(object):
         self.Q_prev = self.Q
         self.Q = Q
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
-        if Q < 0.0071: #Channel is going dry
+        if Q < 0.003: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
 
     def CalculateDischarge(self, time, hour):
@@ -142,7 +165,7 @@ class StreamChannel(object):
         self.Q = Q
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
-        if Q < 0.0071: #Channel is going dry
+        if Q < 0.003: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
 
     def CalcHydroStability(self):

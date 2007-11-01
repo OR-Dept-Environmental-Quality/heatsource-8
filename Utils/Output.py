@@ -1,6 +1,6 @@
 from __future__ import division
 from datetime import datetime, timedelta
-import time
+import time, weakref
 from ..Dieties import IniParams
 from ..Dieties import Chronos
 from os import path

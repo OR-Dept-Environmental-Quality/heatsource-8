@@ -47,6 +47,7 @@ class StreamNode(StreamChannel):
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
+    def close(self): del Q_mb, self.T_bc, self.CalcHeat, self.CalculateDischarge
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
         return self.km == cmp
@@ -86,7 +87,7 @@ class StreamNode(StreamChannel):
         """
         # Make a dictionary to return
         attrDict = {}
-        ignoreList = ["Zone", "Chronos", "Helios", "IniParams", "Log"]
+        ignoreList = ["Zone", "Chronos", "IniParams", "Log"]
         # First we get all the attributes of __slots__
         for k in self.slots:
             if k in ignoreList: continue # Ignore the Zonator, clock, etc.
@@ -136,8 +137,6 @@ class StreamNode(StreamChannel):
         # ...
         # (Say "unanticipated initialization" 3 times, fast.)
         # ...
-        for k,v in IniParams.iteritems():
-            setattr(self,"ini_"+k,v)
         has_prev = self.prev_km is not None
         if has_prev:
             self.CalcHeat = self.CalcHeat_Opt
@@ -153,15 +152,17 @@ class StreamNode(StreamChannel):
         self.T = None
         # Calculate solar position (C module)
         Altitude, Zenith, Daytime, dir = self.head.SolarPos
-        # Create a large tuple filled with everything we need to calculate the fluxes
-        self.F_Solar, \
-            (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-             self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), \
-             (self.T, self.S1), self.F_Total, self.Delta_T = \
-            _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                        self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
-                        self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                        hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev,)
+        try:
+            self.F_Solar, \
+                (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), \
+                 (self.T, self.S1), self.F_Total, self.Delta_T = \
+                _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
+                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
+        except HeatSourceError:
+            raise
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
@@ -172,13 +173,16 @@ class StreamNode(StreamChannel):
         # Calculate solar position (C module)
         Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
         self.SolarPos = Altitude, Zenith, Daytime, dir
-        self.F_Solar, \
-            (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-             self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
-            _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                        self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
-                        self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                        hour, JD, Daytime,Altitude, Zenith, 0.0, 0.0)
+        try:
+            self.F_Solar, \
+                (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
+                _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
+                            hour, JD, Daytime,Altitude, Zenith, 0.0, 0.0)
+        except HeatSourceError:
+            raise
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
