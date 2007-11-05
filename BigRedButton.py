@@ -1,5 +1,6 @@
 from __future__ import division
 
+import gc
 import cProfile, sys, time, traceback, itertools, weakref
 from os.path import join, exists
 from datetime import datetime, timedelta
@@ -46,12 +47,17 @@ class HSProfile(object):
         ##########################################################
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
-
+        gc.enable()
+        gc.set_debug(gc.DEBUG_LEAK)
     def close(self):
         print "Deleting HSProfile"
         self.HS.close()
         del self.reachlist, self.Output, self.run_all, self.Reach, self.HS
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
+        gc.collect()
+        if len(gc.garbage):
+            print hydro_time, len(gc.garbage), gc.garbage[0]
+        else: pass
         for node in self.reachlist:
             node.CalcHydraulics(time,hydro_time)
             node.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset)

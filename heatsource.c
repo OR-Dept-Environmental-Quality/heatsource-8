@@ -157,6 +157,7 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	double dFy;
 	double thed;
 	double power = 2.0/3.0;
+	if (W_b == 0.0) W_b = 0.01; //ASSUMPTION: Make bottom width 1 cm to prevent undefined numbers in the math.
 	if (D_est == 0.0)
 	{
 	    while (Converge > 1e-6)
@@ -199,7 +200,6 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	Value[4] = Ww;
 	Value[5] = U;
 	Value[6] = Dispersion;
-
 }
 
 void CalcMuskingum(double Value[], double Q_est, double U, double W_w, double S, double dx, double dt)
