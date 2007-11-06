@@ -157,10 +157,11 @@ class StreamNode(StreamChannel):
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                  self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), \
                  (self.T, self.S1), self.F_Total, self.Delta_T = \
-                _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
-                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
+                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
+#                _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+#                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+#                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
+#                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
         except HeatSourceError:
             raise
         self.F_DailySum[1] += self.F_Solar[1]
@@ -177,10 +178,11 @@ class StreamNode(StreamChannel):
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                  self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
-                _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
-                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                            hour, JD, Daytime,Altitude, Zenith, 0.0, 0.0)
+                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
+#                _HS.CalcFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+#                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+#                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
+#                            hour, JD, Daytime,Altitude, Zenith, 0.0, 0.0)
         except HeatSourceError:
             raise
         self.F_DailySum[1] += self.F_Solar[1]
@@ -188,6 +190,18 @@ class StreamNode(StreamChannel):
 
         self.T = self.T_bc[bc_hour]
         self.T_prev = self.T_bc[bc_hour]
+
+    def CalcFluxes_THW(self, hour, bc_hour, JD, Daytime, Altitude, Zenith, dir):
+        F_Solar = [0.0]*8
+        if Daytime:
+            F_Solar = self.Solar_THW(JD, hour, bc_hour, Altitude, Zenith, dir, Daytime)
+        F_Ground = self.GroundFlux_THW(bc_hour)
+        F_Total = F_Solar[6] + F_Ground[0] + F_Ground[2] + F_Ground[6] + F_Ground[7]
+        Delta_T = F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
+        if not self.prev_km:
+            return F_Solar, F_Ground, F_Total, Delta_T
+        return F_Solar, F_Ground, self.MacCormick_THW(bc_hour, Delta_T), F_Total, Delta_T
+
 
     def CalcDispersion(self):
         dx = self.dx
@@ -200,27 +214,27 @@ class StreamNode(StreamChannel):
         if self.Disp * dt / (dx ** 2) > 0.5:
             self.Disp = (0.45 * (dx ** 2)) / dt
 
-    def MacCormick_THW(self, hour):
+    def MacCormick_THW(self, bc_hour, Delta_T):
         dt = self.dt
         dx = self.dx
         mix = 0
         SkipNode = False
         if self.prev_km:
             if not SkipNode:
-                mix = self.MixItUp(hour,self.prev_km.Q_prev, self.prev_km.T_prev) if self.Q else 0
+                mix = self.MixItUp(bc_hour,self.prev_km.Q_prev, self.prev_km.T_prev) if self.Q else 0
                 T0 = self.prev_km.T_prev + mix
                 T1 = self.T_prev
                 T2 = self.next_km.T_prev if self.next_km else self.T_prev
                 Dummy1 = -self.U * (T1 - T0) / dx
                 self.CalcDispersion()
                 Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / (dx ** 2)
-                S1 = Dummy1 + Dummy2 + self.Delta_T / dt
+                S1 = Dummy1 + Dummy2 + Delta_T / dt
                 T = T1 + S1 * dt
             else:
                 T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev
         else:
-            T = self.T_bc[hour]
-            T_prev = self.T_bc[hour]
+            T = self.T_bc[bc_hour]
+            T_prev = self.T_bc[bc_hour]
         return T, S1
 
     def MacCormick_BoundaryNode(self,args):
@@ -253,12 +267,12 @@ class StreamNode(StreamChannel):
             raise Exception("Unstable model")
         return T
 
-    def MixItUp(self, hour, Q_up, T_up):
+    def MixItUp(self, bc_hour, Q_up, T_up):
         Q_in = 0
         T_in = 0
-        for i in xrange(len(self.Q_tribs[hour])):
-            Q_in += self.Q_tribs[hour][i] if self.Q_tribs[hour][i] > 0 else 0
-            T_in += self.T_tribs[hour][i] if self.Q_tribs[hour][i] > 0 else 0
+        for i in xrange(len(self.Q_tribs[bc_hour])):
+            Q_in += self.Q_tribs[bc_hour][i] if self.Q_tribs[bc_hour][i] > 0 else 0
+            T_in += self.T_tribs[bc_hour][i] if self.Q_tribs[bc_hour][i] > 0 else 0
 
         # Hyporheic flows if available
         Q_hyp = self.Q_hyp or 0
@@ -274,13 +288,13 @@ class StreamNode(StreamChannel):
 #            T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in))) / (Q_accr + Q_up + Q_in)
         return T_mix - T_up
 
-    def Solar_THW(self,JD,time,hour, Altitude,Zenith,Direction,SampleDist):
+    def Solar_THW(self,JD,hour,bc_hour, Altitude,Zenith,Dir, Daytime):
         """Old method, now pushed down to a C module. This is left for testing only"""
         F_Direct = [0]*8
         F_Diffuse = [0]*8
         F_Solar = [0]*8
-        Cloud = self.ContData[0]
-        FullSunAngle,TopoShadeAngle,BankShadeAngle,RipExtinction,VegetationAngle = self.ShaderList[Direction]
+        Cloud = self.ContData[bc_hour][0]
+        FullSunAngle,TopoShadeAngle,BankShadeAngle,RipExtinction,VegetationAngle = self.ShaderList[Dir]
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces
         pi,exp,log10,log,sqrt = math.pi,math.exp,math.log10,math.log,math.sqrt
         sin,cos,tan,atan,radians = math.sin,math.cos,math.tan,math.atan,math.radians
@@ -334,7 +348,7 @@ class StreamNode(StreamChannel):
             zone = 0
             for vegangle in VegetationAngle:  #Loop to find if shading is occuring from veg. in that zone
                 if Altitude < vegangle:  #veg shading is occurring from this zone
-                    Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (SampleDist/cos(radians(Altitude))))))
+                    Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (IniParams["longsample"]/cos(radians(Altitude))))))
                 zone += 1
             F_Direct[3] = Dummy1
             F_Diffuse[3] = F_Diffuse[2] * self.ViewToSky
@@ -439,7 +453,8 @@ class StreamNode(StreamChannel):
         F_Solar[6] = F_Diffuse[6] + F_Direct[6]
         F_Solar[7] = F_Diffuse[7] + F_Direct[7]
         return F_Solar
-    def GroundFlux_THW(self, hour):
+
+    def GroundFlux_THW(self, bc_hour):
 
         #SedThermCond units of W/(m *C)
         #SedThermDiff units of cm^2/sec
@@ -473,10 +488,10 @@ class StreamNode(StreamChannel):
         #=====================================================
         #Atmospheric variables
         exp = math.exp
-        Humidity, Air_T = self.ContData[hour][-2:] # Last two elements in tuple
+        Cloud, Wind, Humidity, Air_T = self.ContData[bc_hour] # Last two elements in tuple
         Pressure = 1013 - 0.1055 * self.Elevation #mbar
         Sat_Vapor = 6.1275 * exp(17.27 * Air_T / (237.3 + Air_T)) #mbar (Chapra p. 567)
-        Air_Vapor = self.Humidity[hour] * Sat_Vapor
+        Air_Vapor = Humidity * Sat_Vapor
         Sigma = 5.67e-8 #Stefan-Boltzmann constant (W/m2 K4)
         Emissivity = 1.72 * (((Air_Vapor * 0.1) / (273.2 + Air_T)) ** (1 / 7)) * (1 + 0.22 * Cloud ** 2) #Dingman p 282
         #======================================================
@@ -494,7 +509,6 @@ class StreamNode(StreamChannel):
         #===================================================
         #Atmospheric Variables
         log,exp = math.log,math.exp
-        Wind, Humidity, Air_T = self.ContData[hour][-3:]
         Pressure = 1013 - 0.1055 * self.Elevation #mbar
         Sat_Vapor = 6.1275 * exp(17.27 * self.T_prev / (237.3 + self.T_prev)) #mbar (Chapra p. 567)
         Air_Vapor = Humidity * Sat_Vapor
@@ -550,30 +564,30 @@ class StreamNode(StreamChannel):
         return F_Cond, T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_Evap, F_Conv, E
 
     def CalcSolarPosition_THW(lat, lon, hour, minute, second, offset, JDC):
-    
+
         MeanObliquity = 23.0 + (26.0 + ((21.448 - JDC * (46.815 + JDC * (0.00059 - JDC * 0.001813))) / 60.0)) / 60.0
         Obliquity = MeanObliquity + 0.00256 * cos(toRadians*(125.04 - 1934.136 * JDC))
         Eccentricity = 0.016708634 - JDC * (0.000042037 + 0.0000001267 * JDC)
         GeoMeanLongSun = 280.46646 + JDC * (36000.76983 + 0.0003032 * JDC)
-    
+
         while GeoMeanLongSun < 0:
             GeoMeanLongSun += 360
         while GeoMeanLongSun > 360:
             GeoMeanLongSun -= 360
         GeoMeanAnomalySun = 357.52911 + JDC * (35999.05029 - 0.0001537 * JDC)
-    
+
         Dummy1 = toRadians*GeoMeanAnomalySun
         Dummy2 = sin(Dummy1)
         Dummy3 = sin(Dummy2 * 2)
         Dummy4 = sin(Dummy3 * 3)
         SunEqofCenter = Dummy2 * (1.914602 - JDC * (0.004817 + 0.000014 * JDC)) + Dummy3 * (0.019993 - 0.000101 * JDC) + Dummy4 * 0.000289
         SunApparentLong = (GeoMeanLongSun + SunEqofCenter) - 0.00569 - 0.00478 * sin(toRadians*((125.04 - 1934.136 * JDC)))
-    
+
         Dummy1 = sin(toRadians*Obliquity) * sin(toRadians*SunApparentLong)
         Declination = toDegrees*(atan(Dummy1 / sqrt(-Dummy1 * Dummy1 + 1)))
-    
+
         SunRadVector = (1.000001018 * (1 - pow(Eccentricity,2))) / (1 + Eccentricity * cos(toRadians*(GeoMeanAnomalySun + SunEqofCenter)))
-    
+
         #======================================================
         #Equation of time (minutes)
         Dummy = pow((tan(Obliquity * pi / 360)),2)
@@ -583,21 +597,21 @@ class StreamNode(StreamChannel):
         Dummy4 = sin(toRadians*(4 * GeoMeanLongSun))
         Dummy5 = sin(toRadians*(2 * GeoMeanAnomalySun))
         Et = toDegrees*(4 * (Dummy * Dummy1 - 2 * Eccentricity * Dummy2 + 4 * Eccentricity * Dummy * Dummy2 * Dummy3 - 0.5 * pow(Dummy,2) * Dummy4 - 1.25 * pow(Eccentricity,2) * Dummy5))
-    
+
         SolarTime = (hour*60.0) + minute + (second/60.0) + (Et - 4.0 * -lon + (offset*60.0))
-    
+
         while SolarTime > 1440.0:
             SolarTime -= 1440.0
         HourAngle = SolarTime / 4.0 - 180.0
         if HourAngle < -180.0:
             HourAngle += 360.0
-    
+
         Dummy = sin(toRadians*lat) * sin(toRadians*Declination) + cos(toRadians*lat) * cos(toRadians*Declination) * cos(toRadians*HourAngle)
         if Dummy > 1.0:
             Dummy = 1.0
         elif Dummy < -1.0:
             Dummy = -1.0
-    
+
         Zenith = toDegrees*(acos(Dummy))
         Dummy = cos(toRadians*lat) * sin(toRadians*Zenith)
         if abs(Dummy) >= 0.000999:
@@ -607,7 +621,7 @@ class StreamNode(StreamChannel):
                     Azimuth = -1.0
                 else:
                     Azimuth = 1.0
-    
+
             Azimuth = 180 - toDegrees*(acos(Azimuth))
             if HourAngle > 0:
                 Azimuth *= -1.0
@@ -618,7 +632,7 @@ class StreamNode(StreamChannel):
                 Azimuth = 0.0
         if Azimuth < 0:
             Azimuth += 360.0
-    
+
         AtmElevation = 90 - Zenith
         if AtmElevation > 85:
             RefractionCorrection = 0
@@ -631,13 +645,13 @@ class StreamNode(StreamChannel):
             else:
                 RefractionCorrection = -20.774 / Dummy
             RefractionCorrection = RefractionCorrection / 3600
-    
+
         Zenith = Zenith - RefractionCorrection
         Altitude = 90 - Zenith
         Daytime = 0
         if Altitude > 0.0:
                 Daytime = 1
-    
+
         dir = bisect((0.0,67.5,112.5,157.5,202.5,247.5,292.5),Azimuth)-1
-    
+
         return Altitude, Zenith, Daytime, dir

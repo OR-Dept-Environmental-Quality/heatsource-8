@@ -1,6 +1,6 @@
 from __future__ import division
 from itertools import imap, dropwhile, izip, chain, repeat
-import math, time, operator, bisect, weakref
+import math, time, operator, bisect, weakref, copy
 from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
 from win32com.client import Dispatch

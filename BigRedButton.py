@@ -17,12 +17,15 @@ from heatsource import HeatSourceError, CalcMacCormick
 
 from __version__ import version_info
 
-force_quit = False
+#force_quit = False
 
 class HSProfile(object):
     def __init__(self,worksheet,run_type=0):
         self.ErrLog = Logger
         self.HS = HeatSourceInterface(join(worksheet), self.ErrLog, run_type)
+        gc.enable()
+        gc.set_debug(gc.DEBUG_LEAK)
+        gc.collect()
         self.Reach = self.HS.Reach
         self.cur_hour = None
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
@@ -43,21 +46,15 @@ class HSProfile(object):
         Chronos.Start(start, dt, stop, spin)
         Chronos.dst = timedelta(hours=IniParams["daylightsavings"]) # adjust for daylight savings time
         dt_out = timedelta(minutes=60)
-        self.Output = O(dt_out, self.Reach, start)
+        #self.Output = O(dt_out, self.Reach, start)
         ##########################################################
 
         self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
-        gc.enable()
-        gc.set_debug(gc.DEBUG_LEAK)
     def close(self):
         print "Deleting HSProfile"
         self.HS.close()
-        del self.reachlist, self.Output, self.run_all, self.Reach, self.HS
+        del self.reachlist, self.run_all, self.Reach, self.HS, #self.Output
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
-        gc.collect()
-        if len(gc.garbage):
-            print hydro_time, len(gc.garbage), gc.garbage[0]
-        else: pass
         for node in self.reachlist:
             node.CalcHydraulics(time,hydro_time)
             node.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset)
@@ -90,9 +87,9 @@ class HSProfile(object):
             if not n%60: # every hour
                 self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
                 PumpWaitingMessages()
-                if force_quit:
-                    self.HS.PB("Simulation stopped by user")
-                    break
+#                if force_quit:
+#                    self.HS.PB("Simulation stopped by user")
+#                    break
                 if not n%1440:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
@@ -107,10 +104,10 @@ class HSProfile(object):
                 raise SystemExit
 
             out += self.reachlist[-1].Q
-            self.Output(time)
+            #self.Output(time)
             time = Chronos.Tick()
 
-        self.Output.flush()
+        #self.Output.flush()
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         balances = [x.Q_mb for x in self.reachlist]
