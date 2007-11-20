@@ -172,7 +172,8 @@ class StreamNode(StreamChannel):
         self.T_prev = self.T
         self.T = None
         # Calculate solar position (C module)
-        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+#        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+        Altitude, Zenith, Daytime, dir = self.CalcSolarPosition_THW(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
         self.SolarPos = Altitude, Zenith, Daytime, dir
         try:
             self.F_Solar, \
@@ -192,9 +193,9 @@ class StreamNode(StreamChannel):
         self.T_prev = self.T_bc[bc_hour]
 
     def CalcFluxes_THW(self, hour, bc_hour, JD, Daytime, Altitude, Zenith, dir):
-        F_Solar = [0.0]*8
         if Daytime:
             F_Solar = self.Solar_THW(JD, hour, bc_hour, Altitude, Zenith, dir, Daytime)
+        else: F_Solar = [0.0]*8
         F_Ground = self.GroundFlux_THW(bc_hour)
         F_Total = F_Solar[6] + F_Ground[0] + F_Ground[2] + F_Ground[6] + F_Ground[7]
         Delta_T = F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
@@ -563,8 +564,10 @@ class StreamNode(StreamChannel):
         E = Evap_Rate*self.W_w if IniParams["calcevap"] else 0
         return F_Cond, T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_Evap, F_Conv, E
 
-    def CalcSolarPosition_THW(lat, lon, hour, minute, second, offset, JDC):
-
+    def CalcSolarPosition_THW(self, lat, lon, hour, minute, second, offset, JDC):
+        from math import sin, cos, atan, tan, sqrt, pow, pi, acos
+        toRadians = pi/180.0
+        toDegrees = 180.0/pi
         MeanObliquity = 23.0 + (26.0 + ((21.448 - JDC * (46.815 + JDC * (0.00059 - JDC * 0.001813))) / 60.0)) / 60.0
         Obliquity = MeanObliquity + 0.00256 * cos(toRadians*(125.04 - 1934.136 * JDC))
         Eccentricity = 0.016708634 - JDC * (0.000042037 + 0.0000001267 * JDC)
@@ -652,6 +655,6 @@ class StreamNode(StreamChannel):
         if Altitude > 0.0:
                 Daytime = 1
 
-        dir = bisect((0.0,67.5,112.5,157.5,202.5,247.5,292.5),Azimuth)-1
+        dir = bisect.bisect((0.0,67.5,112.5,157.5,202.5,247.5,292.5),Azimuth)-1
 
         return Altitude, Zenith, Daytime, dir
