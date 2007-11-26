@@ -258,6 +258,37 @@ static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
 						 Value[3],Value[4],Value[5],Value[6]);
 	return result;
 }
+static char heatsource_CalcSolarFlux__doc__[] =
+"Calculate the flux from incoming solar radiation."
+;
+
+static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
+{
+	double U, W_w, S, dx, dt, W_b, z, n, D_est;
+	double inputs, Q_up_prev, Q_up, Q, Q_bc;
+	if (!PyArg_ParseTuple(args, "dddddddddddddd", &U, &W_w, &W_b, &S, &dx, &dt, &z, &n, &D_est,
+											  	  &Q, &Q_up, &Q_up_prev, &inputs, &Q_bc))
+		return NULL;
+
+	double Q_new;
+	if (Q_bc >= 0)
+	{
+		Q_new = Q_bc;
+	} else {
+		double Q1 = Q_up + inputs;
+		double Q2 = Q_up_prev + inputs;
+		double Val[3] = {0.0,0.0,0.0};
+		CalcMuskingum(Val, Q2, U, W_w, S, dx, dt);
+		Q_new = Val[0]*Q1 + Val[1]*Q2 + Val[2]*Q;
+	}
+	double Value[7] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,};
+	if (Q_new > 0.003)
+		GetStreamGeometry(Value, Q_new, W_b, z, n, S, D_est, dx, dt);
+
+	PyObject *result = Py_BuildValue("(ffffffff)", Q_new, Value[0],Value[1],Value[2],
+						 Value[3],Value[4],Value[5],Value[6]);
+	return result;
+}
 
 void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zenith, double cloud,
 								double d_w, double W_b, double Elevation, double TopoFactor, double ViewToSky,
@@ -495,6 +526,22 @@ CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, do
 				  double W_w, int emergent, int penman, double wind_a, double wind_b,
 				  double calcevap, double T_prev, double T_sed, double Q_hyp, double F_Solar5, double F_Solar7)
 {
+	double Cloud, Humidity, T_air, Wind;
+	double Elevation, phi, VHeight, ViewToSky, SedDepth;
+	double dx, dt, SedThermCond, SedThermDiff, FAlluvium;
+	double P_w, W_w;
+	int emergent, penman, calcevap;
+	double wind_a, wind_b, T_prev, T_sed, Q_hyp;
+	double F_Solar5, F_Solar7;
+
+	if (!PyArg_ParseTuple(args, "ddddddddddddddddiiddiddddd",
+								&Cloud, &Wind, &Humidity, &T_air, &Elevation,
+								&phi, &VHeight, &ViewToSky, &SedDepth, &dx,
+								&dt, &SedThermCond, &SedThermDiff, &FAlluvium, &P_w,
+								&W_w, &emergent, &penman, &wind_a, &wind_b,
+								&calcevap, &T_prev, &T_sed, &Q_hyp, &F_Solar5,
+								&F_Solar7))
+        return NULL;
 	//#################################################################
 	// Bed Conduction Flux
     //======================================================
@@ -777,8 +824,9 @@ static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
 
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
-	{"CalcFluxes", (PyCFunction) heatsource_CalcFluxes, METH_VARARGS, heatsource_CalcFluxes__doc__},
 	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},
+	{"CalcSolarFlux", (PyCFunction) heatsource_CalcSolarFlux, METH_VARARGS,  heatsource_CalcSolarFlux__doc__},
+	{"CalcGroundFluxes", (PyCFunction) heatsource_CalcGroundFluxes, METH_VARARGS,  heatsource_CalcGroundFluxes__doc__},
 	{"CalcMacCormick", (PyCFunction) heatsource_CalcMacCormick, METH_VARARGS,  heatsource_CalcMacCormick__doc__},
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };

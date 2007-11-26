@@ -62,24 +62,6 @@ class StreamChannel(object):
         self.starttime = Chronos.MakeDatetime(IniParams["date"])
         self.__next_km = self.__prev_km = self.__head = Nothing()
 
-    def GetNextKM(self): return self.__next_km()
-    def SetNextKM(self, val):
-        if not isinstance(val,weakref.ref):
-            raise Exception("References to other nodes must be weakref.ref instances")
-        self.__next_km = val
-    def GetPrevKM(self): return self.__prev_km()
-    def SetPrevKM(self, val):
-        if not isinstance(val,weakref.ref):
-            raise Exception("References to other nodes must be weakref.ref instances")
-        self.__prev_km = val
-    def GetHead(self): return self.__head()
-    def SetHead(self, val):
-        if not isinstance(val,weakref.ref):
-            raise Exception("References to other nodes must be weakref.ref instances")
-        self.__head = val
-    prev_km = property(GetPrevKM, SetPrevKM)
-    next_km = property(GetNextKM, SetNextKM)
-    head = property(GetHead, SetHead)
 
     def __repr__(self):
         return '%s @ %.3f km' % (self.__class__.__name__, self.km)
