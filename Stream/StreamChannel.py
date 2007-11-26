@@ -53,7 +53,7 @@ class StreamChannel(object):
                     "K_h", # Horizontal bed conductivity
                     "Log",  # Global logging class
                     "Disp", # Dispersion due to shear stress
-#                    "next_km", "prev_km",
+                    "next_km", "prev_km",
                     "Q_mass" # Local mass balance variable (StreamChannel level)
                     ]
         for attr in self.slots:

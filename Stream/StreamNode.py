@@ -240,10 +240,11 @@ class StreamNode(StreamChannel):
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
 
-        self.T = self.T_bc[bc_hour]
-        self.T_prev = self.T_bc[bc_hour]
-
-        self.T, self.S1 = _HS.CalcMacCormick(dt, dx, self.U, self.T_sed, self.T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
+        if not self.prev_km:
+            self.T = self.T_bc[bc_hour]
+            self.T_prev = self.T_bc[bc_hour]
+        else:
+            self.T, self.S1 = _HS.CalcMacCormick(dt, dx, self.U, self.T_sed, self.T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
                                           False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
 #            self.T, self.S1 = self.MacCormick_THW(bc_hour)

@@ -258,37 +258,6 @@ static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
 						 Value[3],Value[4],Value[5],Value[6]);
 	return result;
 }
-static char heatsource_CalcSolarFlux__doc__[] =
-"Calculate the flux from incoming solar radiation."
-;
-
-static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
-{
-	double U, W_w, S, dx, dt, W_b, z, n, D_est;
-	double inputs, Q_up_prev, Q_up, Q, Q_bc;
-	if (!PyArg_ParseTuple(args, "dddddddddddddd", &U, &W_w, &W_b, &S, &dx, &dt, &z, &n, &D_est,
-											  	  &Q, &Q_up, &Q_up_prev, &inputs, &Q_bc))
-		return NULL;
-
-	double Q_new;
-	if (Q_bc >= 0)
-	{
-		Q_new = Q_bc;
-	} else {
-		double Q1 = Q_up + inputs;
-		double Q2 = Q_up_prev + inputs;
-		double Val[3] = {0.0,0.0,0.0};
-		CalcMuskingum(Val, Q2, U, W_w, S, dx, dt);
-		Q_new = Val[0]*Q1 + Val[1]*Q2 + Val[2]*Q;
-	}
-	double Value[7] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,};
-	if (Q_new > 0.003)
-		GetStreamGeometry(Value, Q_new, W_b, z, n, S, D_est, dx, dt);
-
-	PyObject *result = Py_BuildValue("(ffffffff)", Q_new, Value[0],Value[1],Value[2],
-						 Value[3],Value[4],Value[5],Value[6]);
-	return result;
-}
 
 void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zenith, double cloud,
 								double d_w, double W_b, double Elevation, double TopoFactor, double ViewToSky,
@@ -300,7 +269,7 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
 
 	if (!PyArg_ParseTuple(ShaderList, "dddOO", &FullSunAngle, &TopoShadeAngle, &BankShadeAngle,
 											   &RipExtinction, &VegetationAngle))
-		return NULL;
+		PyErr_SetString(HeatSourceError, "Problem parsing ShaderList in C Module's CalcSolarFlux method");
 	double rip[4];
 	double veg[4];
 	int i;
@@ -516,7 +485,6 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
 	Value[5] = diffuse_5 + direct_5;
 	Value[6] = diffuse_6 + direct_6;
 	Value[7] = diffuse_7 + direct_7;
-
 }
 
 void
@@ -782,10 +750,14 @@ static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
 							    d_w, W_b, Elevation, TopoFactor, ViewToSky,
 							    SampleDist, phi, emergent, VDensity, VHeight, ShaderList);
 	}
+	PyObject *S = Py_BuildValue("(ffffffff)", F_Solar[0],F_Solar[1],
+						 F_Solar[2],F_Solar[3],F_Solar[4],F_Solar[5],
+						 F_Solar[6],F_Solar[7]);
+	return Py_BuildValue("OOOff", S,G, MacC, F_Total, Delta_T);
 //	SetStringObject(node, (char *)"F_Solar", F_Solar);
 	//####################################################################
 	//## Calculate Ground Fluxes
-	double F_Ground[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+/*	double F_Ground[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 	CalcGroundFluxes(F_Ground, cloud, humidity, T_air, wind, Elevation,
 					  phi, VHeight, ViewToSky, SedDepth, dx, dt,
 					  SedThermCond, SedThermDiff, T_alluv, P_w,
@@ -802,9 +774,6 @@ static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
 	//##################################################################
 	//## Calculate first MacCormick run
 	T_sed = F_Ground[1];
-	PyObject *S = Py_BuildValue("(ffffffff)", F_Solar[0],F_Solar[1],
-						 F_Solar[2],F_Solar[3],F_Solar[4],F_Solar[5],
-						 F_Solar[6],F_Solar[7]);
 	PyObject *G = Py_BuildValue("(fffffffff)",F_Ground[0],F_Ground[1],
 						 F_Ground[2],F_Ground[3],F_Ground[4],F_Ground[5],
 						 F_Ground[6],F_Ground[7],F_Ground[8]);
@@ -812,10 +781,8 @@ static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
 		return Py_BuildValue("OOff", S, G, F_Total, Delta_T);
 	PyObject *MacC = MacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
 								Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr);
-	return Py_BuildValue("OOOff", S,G, MacC, F_Total, Delta_T);
-/*
-	return Py_BuildValue("fff",0.0,0.0,0.0);
 */
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -825,6 +792,7 @@ static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
 	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},
+	{"CalcFluxes", (PyCFunction) heatsource_CalcFluxes, METH_VARARGS, heatsource_CalcFluxes__doc__},
 	{"CalcSolarFlux", (PyCFunction) heatsource_CalcSolarFlux, METH_VARARGS,  heatsource_CalcSolarFlux__doc__},
 	{"CalcGroundFluxes", (PyCFunction) heatsource_CalcGroundFluxes, METH_VARARGS,  heatsource_CalcGroundFluxes__doc__},
 	{"CalcMacCormick", (PyCFunction) heatsource_CalcMacCormick, METH_VARARGS,  heatsource_CalcMacCormick__doc__},

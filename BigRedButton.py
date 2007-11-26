@@ -17,14 +17,13 @@ from heatsource import HeatSourceError, CalcMacCormick
 
 from __version__ import version_info
 
-#force_quit = False
+force_quit = False
 
 class HSProfile(object):
     def __init__(self,worksheet,run_type=0):
         self.ErrLog = Logger
         self.HS = HeatSourceInterface(join(worksheet), self.ErrLog, run_type)
         self.Reach = self.HS.Reach
-        del self.HS
         self.cur_hour = None
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         if run_type == 0: self.run_all = self.run_hs
@@ -83,12 +82,12 @@ class HSProfile(object):
             offset = Chronos.TZOffset(time)
             n = count.next()
             if not n%60: # every hour
-#                self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
+                self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
                 print "%i of %i timesteps"% (n,int(timesteps))
-#                PumpWaitingMessages()
-#                if force_quit:
-#                    self.HS.PB("Simulation stopped by user")
-#                    break
+                PumpWaitingMessages()
+                if force_quit:
+                    self.HS.PB("Simulation stopped by user")
+                    break
                 if not n%1440:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
@@ -113,8 +112,8 @@ class HSProfile(object):
         total_inflow = sum(balances)
         message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day). Water Balance: %0.3f/%0.3f" %\
                     (total_time, total_time/timesteps, total_days, total_inflow, out)
-#        self.HS.PB(message)
-        print message
+        self.HS.PB(message)
+#        print message
 def RunHS(sheet):
     try:
         HSP = HSProfile(sheet)

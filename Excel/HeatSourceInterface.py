@@ -102,17 +102,17 @@ class HeatSourceInterface(ExcelDocument):
             key = l[i] # The current node's key
             # Then, set pointers to the next and previous nodes
             if i == 0: pass
-            else: self.Reach[key].prev_km = weakref.ref(self.Reach[l[i-1]]) # At first node, there's no previous
+            else: self.Reach[key].prev_km = self.Reach[l[i-1]] # At first node, there's no previous
             try:
-                self.Reach[key].next_km = weakref.ref(self.Reach[l[i+1]])
+                self.Reach[key].next_km = self.Reach[l[i+1]]
             except IndexError:
             ##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ## For last node (mouth) we set the downstream node equal to self, this is because
             ## we want to access the node's temp if there's no downstream, and this safes us an
             ## if statement.
-                self.Reach[key].next_km = weakref.ref(self.Reach[key])
+                self.Reach[key].next_km = self.Reach[key]
             # Set a headwater node
-            self.Reach[key].head = weakref.ref(head)
+            self.Reach[key].head = head
             self.Reach[key].Initialize()
             if self.Reach[key].S <= 0.0: slope_problems.append(key)
         if len(slope_problems):
