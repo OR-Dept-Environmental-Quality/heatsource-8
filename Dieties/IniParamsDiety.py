@@ -5,6 +5,7 @@ from datetime import datetime, time
 from time import strptime
 
 class IniParamsDiety(dict):
+    """Dictionary to hold initialization parameters"""
     def __init__(self, *args):
         dict.__init__(self, *args)
 

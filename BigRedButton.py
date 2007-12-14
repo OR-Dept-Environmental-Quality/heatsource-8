@@ -52,13 +52,9 @@ class HSProfile(object):
 #        self.HS.close()
 #        del self.reachlist, self.run_all, self.Reach, self.HS, #self.Output
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
-        for node in self.reachlist:
-            node.CalcHydraulics(time,hydro_time)
-            node.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset)
-        for node in self.reachlist[1:]:
-            node.T, junk = CalcMacCormick(node.dt, node.dx, node.U, node.T_sed, node.T_prev, node.Q_hyp,
-                            node.Q_tribs[solar_time], node.T_tribs[solar_time], node.prev_km.Q, node.Delta_T, node.Disp,
-                            True, node.S1, node.prev_km.T, node.T, node.next_km.T, node.Q_in, node.T_in)
+        [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
+        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
+#        [x.MacCormick2(solar_time) for x in self.reachlist]
     def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
     def run_sh(self,time,hydro_time, solar_time, JD, JDC, offset):
@@ -90,9 +86,9 @@ class HSProfile(object):
                     break
                 if not n%1440:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
-                hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
-                if time < start:
-                    solar_time = (time + timedelta(days=start.day-solar_time.day)).isoformat(" ")[:-12]+":00:00"
+            hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
+            if time < start:
+                solar_time = (time + timedelta(days=start.day-solar_time.day)).isoformat(" ")[:-12]+":00:00"
             try:
                 self.run_all(time,hydro_time, solar_time, JD, JDC, offset)
             except HeatSourceError, (stderr):
@@ -110,8 +106,9 @@ class HSProfile(object):
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         balances = [x.Q_mb for x in self.reachlist]
         total_inflow = sum(balances)
-        message = "Finished in %i seconds (%0.3f seconds per timestep, %0.1f seconds per day). Water Balance: %0.3f/%0.3f" %\
-                    (total_time, total_time/timesteps, total_days, total_inflow, out)
+        mettaseconds = (total_time/timesteps/len(self.reachlist))*1e6
+        message = "Finished in %i seconds (%0.3f mettaseconds). Water Balance: %0.3f/%0.3f" %\
+                    (total_time, mettaseconds, total_inflow, out)
         self.HS.PB(message)
 #        print message
 def RunHS(sheet):

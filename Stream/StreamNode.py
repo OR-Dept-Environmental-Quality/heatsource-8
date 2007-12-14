@@ -6,9 +6,7 @@ from ..Dieties import IniParams
 from StreamChannel import StreamChannel
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
-import heatsource.heatsource as _HS
-from heatsource.heatsource import HeatSourceError
-
+from heatsource import heatsource as _HS
 Outfile = open("E:\evans.out","w")
 
 class StreamNode(StreamChannel):
@@ -21,7 +19,7 @@ class StreamNode(StreamChannel):
              "T_sed", "T_in", "T_tribs", # Temperature attrs
              "VHeight", "VDensity", #Vegetation params
              "ContData", # Continuous data
-             "Zone", "T_bc", # Initialization parameters, Zonator and boundary conditions
+             "Zone", "T_bc", # Initialization parameters, Zone and boundary conditions
              "Delta_T", # Current temperature calculated from only local fluxes
              "T", "T_prev", # Current and previous stream temperature
              "Flux", # Dictionary to hold heat flux values
@@ -35,7 +33,6 @@ class StreamNode(StreamChannel):
             x = kwargs[attr] if attr in kwargs.keys() else None
             setattr(self, attr, x)
         self.T = 0.0
-        self.slots += s
         for attr in ["ContData", "T_tribs", "Q_tribs"]:
             setattr(self, attr, {})
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
@@ -66,50 +63,6 @@ class StreamNode(StreamChannel):
     def __le__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
         return self.km <= cmp
-    def GetZones(self):
-        return self.Zone
-    def GetAttributes(self, zone=False):
-        """Return a dictionary of all class attribute names and values
-
-        This class returns a dictionary with keys that are the attribute name
-        and values that are the current value for that attribute. All attributes
-        in __slots__ and in self.slots (which hold the values for the StreamChannel)
-        are included, including an optional breakdown of the values in the Zonator instance.
-
-        If the argument zone is boolean True, then the values of the Zonator instance
-        are given as well. The values in the Zonator are given differently named keys,
-        in the form of X_Y_ATTR where X is the cardinal direction, clockwise from 0=NE to
-        6=NW; Y is the zone number (0-4) and ATTR is the attribute name
-        (e.g. VDensity). This dictionary can then be iterated over in a single
-        call for printing. Internal dictionaries and lists are returned as objects
-        and should be dealt with as such. (e.g. boundary conditions and such should
-        be iterated over externally).
-        """
-        # Make a dictionary to return
-        attrDict = {}
-        ignoreList = ["Zone", "Chronos", "IniParams", "Log"]
-        # First we get all the attributes of __slots__
-        for k in self.slots:
-            if k in ignoreList: continue # Ignore the Zonator, clock, etc.
-            try:
-                attrDict[k] = getattr(self, k)
-            except AttributeError:
-                attrDict[k] = None
-        if zone:
-            for k, v in self.GetZoneAttributes().iteritems():
-                attrDict[k] = v
-        return attrDict
-    def GetZoneAttributes(self):
-        """Return a dictionary of key/value pairs for the internal Zonator instance.
-
-        See GetAttributes() for details of the key format"""
-        attrDict = {}
-        # Expand the Zonator portion into the dictionary
-        for i, j, zone in self.Zone:
-            for attr in zone.__slots__:
-                k = "%i_%i_%s" %(i, j, attr)
-                attrDict[k] = getattr(zone, attr)
-        return attrDict
 
     def CalcHydraulics(self, time, bc_hour):
         self.Q_mass = 0
@@ -157,6 +110,7 @@ class StreamNode(StreamChannel):
         VTS = self.ViewToSky
         emerg = IniParams["emergent"]
         VHeight = self.VHeight
+        cloud = self.ContData[bc_hour][0]
         dt = self.dt
         dx = self.dx
         T_sed = self.T_sed
@@ -167,7 +121,7 @@ class StreamNode(StreamChannel):
         # Testing method, these should return the same (to 1.0e-6 or so) result
 #       self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"], Daytime)
         if Daytime:
-            self.F_Solar = _HS.CalcSolarFlux(hour, JD, Altitude, Zenith, self.ContData[bc_hour][0], self.d_w,
+            self.F_Solar = _HS.CalcSolarFlux(hour, JD, Altitude, Zenith, cloud, self.d_w,
                                               self.W_b, Elev, self.TopoFactor, VTS,
                                               IniParams["transsample"], self.phi, emerg,
                                               self.VDensity, VHeight, self.ShaderList[dir])
@@ -193,6 +147,7 @@ class StreamNode(StreamChannel):
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
                                           False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
 #            self.T, self.S1 = self.MacCormick_THW(bc_hour)
+        self.prev_km.MacCormick2(bc_hour)
 
     def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
         # Reset temperatures
@@ -243,11 +198,16 @@ class StreamNode(StreamChannel):
         if not self.prev_km:
             self.T = self.T_bc[bc_hour]
             self.T_prev = self.T_bc[bc_hour]
-        else:
-            self.T, self.S1 = _HS.CalcMacCormick(dt, dx, self.U, self.T_sed, self.T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
+            return
+
+        self.T, self.S1 = _HS.CalcMacCormick(dt, dx, self.U, self.T_sed, self.T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
                                           False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
 #            self.T, self.S1 = self.MacCormick_THW(bc_hour)
+        # Call the second MacCormick calculation for the upstream node,
+        # now that we have a temperature estimate for this node and don't need the previous node's
+        # previous temperature
+        self.prev_km.MacCormick2(bc_hour)
 
     def CalcFluxes_THW(self, hour, bc_hour, JD, Daytime, Altitude, Zenith, dir):
         if Daytime:
@@ -257,8 +217,12 @@ class StreamNode(StreamChannel):
         F_Total = F_Solar[6] + F_Ground[0] + F_Ground[2] + F_Ground[6] + F_Ground[7]
         Delta_T = F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
         if not self.prev_km:
-            return F_Solar, F_Ground, F_Total, Delta_T
-        return F_Solar, F_Ground, self.MacCormick_THW(bc_hour, Delta_T), F_Total, Delta_T
+            return
+        #===================================================
+        self.T, S = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
+                                    self.Q_tribs[hour], self.T_tribs[hour], self.prev_km.Q, self.Delta_T, self.Disp,
+                                    True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
+#        self.T = self.MacCormick2_THW(hour)
 
 
     def CalcDispersion(self):
@@ -351,8 +315,8 @@ class StreamNode(StreamChannel):
         F_Direct = [0]*8
         F_Diffuse = [0]*8
         F_Solar = [0]*8
-        Cloud = self.ContData[bc_hour][0]
-        FullSunAngle,TopoShadeAngle,BankShadeAngle,RipExtinction,VegetationAngle = self.ShaderList[Dir]
+        Cloud = self.ContData[0]
+        FullSunAngle,TopoShadeAngle,BankShadeAngle,RipExtinction,VegetationAngle = self.ShaderList[Direction]
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces
         pi,exp,log10,log,sqrt = math.pi,math.exp,math.log10,math.log,math.sqrt
         sin,cos,tan,atan,radians = math.sin,math.cos,math.tan,math.atan,math.radians
@@ -546,7 +510,7 @@ class StreamNode(StreamChannel):
         #=====================================================
         #Atmospheric variables
         exp = math.exp
-        Cloud, Wind, Humidity, Air_T = self.ContData[bc_hour] # Last two elements in tuple
+        Humidity, Air_T = self.ContData[hour][-2:] # Last two elements in tuple
         Pressure = 1013 - 0.1055 * self.Elevation #mbar
         Sat_Vapor = 6.1275 * exp(17.27 * Air_T / (237.3 + Air_T)) #mbar (Chapra p. 567)
         Air_Vapor = Humidity * Sat_Vapor
@@ -567,6 +531,7 @@ class StreamNode(StreamChannel):
         #===================================================
         #Atmospheric Variables
         log,exp = math.log,math.exp
+        Wind, Humidity, Air_T = self.ContData[hour][-3:]
         Pressure = 1013 - 0.1055 * self.Elevation #mbar
         Sat_Vapor = 6.1275 * exp(17.27 * self.T_prev / (237.3 + self.T_prev)) #mbar (Chapra p. 567)
         Air_Vapor = Humidity * Sat_Vapor

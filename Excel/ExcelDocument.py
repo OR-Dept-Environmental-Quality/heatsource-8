@@ -1,5 +1,6 @@
 from __future__ import division
-from win32com.client import constants, Dispatch
+import win32com, win32com.client
+constants = win32com.client.constants
 from pythoncom import CoInitialize,CoUninitialize
 from itertools import dropwhile
 from pywintypes import com_error
@@ -42,7 +43,10 @@ class ExcelDocument(object):
         # macro which would activate the Heat Source workbook. The reason we do not call Open(excelfile)
         # is that we want to be able to catch unsaved changes, which is possible only if we catch
         # a reference to the active workbook.
-        self.app = Dispatch("Excel.Application")
+        try:
+            self.app = win32com.client.gencache.EnsureDispatch("Excel.Application")
+        except:
+            self.app = win32com.client.Dispatch("Excel.Application")
         self.quit_excel = False
         self.PBtext = TextPB()
         # If we don't have an active workbook, open one

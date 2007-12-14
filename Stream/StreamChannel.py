@@ -18,13 +18,13 @@ class StreamChannel(object):
     using the Newton-Raphson iteration method. In the future,
     an argument can be added to the constructor to define other
     kinds of channels, or some of this can be pushed down to
-    a base class.
+    a base class. This class is designed to use the heatsource
+    C module extensively.
     """
     def __init__(self):
-    # Protect the allowable attributes, so we cannot later add an attribute.
-    # This is useful to avoid programming errors where we might set self.Slope
-    # at some point, and access self.S at another point.
-        self.slots = ["S",        # Slope
+        # This was originally a use of the __slots__ attribute that didn't work with subclasses.
+        # We could do this differently, but this is just as good.
+        slots = ["S",        # Slope
                     "n",        # Manning's n
                     "z", # z factor: Ration of run to rise of the side of a trapazoidal channel
                     "d_w", # Wetted depth. Calculated in GetWettedDepth()
@@ -56,11 +56,10 @@ class StreamChannel(object):
                     "next_km", "prev_km",
                     "Q_mass" # Local mass balance variable (StreamChannel level)
                     ]
-        for attr in self.slots:
+        for attr in slots:
             setattr(self,attr,None)
         self.Q_mass = 0
         self.starttime = Chronos.MakeDatetime(IniParams["date"])
-        self.__next_km = self.__prev_km = self.__head = Nothing()
 
 
     def __repr__(self):
@@ -105,7 +104,7 @@ class StreamChannel(object):
     def CalculateDischarge(self, time, hour):
         """Return the discharge for the current timestep
 
-        This method uses the GetKnownDischarges() and GetMuskigum() methods to
+        This method uses the GetKnownDischarges() and GetMuskigum() methods (in C module) to
         grab the values necessary to calculate the discharge at the current timestep for
         the channel. If we are at a boundary (spatial or temporal) the appropriate
         boundary condition is returned. When the new discharge is calculated, the previous

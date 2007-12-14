@@ -35,7 +35,7 @@ class Output(object):
                         "Temp_H20.txt": [None, "Stream Temperature (*C)"],
                         "Temp_Sed.txt": [None, "Sediment Temperature (*C)"],
                         "VTS.txt": [None, "View to Sky"],
-                        "Hyd_Disp.txt": [None, "Hydraulic Dispersion (units/units)"]
+                        "Hyd_Disp.txt": [None, "Hydraulic Dispersion (units/unit)"]
                     }
 
         for key in self.files.iterkeys():

@@ -11,19 +11,41 @@
 static PyObject *HeatSourceError;
 
 static char heatsource_CalcSolarPosition__doc__[] =
-"Calculates relative position of sun"
+"CalcSolarPosition(*args)-> (Altitude, Zenith, Daytime, Direction) \
+\
+This method calculates the relative position of sun and returns a \
+4 item tuple with altitude, solar zenith, a boolean telling whether \
+it is daytime or not, and a direction. The direction is a number \
+between 0 and 7 designating our rough cardinal direction. zero is \
+north and numbers proceed clockwise around the compass directions. \
+"
 ;
 
 static PyObject *
 heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 {
+<<<<<<< .mine
+	// Get all the arguments from the input tuple
+	double lat = PyFloat_AsDouble(PyTuple_GetItem(args,0));
+	double lon = PyFloat_AsDouble(PyTuple_GetItem(args,1));
+	long hour = PyInt_AsLong(PyTuple_GetItem(args,2));
+	long min = PyInt_AsLong(PyTuple_GetItem(args,3));
+	long sec = PyInt_AsLong(PyTuple_GetItem(args,4));
+	long offset = PyInt_AsLong(PyTuple_GetItem(args,5));
+	double JDC = PyFloat_AsDouble(PyTuple_GetItem(args,6));
+=======
 	double lat, lon, JDC;
 	double Dummy,Dummy1,Dummy2,Dummy3,Dummy4,Dummy5;
 	int hour, min, sec, offset;
 	if (!PyArg_ParseTuple(args, "ddiiiid", &lat, &lon, &hour, &min, &sec, &offset, &JDC))
 		return NULL;
+>>>>>>> .r252
 
-	// temporary values calculated
+<<<<<<< .mine
+	// define a bunch of variables
+	double Dummy,Dummy1,Dummy2,Dummy3,Dummy4,Dummy5;
+=======
+>>>>>>> .r252
 	double MeanObliquity; // Average obliquity (degrees)
 	double Obliquity; // Corrected obliquity (degrees)
     double Eccentricity; // Eccentricity of earth's orbit (unitless)
@@ -45,6 +67,10 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 	double toRadians = pi/180.0;
 	double toDegrees = 180.0/pi;
 
+	///////////////////////////////////////////////////////////
+	// Most of the following code is self-explanatory in that it is
+	// essentially a bunch of math calculations. These should be relatively
+	// easy to modify as long as proper C-syntax is kept (remember your semi-colons)
     MeanObliquity = 23.0 + (26.0 + ((21.448 - JDC * (46.815 + JDC * (0.00059 - JDC * 0.001813))) / 60.0)) / 60.0;
     Obliquity = MeanObliquity + 0.00256 * cos(toRadians*(125.04 - 1934.136 * JDC));
     Eccentricity = 0.016708634 - JDC * (0.000042037 + 0.0000001267 * JDC);
@@ -96,7 +122,6 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
             if (Azimuth < 0) { Azimuth = -1.0; }
             else { Azimuth = 1.0; }
         }
-
         Azimuth = 180 - toDegrees*(acos(Azimuth));
         if (HourAngle > 0) { Azimuth *= -1.0; }
     } else
@@ -123,8 +148,23 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 	{
 		Daytime = 1;
 	}
+	/*******************************************************************
+	 Here, we do a bit of Python programming from within this C
+	 module. This is just so we don't have to do this in Python
+	 later, since it's not actually used within Python.
+	 What we have here is an implementation of a bisect routine
+	 (see the Python bisect module documentation). The routine is
+	 inlined here for speed. Look at the Python bisect code for details
+	 on the implementation. I just took the actual code from the
+	 Python module and re-created it here.
 
-	/* Implementation of a bisect routine, inlined for speed. Look at the Python bisect code for details */
+	 These are the azimuth angles which correspond to the 8 cardinal directions.
+	 What we want to do is translate the Azimuth variable to a number between
+	 0 and 7 to correspond to one of the directions. We do this because the
+	 ShaderList (list of shade/topo angles) has 8 tuples of information, and we
+	 want to slice with the correct tuple to get the shade values. Doing it
+	 here is just faster than in Python because it's recalculated every time.
+	**********************************************************************/
 	double AzimuthBreaks[] = {0.0,67.5,112.5,157.5,202.5,247.5,292.5};
 	int lo = 0;
 	int hi = 7;
@@ -141,7 +181,7 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 		else {PyErr_SetString(HeatSourceError, "Bad value in SetSolarPosition's bisect routine (WTF? Better call for help.)");}
 
 	}
-	lo -= 1;
+	lo -= 1; // this cooresponds now to the cardinal direction
 
 	return Py_BuildValue("ddii",Altitude,Zenith,Daytime,lo);
 }
@@ -149,6 +189,19 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 void
 GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, double S, double D_est, double dx, double dt)
 {
+<<<<<<< .mine
+	/*********************************************************
+	 * This method takes stream characteristics, the most recently
+	 * calculated discharge, and an optional estimated depth. It uses the
+	 * secant method to iterate to a solution for wetted depth
+	 * if the estimated depth is zero. If the estimated depth is
+	 * a positive number, it uses that as wetted depth. It then
+	 * uses this depth to calculate the new channel characteristics
+	 * and uses those characteristics to calculate the physical
+	 * dispersion.
+	 ********************************************************/
+=======
+>>>>>>> .r252
     double Converge = 10.0;
     double dy = 0.01;
     int count = 0;
@@ -160,6 +213,9 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	if (W_b == 0.0) W_b = 0.01; //ASSUMPTION: Make bottom width 1 cm to prevent undefined numbers in the math.
 	if (D_est == 0.0)
 	{
+		// This is a secant iterative solution method. It uses the equation for discharge at equality
+		// then adds a slight change to the depth and solves it again. It should iterate for a solution to depth
+		// within about 5-6 solutions.
 	    while (Converge > 1e-6)
 		{
 	        Fy = (D_est * (W_b + z * D_est)) * pow(((D_est * (W_b + z * D_est)) / (W_b + 2 * D_est * sqrt(1+ pow(z,2)))),power) - ((n * Q_est) / sqrt(S));
@@ -168,6 +224,8 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	        dFy = (Fyy - Fy) / dy;
 	        if (dFy <= 0) {dFy = 0.99;}
 	        D_est -= Fy / dFy;
+			// Damn, missed it. There may be a local minimum confusing us, so we choose another depth at random
+			// and try again.
 	        if ((D_est < 0) || (D_est > 5000) || (count > 10000))
 	        {
 	        	D_est = (double)rand();
@@ -178,12 +236,15 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	        count += 1;
 		}
 	}
+	// Use the calculated wetted depth to calculate new channel characteristics
 	double A = (D_est * (W_b + z * D_est));
 	double Pw = (W_b + 2 * D_est * sqrt(1+ pow(z,2)));
 	double Rh = A/Pw;
 	double Ww = W_b + 2 * z * D_est;
 	double U = Q_est / A;
 	double Dispersion, Shear_Velocity;
+
+	// THis is a sheer velocity estimate, followed by an estimate of numerical dispersion
     if (S == 0.0) {
         Shear_Velocity = U;
     } else {
@@ -193,6 +254,9 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
     if ((Dispersion * dt / pow(dx,2.0)) > 0.5)
        Dispersion = (0.45 * pow(dx,2)) / dt;
 
+<<<<<<< .mine
+	// The first argument is a pointer to an array, we just replace the array values in place
+	// and don't return.
 	Value[0] = D_est;
 	Value[1] = A;
 	Value[2] = Pw;
@@ -200,17 +264,34 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	Value[4] = Ww;
 	Value[5] = U;
 	Value[6] = Dispersion;
+=======
+	Value[0] = D_est;
+	Value[1] = A;
+	Value[2] = Pw;
+	Value[3] = Rh;
+	Value[4] = Ww;
+	Value[5] = U;
+	Value[6] = Dispersion;
+>>>>>>> .r252
 }
 
 void CalcMuskingum(double Value[], double Q_est, double U, double W_w, double S, double dx, double dt)
 {
+<<<<<<< .mine
+	// Calculates the Muskingum coefficients for the routing model. Nothing complicated here,
+	// look in Chow or somewhere for details on the calculations.
     double c_k = (5.0/3.0) * U;  // Wave celerity
     double X = 0.5 * (1.0 - Q_est / (W_w * S * dx * c_k));
+=======
+    double c_k = (5.0/3.0) * U;  // Wave celerity
+    double X = 0.5 * (1.0 - Q_est / (W_w * S * dx * c_k));
+>>>>>>> .r252
     if (X > 0.5) { X = 0.5; }
     else if (X < 0.0) {	X = 0.0; }
     double K = dx / c_k;
 
-    // Check the celerity to ensure stability. These tests are from the VB code.
+    // Check the celerity to ensure stability. We throw a Python error if this test fails because
+    // we want the error to propagate to the interface
     if (dt >= (2 * K * (1 - X)))
 		{
 			PyObject *msg = PyString_FromString("Unstable celerity. Decrease dt or increase dx");
@@ -222,13 +303,28 @@ void CalcMuskingum(double Value[], double Q_est, double U, double W_w, double S,
     double C2 = (0.5*dt + K * X) / D;
     double C3 = (K * (1 - X) - 0.5*dt) / D;
     // TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
+<<<<<<< .mine
+	// change the array values then exit
 	Value[0] = C1;
 	Value[1] = C2;
 	Value[2] = C3;
 }
 
+=======
+	Value[0] = C1;
+	Value[1] = C2;
+	Value[2] = C3;
+>>>>>>> .r252
 static char heatsource_CalcFlows__doc__[] =
-"Calculate all of the flows"
+"CalcFlows(*args)-> tuple of stream characteristics. \
+\
+This method takes values for discharge (Upstream, \
+previous upstream and previous this node) and calls a \
+method to calculate the Muskingum routing coefficients. \
+It then calculates a new discharge, and calls another \
+method to calculate the stream geometry. It returns a \
+tuple of values with discharge, stream geometry and \
+dispersion."
 ;
 
 static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
@@ -238,7 +334,67 @@ static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "dddddddddddddd", &U, &W_w, &W_b, &S, &dx, &dt, &z, &n, &D_est,
 											  	  &Q, &Q_up, &Q_up_prev, &inputs, &Q_bc))
 		return NULL;
+	// if there is a value for Q_bc, then we are at a boundary node and do not
+	// need to calculate discharge.
+	double Q_new;
+	if (Q_bc >= 0)
+	{
+		Q_new = Q_bc;
+	} else {
+		double Q1 = Q_up + inputs;
+		double Q2 = Q_up_prev + inputs;
+		double Val[3] = {0.0,0.0,0.0}; // an array for the muskingum method to use
+		CalcMuskingum(Val, Q2, U, W_w, S, dx, dt);
+		Q_new = Val[0]*Q1 + Val[1]*Q2 + Val[2]*Q;
+	}
+	double Value[7] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,}; // an array for the geometry method to use
+	if (Q_new > 0.003)
+		GetStreamGeometry(Value, Q_new, W_b, z, n, S, D_est, dx, dt);
 
+	PyObject *result = Py_BuildValue("(ffffffff)", Q_new, Value[0],Value[1],Value[2],
+						 Value[3],Value[4],Value[5],Value[6]);
+	return result;
+}
+
+<<<<<<< .mine
+static char heatsource_CalcSolarFlux__doc__[] =
+"CalcSolarFlux(*args)-> tuple of 8 solar flux calculations \
+\
+Calculate the flux from incoming solar radiation for a given \
+solar position. It returns a tuple of length 8 containing \
+calculations for solar fluxs from incoming to stream."
+=======
+static char heatsource_CalcFlows__doc__[] =
+"Calculate all of the flows"
+>>>>>>> .r252
+;
+
+static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
+{
+<<<<<<< .mine
+	int hour, JD, emergent;
+	double Altitude, Zenith, cloud, d_w, W_b;
+	double Elevation, TopoFactor, ViewToSky;
+	double SampleDist, phi, VDensity, VHeight;
+	PyObject *ShaderList;
+	// Strip out all of the arguments. ShaderList is kept a Python Object because it's a tuple
+	// with tuples in it.
+	if (!PyArg_ParseTuple(args, "iiddddddddddiddO", &hour, &JD, &Altitude,
+														&Zenith, &cloud, &d_w, &W_b,
+														&Elevation, &TopoFactor, &ViewToSky,
+														&SampleDist, &phi, &emergent,
+														&VDensity, &VHeight, &ShaderList))
+        return NULL;
+=======
+	double U, W_w, S, dx, dt, W_b, z, n, D_est;
+	double inputs, Q_up_prev, Q_up, Q, Q_bc;
+	if (!PyArg_ParseTuple(args, "dddddddddddddd", &U, &W_w, &W_b, &S, &dx, &dt, &z, &n, &D_est,
+											  	  &Q, &Q_up, &Q_up_prev, &inputs, &Q_bc))
+		return NULL;
+>>>>>>> .r252
+	// Now deal with Shader list. The first three values are angles, the 4th value is
+	// a tuple of riparian extinction values for the 4 zones and the 5th is a tuple of
+	// angles for the top of vegetation for each zone
 	double Q_new;
 	if (Q_bc >= 0)
 	{
@@ -270,6 +426,7 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
 	if (!PyArg_ParseTuple(ShaderList, "dddOO", &FullSunAngle, &TopoShadeAngle, &BankShadeAngle,
 											   &RipExtinction, &VegetationAngle))
 		PyErr_SetString(HeatSourceError, "Problem parsing ShaderList in C Module's CalcSolarFlux method");
+	// We strip out those 4 element tuples and put the values in an array for C to handle easily.
 	double rip[4];
 	double veg[4];
 	int i;
@@ -391,9 +548,7 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     	double ripExtinctEmergent, shadeDensityEmergent;
         double pathEmergent = VHeight / sin(radians*Altitude);
         if (pathEmergent > W_b)
-		{
             pathEmergent = W_b;
-		}
         if (VDensity == 1.0)
         {
             VDensity = 0.9999;
@@ -432,13 +587,9 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
         Stream_Reflect = 0.091 * (1 / cos(Zenith * radians)) - 0.0386;
     }
     if (fabs(Stream_Reflect) > 1)
-    {
         Stream_Reflect = 0.0515 * (Zenith * radians) - 3.636;
-    }
     if (fabs(Stream_Reflect) > 1)
-    {
         Stream_Reflect = 0.091 * (1 / cos(Zenith * pi / 180)) - 0.0386;
-    }
     diffuse_5 = diffuse_4 * 0.91;
     direct_5 = direct_4 * (1 - Stream_Reflect);
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -449,9 +600,7 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     double Water_Path = d_w / cos(atan((sin(radians*Zenith) / 1.3333) / sqrt(-(sin(radians*Zenith) / 1.3333) * (sin(radians*Zenith) / 1.3333) + 1))); //Jerlov (1976)
     double Trans_Stream = 0.415 - (0.194 * log10(Water_Path * 100));
     if (Trans_Stream > 1)
-    {
         Trans_Stream = 1;
-    }
     double Dummy1 = direct_5 * (1 - Trans_Stream);       //Direct Solar Radiation attenuated on way down
     double Dummy2 = direct_5 - Dummy1 ;                  //Direct Solar Radiation Hitting Stream bed
     double Bed_Reflect = exp(0.0214 * (Zenith * radians) - 1.941);   //Reflection Coef. for Direct Solar
@@ -464,9 +613,7 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     direct_7 = Dummy3 - Dummy4;
     Trans_Stream = 0.415 - (0.194 * log10(100 * d_w));
     if (Trans_Stream > 1)
-    {
         Trans_Stream = 1;
-    }
     Dummy1 = diffuse_5 * (1 - Trans_Stream);      //Diffuse Solar Radiation attenuated on way down
     Dummy2 = diffuse_5 - Dummy1;                  //Diffuse Solar Radiation Hitting Stream bed
     Bed_Reflect = exp(0.0214 * (0) - 1.941);               //Reflection Coef. for Diffuse Solar
@@ -477,6 +624,18 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     diffuse_6 = Dummy1 + Dummy4 + Dummy6;
     diffuse_7 = Dummy3 - Dummy4;
 
+<<<<<<< .mine
+	float solar_0 = diffuse_0 + direct_0;
+	float solar_1 = diffuse_1 + direct_1;
+	float solar_2 = diffuse_2 + direct_2;
+	float solar_3 = diffuse_3 + direct_3;
+	float solar_4 = diffuse_4 + direct_4;
+	float solar_5 = diffuse_5 + direct_5;
+	float solar_6 = diffuse_6 + direct_6;
+	float solar_7 = diffuse_7 + direct_7;
+
+	return Py_BuildValue("(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7);
+=======
 	Value[0] = diffuse_0 + direct_0;
 	Value[1] = diffuse_1 + direct_1;
 	Value[2] = diffuse_2 + direct_2;
@@ -485,14 +644,28 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
 	Value[5] = diffuse_5 + direct_5;
 	Value[6] = diffuse_6 + direct_6;
 	Value[7] = diffuse_7 + direct_7;
+>>>>>>> .r252
 }
 
+<<<<<<< .mine
+static char heatsource_CalcGroundFluxes__doc__[] =
+"CalcGroundFluxes(*args)-> tuple of 9 non-solar flux calculations \
+\
+Calculates the longwave, conductive, convective and evaporative fluxes. \
+Also calculates the evaporation and the sediment temperature. Returns \
+a 9 length tuple."
+;
+
+static PyObject *
+heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
+=======
 void
 CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, double Wind, double Elevation,
 				  double phi, double VHeight, double ViewToSky, double SedDepth, double dx, double dt,
 				  double SedThermCond, double SedThermDiff, double T_alluv, double P_w,
 				  double W_w, int emergent, int penman, double wind_a, double wind_b,
 				  double calcevap, double T_prev, double T_sed, double Q_hyp, double F_Solar5, double F_Solar7)
+>>>>>>> .r252
 {
 	double Cloud, Humidity, T_air, Wind;
 	double Elevation, phi, VHeight, ViewToSky, SedDepth;
@@ -633,10 +806,26 @@ CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, do
 	Value[8] = R_evap;
 }
 
+<<<<<<< .mine
+static char heatsource_CalcMacCormick__doc__[] =
+"Central difference calculations for temperature ODE. \
+\
+This method calculates the central difference solution \
+for temperature. We call it once immediately after hitting \
+the solar flux calculation, which gives us an estimate of the \
+current temperature. After calculating the downstream nodes \
+estimated temperature, it's called again to calculate the \
+central difference."
+;
+
+static PyObject *
+heatsource_CalcMacCormick(PyObject *self, PyObject *args)
+=======
 PyObject *
 MacCormick(double dt, double dx, double U, double T_sed, double T_prev, double Q_hyp,
 		   PyObject *Q_tup, PyObject *T_tup, double Q_up, double Delta_T, double Disp, int S1,
 		   double S1_value, double T0, double T1, double T2, double Q_accr, double T_accr)
+>>>>>>> .r252
 {
 	double T_up = T0;
 	double Temp=0;
@@ -791,10 +980,14 @@ static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
 
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
+<<<<<<< .mine
+=======
 	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},
 	{"CalcFluxes", (PyCFunction) heatsource_CalcFluxes, METH_VARARGS, heatsource_CalcFluxes__doc__},
+>>>>>>> .r252
 	{"CalcSolarFlux", (PyCFunction) heatsource_CalcSolarFlux, METH_VARARGS,  heatsource_CalcSolarFlux__doc__},
 	{"CalcGroundFluxes", (PyCFunction) heatsource_CalcGroundFluxes, METH_VARARGS,  heatsource_CalcGroundFluxes__doc__},
+	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},
 	{"CalcMacCormick", (PyCFunction) heatsource_CalcMacCormick, METH_VARARGS,  heatsource_CalcMacCormick__doc__},
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };
@@ -803,7 +996,13 @@ static struct PyMethodDef heatsource_methods[] = {
 /* Initialization function for the module (*must* be called initheatsource) */
 
 static char heatsource_module_documentation[] =
-""
+"Provide optimized C functions for many heavy mathematical routines. \
+\
+The heatsource C module provides functions for calculating solar position, \
+solar flux, ground fluxes, Muskingum routing, stream geometry and the \
+MacCormick central difference calculation. They are provided here because \
+the functions are hit every timestep and every spacestep, so we want to \
+make them as fast as possible."
 ;
 
 PyMODINIT_FUNC
