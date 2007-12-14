@@ -363,7 +363,7 @@ class HeatSourceInterface(ExcelDocument):
         data = self.GetColumnarData()
         #################################
         # Build a boundary node
-        node = StreamNode(run_type=self.run_type,Q_mb=self.Q_mb)
+        node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
         # Then set the attributes for everything in the dictionary
         for k,v in data.iteritems():
             setattr(node,k,v[0])
@@ -503,7 +503,7 @@ class HeatSourceInterface(ExcelDocument):
                     T_None += math.degrees(math.atan(SH/LC_Distance)), # likewise, a tuple of values
                     ##########################################################
                     # Now we calculate the view to sky value
-                    # LC_Angle is the vertical angle from the surface to the land-cover top. It's 
+                    # LC_Angle is the vertical angle from the surface to the land-cover top. It's
                     # multiplied by the density as a kludge
                     LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)  #TODO: do we really want to multiply by Vdens?
                     if not j or LC_Angle_Max < LC_Angle:

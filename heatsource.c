@@ -6,7 +6,6 @@
 #include "Python.h"
 #include <math.h>
 #include <stdlib.h>
-#include <string.h>
 
 static PyObject *HeatSourceError;
 
@@ -22,9 +21,8 @@ north and numbers proceed clockwise around the compass directions. \
 ;
 
 static PyObject *
-heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
+heatsource_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-<<<<<<< .mine
 	// Get all the arguments from the input tuple
 	double lat = PyFloat_AsDouble(PyTuple_GetItem(args,0));
 	double lon = PyFloat_AsDouble(PyTuple_GetItem(args,1));
@@ -33,19 +31,9 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 	long sec = PyInt_AsLong(PyTuple_GetItem(args,4));
 	long offset = PyInt_AsLong(PyTuple_GetItem(args,5));
 	double JDC = PyFloat_AsDouble(PyTuple_GetItem(args,6));
-=======
-	double lat, lon, JDC;
-	double Dummy,Dummy1,Dummy2,Dummy3,Dummy4,Dummy5;
-	int hour, min, sec, offset;
-	if (!PyArg_ParseTuple(args, "ddiiiid", &lat, &lon, &hour, &min, &sec, &offset, &JDC))
-		return NULL;
->>>>>>> .r252
 
-<<<<<<< .mine
 	// define a bunch of variables
 	double Dummy,Dummy1,Dummy2,Dummy3,Dummy4,Dummy5;
-=======
->>>>>>> .r252
 	double MeanObliquity; // Average obliquity (degrees)
 	double Obliquity; // Corrected obliquity (degrees)
     double Eccentricity; // Eccentricity of earth's orbit (unitless)
@@ -165,11 +153,11 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 	 want to slice with the correct tuple to get the shade values. Doing it
 	 here is just faster than in Python because it's recalculated every time.
 	**********************************************************************/
-	double AzimuthBreaks[] = {0.0,67.5,112.5,157.5,202.5,247.5,292.5};
+	float AzimuthBreaks[] = {0.0,67.5,112.5,157.5,202.5,247.5,292.5};
 	int lo = 0;
 	int hi = 7;
 	int mid;
-	double *litem;
+	float *litem;
 
 	while (lo < hi) {
 		mid = (lo + hi) / 2;
@@ -189,7 +177,6 @@ heatsource_CalcSolarPosition(PyObject *self, PyObject *args)
 void
 GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, double S, double D_est, double dx, double dt)
 {
-<<<<<<< .mine
 	/*********************************************************
 	 * This method takes stream characteristics, the most recently
 	 * calculated discharge, and an optional estimated depth. It uses the
@@ -200,8 +187,6 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	 * and uses those characteristics to calculate the physical
 	 * dispersion.
 	 ********************************************************/
-=======
->>>>>>> .r252
     double Converge = 10.0;
     double dy = 0.01;
     int count = 0;
@@ -254,7 +239,6 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
     if ((Dispersion * dt / pow(dx,2.0)) > 0.5)
        Dispersion = (0.45 * pow(dx,2)) / dt;
 
-<<<<<<< .mine
 	// The first argument is a pointer to an array, we just replace the array values in place
 	// and don't return.
 	Value[0] = D_est;
@@ -264,28 +248,14 @@ GetStreamGeometry(double Value[], double Q_est, double W_b, double z, double n, 
 	Value[4] = Ww;
 	Value[5] = U;
 	Value[6] = Dispersion;
-=======
-	Value[0] = D_est;
-	Value[1] = A;
-	Value[2] = Pw;
-	Value[3] = Rh;
-	Value[4] = Ww;
-	Value[5] = U;
-	Value[6] = Dispersion;
->>>>>>> .r252
 }
 
 void CalcMuskingum(double Value[], double Q_est, double U, double W_w, double S, double dx, double dt)
 {
-<<<<<<< .mine
 	// Calculates the Muskingum coefficients for the routing model. Nothing complicated here,
 	// look in Chow or somewhere for details on the calculations.
     double c_k = (5.0/3.0) * U;  // Wave celerity
     double X = 0.5 * (1.0 - Q_est / (W_w * S * dx * c_k));
-=======
-    double c_k = (5.0/3.0) * U;  // Wave celerity
-    double X = 0.5 * (1.0 - Q_est / (W_w * S * dx * c_k));
->>>>>>> .r252
     if (X > 0.5) { X = 0.5; }
     else if (X < 0.0) {	X = 0.0; }
     double K = dx / c_k;
@@ -303,18 +273,12 @@ void CalcMuskingum(double Value[], double Q_est, double U, double W_w, double S,
     double C2 = (0.5*dt + K * X) / D;
     double C3 = (K * (1 - X) - 0.5*dt) / D;
     // TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
-<<<<<<< .mine
 	// change the array values then exit
 	Value[0] = C1;
 	Value[1] = C2;
 	Value[2] = C3;
 }
 
-=======
-	Value[0] = C1;
-	Value[1] = C2;
-	Value[2] = C3;
->>>>>>> .r252
 static char heatsource_CalcFlows__doc__[] =
 "CalcFlows(*args)-> tuple of stream characteristics. \
 \
@@ -356,106 +320,34 @@ static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
 	return result;
 }
 
-<<<<<<< .mine
-static char heatsource_CalcSolarFlux__doc__[] =
-"CalcSolarFlux(*args)-> tuple of 8 solar flux calculations \
-\
-Calculate the flux from incoming solar radiation for a given \
-solar position. It returns a tuple of length 8 containing \
-calculations for solar fluxs from incoming to stream."
-=======
-static char heatsource_CalcFlows__doc__[] =
-"Calculate all of the flows"
->>>>>>> .r252
-;
-
-static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
+void GetSolarFlux(double Value[], int hour, int JD, double Altitude,
+					double Zenith, double cloud, double d_w, double W_b,
+					double Elevation, double TopoFactor, double ViewToSky,
+					double SampleDist, double phi, int emergent,
+					double VDensity, double VHeight, double rip[], double veg[],
+					double FullSunAngle, double TopoShadeAngle, double BankShadeAngle)
 {
-<<<<<<< .mine
-	int hour, JD, emergent;
-	double Altitude, Zenith, cloud, d_w, W_b;
-	double Elevation, TopoFactor, ViewToSky;
-	double SampleDist, phi, VDensity, VHeight;
-	PyObject *ShaderList;
-	// Strip out all of the arguments. ShaderList is kept a Python Object because it's a tuple
-	// with tuples in it.
-	if (!PyArg_ParseTuple(args, "iiddddddddddiddO", &hour, &JD, &Altitude,
-														&Zenith, &cloud, &d_w, &W_b,
-														&Elevation, &TopoFactor, &ViewToSky,
-														&SampleDist, &phi, &emergent,
-														&VDensity, &VHeight, &ShaderList))
-        return NULL;
-=======
-	double U, W_w, S, dx, dt, W_b, z, n, D_est;
-	double inputs, Q_up_prev, Q_up, Q, Q_bc;
-	if (!PyArg_ParseTuple(args, "dddddddddddddd", &U, &W_w, &W_b, &S, &dx, &dt, &z, &n, &D_est,
-											  	  &Q, &Q_up, &Q_up_prev, &inputs, &Q_bc))
-		return NULL;
->>>>>>> .r252
-	// Now deal with Shader list. The first three values are angles, the 4th value is
-	// a tuple of riparian extinction values for the 4 zones and the 5th is a tuple of
-	// angles for the top of vegetation for each zone
-	double Q_new;
-	if (Q_bc >= 0)
-	{
-		Q_new = Q_bc;
-	} else {
-		double Q1 = Q_up + inputs;
-		double Q2 = Q_up_prev + inputs;
-		double Val[3] = {0.0,0.0,0.0};
-		CalcMuskingum(Val, Q2, U, W_w, S, dx, dt);
-		Q_new = Val[0]*Q1 + Val[1]*Q2 + Val[2]*Q;
-	}
-	double Value[7] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,};
-	if (Q_new > 0.003)
-		GetStreamGeometry(Value, Q_new, W_b, z, n, S, D_est, dx, dt);
-
-	PyObject *result = Py_BuildValue("(ffffffff)", Q_new, Value[0],Value[1],Value[2],
-						 Value[3],Value[4],Value[5],Value[6]);
-	return result;
-}
-
-void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zenith, double cloud,
-								double d_w, double W_b, double Elevation, double TopoFactor, double ViewToSky,
-								double SampleDist, double phi, int emergent, double VDensity, double VHeight,
-								PyObject *ShaderList)
-{
-	double FullSunAngle, TopoShadeAngle, BankShadeAngle;
-	PyObject *RipExtinction, *VegetationAngle;
-
-	if (!PyArg_ParseTuple(ShaderList, "dddOO", &FullSunAngle, &TopoShadeAngle, &BankShadeAngle,
-											   &RipExtinction, &VegetationAngle))
-		PyErr_SetString(HeatSourceError, "Problem parsing ShaderList in C Module's CalcSolarFlux method");
-	// We strip out those 4 element tuples and put the values in an array for C to handle easily.
-	double rip[4];
-	double veg[4];
-	int i;
-	for (i=0; i<4; i++)
-	{
-		rip[i] = PyFloat_AsDouble(PyTuple_GetItem(RipExtinction,i));
-		veg[i] = PyFloat_AsDouble(PyTuple_GetItem(VegetationAngle,i));
-	}
 	// Constants
-	double pi = 3.14159265358979323846f;
-	double radians = pi/180.0;
+	float pi = 3.14159265358979323846f;
+	float radians = pi/180.0;
 
 	// Solar fluxes
-	double direct_0 = 0.0;
-	double direct_1 = 0.0;
-	double direct_2 = 0.0;
-	double direct_3 = 0.0;
-	double direct_4 = 0.0;
-	double direct_5 = 0.0;
-	double direct_6 = 0.0;
-	double direct_7 = 0.0;
-	double diffuse_0 = 0.0;
-	double diffuse_1 = 0.0;
-	double diffuse_2 = 0.0;
-	double diffuse_3 = 0.0;
-	double diffuse_4 = 0.0;
-	double diffuse_5 = 0.0;
-	double diffuse_6 = 0.0;
-	double diffuse_7 = 0.0;
+	float direct_0 = 0.0;
+	float direct_1 = 0.0;
+	float direct_2 = 0.0;
+	float direct_3 = 0.0;
+	float direct_4 = 0.0;
+	float direct_5 = 0.0;
+	float direct_6 = 0.0;
+	float direct_7 = 0.0;
+	float diffuse_0 = 0.0;
+	float diffuse_1 = 0.0;
+	float diffuse_2 = 0.0;
+	float diffuse_3 = 0.0;
+	float diffuse_4 = 0.0;
+	float diffuse_5 = 0.0;
+	float diffuse_6 = 0.0;
+	float diffuse_7 = 0.0;
     //#############################################################
     //Route solar radiation to the stream surface
     //   Flux_Solar(x) and Flux_Diffuse = Solar flux at various positions
@@ -473,19 +365,19 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
 	// TODO: Original VB code's JulianDay calculation:
 	// JulianDay = -DateDiff("d", theTime, DateSerial(year(theTime), 1, 1))
 	// THis calculation for Rad_Vec should be checked, with respect to the DST hour/24 part.
-	double Rad_Vec = 1.0 + 0.017 * cos((2.0 * pi / 365.0) * (186.0 - JD + (double)hour / 24.0));
-	double Solar_Constant = 1367.0; //W/m2
+	float Rad_Vec = 1.0 + 0.017 * cos((2.0 * pi / 365.0) * (186.0 - JD + (float)hour / 24.0));
+	float Solar_Constant = 1367.0; //W/m2
 	direct_0 = (Solar_Constant / pow(Rad_Vec,2)) * sin(radians*(Altitude)); //Global Direct Solar Radiation
 	///////////////////////////////////////////////////////////////////
     // 1 - Above Topography
-    double Air_Mass = (35 / sqrt(1224 * sin(radians*Altitude) + 1)) * exp(-0.0001184 * Elevation);
-    double Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10)) + 0.8;
+    float Air_Mass = (35 / sqrt(1224 * sin(radians*Altitude) + 1)) * exp(-0.0001184 * Elevation);
+    float Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10)) + 0.8;
     // Calculate Diffuse Fraction
 	direct_1 = direct_0 * pow(Trans_Air,Air_Mass) * (1 - 0.65 * pow(cloud,2));
-	double Clearness_Index;
+	float Clearness_Index;
     if (direct_0 == 0.0) { Clearness_Index = 1.0; }
     else {Clearness_Index = direct_1 / direct_0; }
-    double Diffuse_Fraction = (0.938 + 1.071 * Clearness_Index) -
+    float Diffuse_Fraction = (0.938 + 1.071 * Clearness_Index) -
         (5.14 * pow(Clearness_Index,2)) +
         (2.98 * pow(Clearness_Index,3)) -
         (sin(2.0 * pi * (JD - 40.0) / 365.0)) *
@@ -511,12 +403,12 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     {
         direct_2 = direct_1;
         diffuse_2 = diffuse_1 * (1 - TopoFactor);
-        double Dummy1 = direct_2;
+        float Dummy1 = direct_2;
         int i;
         for (i=0; i<4; i++)
         {
-			if (Altitude < (double)veg[i])
-				Dummy1 *= (1.0-(1.0-exp(-1.0 * (double)rip[i] * (SampleDist/cos(radians*Altitude)))));
+			if (Altitude < veg[i])
+				Dummy1 *= (1.0-(1.0-exp(-1.0 * rip[i] * (SampleDist/cos(radians*Altitude)))));
 		}
         direct_3 = Dummy1;
         diffuse_3 = diffuse_2 * ViewToSky;
@@ -545,8 +437,8 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     //Account for emergent vegetation
     if (emergent==1)
     {
-    	double ripExtinctEmergent, shadeDensityEmergent;
-        double pathEmergent = VHeight / sin(radians*Altitude);
+    	float ripExtinctEmergent, shadeDensityEmergent;
+        float pathEmergent = VHeight / sin(radians*Altitude);
         if (pathEmergent > W_b)
             pathEmergent = W_b;
         if (VDensity == 1.0)
@@ -577,7 +469,7 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     }
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     //5 - Entering Stream
-	double Stream_Reflect;
+	float Stream_Reflect;
     if (Zenith > 80.0)
     {
         Stream_Reflect = 0.0515 * Zenith - 3.636;
@@ -597,18 +489,18 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
 	// Empty-
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     //7 - Received by Bed
-    double Water_Path = d_w / cos(atan((sin(radians*Zenith) / 1.3333) / sqrt(-(sin(radians*Zenith) / 1.3333) * (sin(radians*Zenith) / 1.3333) + 1))); //Jerlov (1976)
-    double Trans_Stream = 0.415 - (0.194 * log10(Water_Path * 100));
+    float Water_Path = d_w / cos(atan((sin(radians*Zenith) / 1.3333) / sqrt(-(sin(radians*Zenith) / 1.3333) * (sin(radians*Zenith) / 1.3333) + 1))); //Jerlov (1976)
+    float Trans_Stream = 0.415 - (0.194 * log10(Water_Path * 100));
     if (Trans_Stream > 1)
         Trans_Stream = 1;
-    double Dummy1 = direct_5 * (1 - Trans_Stream);       //Direct Solar Radiation attenuated on way down
-    double Dummy2 = direct_5 - Dummy1 ;                  //Direct Solar Radiation Hitting Stream bed
-    double Bed_Reflect = exp(0.0214 * (Zenith * radians) - 1.941);   //Reflection Coef. for Direct Solar
-    double BedRock = 1 - phi;
-    double Dummy3 = Dummy2 * (1 - Bed_Reflect);                //Direct Solar Radiation Absorbed in Bed
-    double Dummy4 = 0.53 * BedRock * Dummy3;                  //Direct Solar Radiation Immediately Returned to Water Column as Heat
-    double Dummy5 = Dummy2 * Bed_Reflect;                   //Direct Solar Radiation Reflected off Bed
-    double Dummy6 = Dummy5 * (1 - Trans_Stream);              //Direct Solar Radiation attenuated on way up
+    float Dummy1 = direct_5 * (1 - Trans_Stream);       //Direct Solar Radiation attenuated on way down
+    float Dummy2 = direct_5 - Dummy1 ;                  //Direct Solar Radiation Hitting Stream bed
+    float Bed_Reflect = exp(0.0214 * (Zenith * radians) - 1.941);   //Reflection Coef. for Direct Solar
+    float BedRock = 1 - phi;
+    float Dummy3 = Dummy2 * (1 - Bed_Reflect);                //Direct Solar Radiation Absorbed in Bed
+    float Dummy4 = 0.53 * BedRock * Dummy3;                  //Direct Solar Radiation Immediately Returned to Water Column as Heat
+    float Dummy5 = Dummy2 * Bed_Reflect;                   //Direct Solar Radiation Reflected off Bed
+    float Dummy6 = Dummy5 * (1 - Trans_Stream);              //Direct Solar Radiation attenuated on way up
     direct_6 = Dummy1 + Dummy4 + Dummy6;
     direct_7 = Dummy3 - Dummy4;
     Trans_Stream = 0.415 - (0.194 * log10(100 * d_w));
@@ -624,18 +516,7 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
     diffuse_6 = Dummy1 + Dummy4 + Dummy6;
     diffuse_7 = Dummy3 - Dummy4;
 
-<<<<<<< .mine
-	float solar_0 = diffuse_0 + direct_0;
-	float solar_1 = diffuse_1 + direct_1;
-	float solar_2 = diffuse_2 + direct_2;
-	float solar_3 = diffuse_3 + direct_3;
-	float solar_4 = diffuse_4 + direct_4;
-	float solar_5 = diffuse_5 + direct_5;
-	float solar_6 = diffuse_6 + direct_6;
-	float solar_7 = diffuse_7 + direct_7;
-
-	return Py_BuildValue("(ffffffff)",solar_0,solar_1,solar_2,solar_3,solar_4,solar_5,solar_6,solar_7);
-=======
+	//////////////////////////////////////////////
 	Value[0] = diffuse_0 + direct_0;
 	Value[1] = diffuse_1 + direct_1;
 	Value[2] = diffuse_2 + direct_2;
@@ -644,10 +525,189 @@ void CalcSolarFlux(double Value[], int hour, int JD, double Altitude, double Zen
 	Value[5] = diffuse_5 + direct_5;
 	Value[6] = diffuse_6 + direct_6;
 	Value[7] = diffuse_7 + direct_7;
->>>>>>> .r252
 }
 
-<<<<<<< .mine
+static char heatsource_CalcSolarFlux__doc__[] =
+"CalcSolarFlux(*args)-> tuple of 8 solar flux calculations \
+\
+Calculate the flux from incoming solar radiation for a given \
+solar position. It returns a tuple of length 8 containing \
+calculations for solar fluxs from incoming to stream."
+;
+
+static PyObject *
+heatsource_CalcSolarFlux(PyObject *self, PyObject *args)
+{
+	int hour, JD, emergent;
+	double Altitude, Zenith, cloud, d_w, W_b;
+	double Elevation, TopoFactor, ViewToSky;
+	double SampleDist, phi, VDensity, VHeight;
+	PyObject *ShaderList;
+	// Strip out all of the arguments. ShaderList is kept a Python Object because it's a tuple
+	// with tuples in it.
+	if (!PyArg_ParseTuple(args, "iiddddddddddiddO", &hour, &JD, &Altitude,
+														&Zenith, &cloud, &d_w, &W_b,
+														&Elevation, &TopoFactor, &ViewToSky,
+														&SampleDist, &phi, &emergent,
+														&VDensity, &VHeight, &ShaderList))
+        return NULL;
+	// Now deal with Shader list. The first three values are angles, the 4th value is
+	// a tuple of riparian extinction values for the 4 zones and the 5th is a tuple of
+	// angles for the top of vegetation for each zone
+	double FullSunAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,0));   // Angle at which full sun hits stream
+	double TopoShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,1)); // Angle at which stream is shaded by distant topography
+	double BankShadeAngle = PyFloat_AsDouble(PyTuple_GetItem(ShaderList,2)); // Angle at which stream is shaded by bank
+	PyObject *RipExtinction = PyTuple_GetItem(ShaderList,3); // 4 element tuple of extinction cooefficients by zone
+	PyObject *VegetationAngle = PyTuple_GetItem(ShaderList,4); // 4 element tuple of top-of-vegetation angles by zone
+	// We strip out those 4 element tuples and put the values in an array for C to handle easily.
+	double rip[4];
+	double veg[4];
+	int i;
+	for (i=0; i<4; i++)
+	{
+		rip[i] = PyFloat_AsDouble(PyTuple_GetItem(RipExtinction,i));
+		veg[i] = PyFloat_AsDouble(PyTuple_GetItem(VegetationAngle,i));
+	}
+	double solar[8] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+	GetSolarFlux(solar, hour, JD, Altitude, Zenith, cloud, d_w, W_b,
+					Elevation, TopoFactor, ViewToSky, SampleDist, phi, emergent,
+					VDensity, VHeight, rip, veg, FullSunAngle, TopoShadeAngle, BankShadeAngle);
+
+	return Py_BuildValue("ffffffff",solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7]);
+}
+
+void GetGroundFluxes(double Value[], double Cloud, double Wind, double Humidity, double T_air, double Elevation,
+					double phi, double VHeight, double ViewToSky, double SedDepth, double dx,
+					double dt, double SedThermCond, double SedThermDiff, double FAlluvium, double P_w,
+					double W_w, int emergent, int penman, double wind_a, double wind_b,
+					int calcevap, double T_prev, double T_sed, double Q_hyp, double F_Solar5,
+					double F_Solar7)
+{
+	//#################################################################
+	// Bed Conduction Flux
+    //======================================================
+    //Calculate the conduction flux between water column & substrate
+	float SedRhoCp = SedThermCond / (SedThermDiff/10000);
+	// Water variables
+	float rhow = 1000;				// water density (kg/m3)
+	float H2O_HeatCapacity = 4187;	// J/(kg *C)
+
+    float F_Conduction = SedThermCond * (T_sed - T_prev) / (SedDepth / 2);
+    //Calculate the conduction flux between deeper alluvium & substrate
+	float Flux_Conduction_Alluvium = 0.0;
+
+    if (FAlluvium > 0)
+    {
+        Flux_Conduction_Alluvium = SedThermCond * (T_sed - FAlluvium) / (SedDepth / 2);
+    }
+    //======================================================
+    //Calculate the changes in temperature in the substrate conduction layer
+    // Negative hyporheic flow is heat into sediment
+    float F_hyp = Q_hyp * rhow *H2O_HeatCapacity * (T_sed - T_prev) / ( W_w * dx);
+    //Temperature change in substrate from solar exposure and conducted heat
+    float NetFlux_Sed = F_Solar7 - F_Conduction - Flux_Conduction_Alluvium - F_hyp;
+    float DT_Sed = NetFlux_Sed * dt / (SedDepth * SedRhoCp);
+    //======================================================
+    //Calculate the temperature of the substrate conduction layer
+    float T_sed_new = T_sed + DT_Sed;
+    if ((T_sed_new > 50.0f) || (T_sed_new < 0.0f))
+	  	PyErr_SetString(HeatSourceError, "Sediment temperature not bounded in 0<=temp<=50.");
+    // End Conduction Flux
+	//###########################################################################################
+
+	//##############################################################################
+	// Longwave Flux
+    float Sat_Vapor_Air = 6.1275 * exp(17.27 * T_air / (237.3 + T_air)); //mbar (Chapra p. 567)
+    float Air_Vapor_Air = Humidity * Sat_Vapor_Air;
+    float Sigma = 5.67e-8; //Stefan-Boltzmann constant (W/m2 K4)
+    float Emissivity = 1.72 * pow(((Air_Vapor_Air * 0.1) / (273.2 + T_air)),(1.0/7.0)) * (1 + 0.22 * pow(Cloud,2.0)); //Dingman p 282
+    //======================================================
+    //Calcualte the atmospheric longwave flux
+    float F_LW_Atm = 0.96 * ViewToSky * Emissivity * Sigma * pow((T_air + 273.2),4.0);
+    //Calcualte the backradiation longwave flux
+    float F_LW_Stream = -0.96 * Sigma * pow((T_prev + 273.2),4.0);
+    //Calcualte the vegetation longwave flux
+    float F_LW_Veg = 0.96 * (1 - ViewToSky) * 0.96 * Sigma * pow((T_air + 273.2),4);
+	float F_Longwave = F_LW_Atm + F_LW_Stream + F_LW_Veg;
+	//###############################################################################
+	//######################################################################
+	// Evaporative and Convective flux
+	float F_evap, F_conv;
+    float Pressure = 1013.0 - 0.1055 * Elevation; //mbar
+    float Sat_Vapor = 6.1275 * exp(17.27 * T_prev / (237.3 + T_prev)); //mbar (Chapra p. 567)
+    float Air_Vapor = Humidity * Sat_Vapor;
+    //===================================================
+    //Calculate the frictional reduction in wind velocity
+    float Zd, Zo, Zm, Friction_Velocity;
+    if ((emergent) && (VHeight > 0))
+    {
+        Zd = 0.7 * VHeight;
+        Zo = 0.1 * VHeight;
+        Zm = 2;
+        Friction_Velocity = Wind * 0.4 / log((Zm - Zd) / Zo); //Vertical Wind Decay Rate (Dingman p. 594)
+    } else {
+        Zo = 0.00023; //Brustsaert (1982) p. 277 Dingman
+        Zd = 0.0; //Brustsaert (1982) p. 277 Dingman
+        Zm = 2.0;
+        Friction_Velocity = Wind;
+    }
+    //===================================================
+    //Wind Function f(w)
+    float Wind_Function = wind_a + wind_b * Friction_Velocity; //m/mbar/s
+    //===================================================
+    //Latent Heat of Vaporization
+    float LHV = 1000.0 * (2501.4 + (1.83 * T_prev)); //J/kg
+    //===================================================
+    //Use Jobson Wind Function
+    float Bowen, K_evap;
+    if (penman)
+    {
+        //Calculate Evaporation FLUX
+        float P = 998.2; // kg/m3
+        float Gamma = 1003.5 * Pressure / (LHV * 0.62198); //mb/*C  Cuenca p 141
+        float Delta = 6.1275 * exp(17.27 * T_air / (237.3 + T_air)) - 6.1275 * exp(17.27 * (T_air - 1.0) / (237.3 + T_air - 1));
+        float NetRadiation = F_Solar5 + F_Longwave;  //J/m2/s
+        if (NetRadiation < 0.0)
+        {
+            NetRadiation = 0; //J/m2/s
+        }
+        float Ea = Wind_Function * (Sat_Vapor - Air_Vapor);  //m/s
+        K_evap = ((NetRadiation * Delta / (P * LHV)) + Ea * Gamma) / (Delta + Gamma);
+        F_evap = -K_evap * LHV * P; //W/m2
+        //Calculate Convection FLUX
+        Bowen = Gamma * (T_prev - T_air) / (Sat_Vapor - Air_Vapor);
+    } else {
+        //===================================================
+        //Calculate Evaporation FLUX
+        K_evap = Wind_Function * (Sat_Vapor - Air_Vapor);  //m/s
+        float P = 998.2; // kg/m3
+        F_evap = -K_evap * LHV * P; //W/m2
+        //Calculate Convection FLUX
+        if ((Sat_Vapor - Air_Vapor) != 0)
+        {
+            Bowen = 0.61 * (Pressure / 1000) * (T_prev - T_air) / (Sat_Vapor - Air_Vapor);
+        } else {
+            Bowen = 1.0;
+        }
+    }
+    F_conv = F_evap * Bowen;
+    float R_evap = 0.0;
+    if (calcevap)
+		R_evap = K_evap * W_w;
+	// End Evap and Conv Flux
+	//##############################################################################################
+	Value[0] = F_Conduction;
+	Value[1] = T_sed_new;
+	Value[2] = F_Longwave;
+	Value[3] = F_LW_Atm;
+	Value[4] = F_LW_Stream;
+	Value[5] = F_LW_Veg;
+	Value[6] = F_evap;
+	Value[7] = F_conv;
+	Value[8] = R_evap;
+}
+
+
 static char heatsource_CalcGroundFluxes__doc__[] =
 "CalcGroundFluxes(*args)-> tuple of 9 non-solar flux calculations \
 \
@@ -658,14 +718,6 @@ a 9 length tuple."
 
 static PyObject *
 heatsource_CalcGroundFluxes(PyObject *self, PyObject *args)
-=======
-void
-CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, double Wind, double Elevation,
-				  double phi, double VHeight, double ViewToSky, double SedDepth, double dx, double dt,
-				  double SedThermCond, double SedThermDiff, double T_alluv, double P_w,
-				  double W_w, int emergent, int penman, double wind_a, double wind_b,
-				  double calcevap, double T_prev, double T_sed, double Q_hyp, double F_Solar5, double F_Solar7)
->>>>>>> .r252
 {
 	double Cloud, Humidity, T_air, Wind;
 	double Elevation, phi, VHeight, ViewToSky, SedDepth;
@@ -683,61 +735,63 @@ CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, do
 								&calcevap, &T_prev, &T_sed, &Q_hyp, &F_Solar5,
 								&F_Solar7))
         return NULL;
+
 	//#################################################################
 	// Bed Conduction Flux
     //======================================================
     //Calculate the conduction flux between water column & substrate
-	double SedRhoCp = SedThermCond / (SedThermDiff/10000);
+	float SedRhoCp = SedThermCond / (SedThermDiff/10000);
 	// Water variables
-	double rhow = 1000;				// water density (kg/m3)
-	double H2O_HeatCapacity = 4187;	// J/(kg *C)
+	float rhow = 1000;				// water density (kg/m3)
+	float H2O_HeatCapacity = 4187;	// J/(kg *C)
 
-    double F_Conduction = SedThermCond * (T_sed - T_prev) / (SedDepth / 2);
+    float F_Conduction = SedThermCond * (T_sed - T_prev) / (SedDepth / 2);
     //Calculate the conduction flux between deeper alluvium & substrate
-	double Flux_Conduction_Alluvium = 0.0;
+	float Flux_Conduction_Alluvium = 0.0;
 
-    if (T_alluv > 0)
+    if (FAlluvium > 0)
     {
-        Flux_Conduction_Alluvium = SedThermCond * (T_sed - T_alluv) / (SedDepth / 2);
+        Flux_Conduction_Alluvium = SedThermCond * (T_sed - FAlluvium) / (SedDepth / 2);
     }
     //======================================================
     //Calculate the changes in temperature in the substrate conduction layer
     // Negative hyporheic flow is heat into sediment
-    double F_hyp = Q_hyp * rhow *H2O_HeatCapacity * (T_sed - T_prev) / ( W_w * dx);
+    float F_hyp = Q_hyp * rhow *H2O_HeatCapacity * (T_sed - T_prev) / ( W_w * dx);
     //Temperature change in substrate from solar exposure and conducted heat
-    double NetFlux_Sed = F_Solar7 - F_Conduction - Flux_Conduction_Alluvium - F_hyp;
-    double DT_Sed = NetFlux_Sed * dt / (SedDepth * SedRhoCp);
+    float NetFlux_Sed = F_Solar7 - F_Conduction - Flux_Conduction_Alluvium - F_hyp;
+    float DT_Sed = NetFlux_Sed * dt / (SedDepth * SedRhoCp);
     //======================================================
     //Calculate the temperature of the substrate conduction layer
-    double T_sed_new = T_sed + DT_Sed;
+    float T_sed_new = T_sed + DT_Sed;
     if ((T_sed_new > 50.0f) || (T_sed_new < 0.0f))
 	  	PyErr_SetString(HeatSourceError, "Sediment temperature not bounded in 0<=temp<=50.");
     // End Conduction Flux
 	//###########################################################################################
+
 	//##############################################################################
 	// Longwave Flux
-    double Sat_Vapor_Air = 6.1275 * exp(17.27 * T_air / (237.3 + T_air)); //mbar (Chapra p. 567)
-    double Air_Vapor_Air = Humidity * Sat_Vapor_Air;
-    double Sigma = 5.67e-8; //Stefan-Boltzmann constant (W/m2 K4)
-    double Emissivity = 1.72 * pow(((Air_Vapor_Air * 0.1) / (273.2 + T_air)),(1.0/7.0)) * (1 + 0.22 * pow(Cloud,2.0)); //Dingman p 282
+    float Sat_Vapor_Air = 6.1275 * exp(17.27 * T_air / (237.3 + T_air)); //mbar (Chapra p. 567)
+    float Air_Vapor_Air = Humidity * Sat_Vapor_Air;
+    float Sigma = 5.67e-8; //Stefan-Boltzmann constant (W/m2 K4)
+    float Emissivity = 1.72 * pow(((Air_Vapor_Air * 0.1) / (273.2 + T_air)),(1.0/7.0)) * (1 + 0.22 * pow(Cloud,2.0)); //Dingman p 282
     //======================================================
     //Calcualte the atmospheric longwave flux
-    double F_LW_Atm = 0.96 * ViewToSky * Emissivity * Sigma * pow((T_air + 273.2),4.0);
+    float F_LW_Atm = 0.96 * ViewToSky * Emissivity * Sigma * pow((T_air + 273.2),4.0);
     //Calcualte the backradiation longwave flux
-    double F_LW_Stream = -0.96 * Sigma * pow((T_prev + 273.2),4.0);
+    float F_LW_Stream = -0.96 * Sigma * pow((T_prev + 273.2),4.0);
     //Calcualte the vegetation longwave flux
-    double F_LW_Veg = 0.96 * (1 - ViewToSky) * 0.96 * Sigma * pow((T_air + 273.2),4);
-	double F_Longwave = F_LW_Atm + F_LW_Stream + F_LW_Veg;
+    float F_LW_Veg = 0.96 * (1 - ViewToSky) * 0.96 * Sigma * pow((T_air + 273.2),4);
+	float F_Longwave = F_LW_Atm + F_LW_Stream + F_LW_Veg;
 	//###############################################################################
 	//######################################################################
 	// Evaporative and Convective flux
-	double F_evap, F_conv;
-    double Pressure = 1013.0 - 0.1055 * Elevation; //mbar
-    double Sat_Vapor = 6.1275 * exp(17.27 * T_prev / (237.3 + T_prev)); //mbar (Chapra p. 567)
-    double Air_Vapor = Humidity * Sat_Vapor;
+	float F_evap, F_conv;
+    float Pressure = 1013.0 - 0.1055 * Elevation; //mbar
+    float Sat_Vapor = 6.1275 * exp(17.27 * T_prev / (237.3 + T_prev)); //mbar (Chapra p. 567)
+    float Air_Vapor = Humidity * Sat_Vapor;
     //===================================================
     //Calculate the frictional reduction in wind velocity
-    double Zd, Zo, Zm, Friction_Velocity;
+    float Zd, Zo, Zm, Friction_Velocity;
     if ((emergent) && (VHeight > 0))
     {
         Zd = 0.7 * VHeight;
@@ -752,25 +806,25 @@ CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, do
     }
     //===================================================
     //Wind Function f(w)
-    double Wind_Function = wind_a + wind_b * Friction_Velocity; //m/mbar/s
+    float Wind_Function = wind_a + wind_b * Friction_Velocity; //m/mbar/s
     //===================================================
     //Latent Heat of Vaporization
-    double LHV = 1000.0 * (2501.4 + (1.83 * T_prev)); //J/kg
+    float LHV = 1000.0 * (2501.4 + (1.83 * T_prev)); //J/kg
     //===================================================
     //Use Jobson Wind Function
-    double Bowen, K_evap;
+    float Bowen, K_evap;
     if (penman)
     {
         //Calculate Evaporation FLUX
-        double P = 998.2; // kg/m3
-        double Gamma = 1003.5 * Pressure / (LHV * 0.62198); //mb/*C  Cuenca p 141
-        double Delta = 6.1275 * exp(17.27 * T_air / (237.3 + T_air)) - 6.1275 * exp(17.27 * (T_air - 1.0) / (237.3 + T_air - 1));
-        double NetRadiation = F_Solar5 + F_Longwave;  //J/m2/s
+        float P = 998.2; // kg/m3
+        float Gamma = 1003.5 * Pressure / (LHV * 0.62198); //mb/*C  Cuenca p 141
+        float Delta = 6.1275 * exp(17.27 * T_air / (237.3 + T_air)) - 6.1275 * exp(17.27 * (T_air - 1.0) / (237.3 + T_air - 1));
+        float NetRadiation = F_Solar5 + F_Longwave;  //J/m2/s
         if (NetRadiation < 0.0)
         {
             NetRadiation = 0; //J/m2/s
         }
-        double Ea = Wind_Function * (Sat_Vapor - Air_Vapor);  //m/s
+        float Ea = Wind_Function * (Sat_Vapor - Air_Vapor);  //m/s
         K_evap = ((NetRadiation * Delta / (P * LHV)) + Ea * Gamma) / (Delta + Gamma);
         F_evap = -K_evap * LHV * P; //W/m2
         //Calculate Convection FLUX
@@ -779,7 +833,7 @@ CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, do
         //===================================================
         //Calculate Evaporation FLUX
         K_evap = Wind_Function * (Sat_Vapor - Air_Vapor);  //m/s
-        double P = 998.2; // kg/m3
+        float P = 998.2; // kg/m3
         F_evap = -K_evap * LHV * P; //W/m2
         //Calculate Convection FLUX
         if ((Sat_Vapor - Air_Vapor) != 0)
@@ -790,23 +844,23 @@ CalcGroundFluxes(double Value[], double Cloud, double Humidity, double T_air, do
         }
     }
     F_conv = F_evap * Bowen;
-    double R_evap = 0.0;
+    float R_evap = 0.0;
     if (calcevap)
 		R_evap = K_evap * W_w;
 	// End Evap and Conv Flux
 	//##############################################################################################
-	Value[0] = F_Conduction;
-	Value[1] = T_sed_new;
-	Value[2] = F_Longwave;
-	Value[3] = F_LW_Atm;
-	Value[4] = F_LW_Stream;
-	Value[5] = F_LW_Veg;
-	Value[6] = F_evap;
-	Value[7] = F_conv;
-	Value[8] = R_evap;
+	double Value[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+	GetGroundFluxes(Value, Cloud, Wind, Humidity, T_air, Elevation,
+					phi, VHeight, ViewToSky, SedDepth, dx,
+					dt, SedThermCond, SedThermDiff, FAlluvium, P_w,
+					W_w, emergent, penman, wind_a, wind_b,
+					calcevap, T_prev, T_sed, Q_hyp, F_Solar5,
+					F_Solar7);
+
+	return Py_BuildValue("(fffffffff)(fffffffff)",F_Conduction,T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_evap, F_conv, R_evap,
+												  Value[0],Value[1],Value[2],Value[3],Value[4],Value[5],Value[6],Value[7],Value[8]);
 }
 
-<<<<<<< .mine
 static char heatsource_CalcMacCormick__doc__[] =
 "Central difference calculations for temperature ODE. \
 \
@@ -820,43 +874,41 @@ central difference."
 
 static PyObject *
 heatsource_CalcMacCormick(PyObject *self, PyObject *args)
-=======
-PyObject *
-MacCormick(double dt, double dx, double U, double T_sed, double T_prev, double Q_hyp,
-		   PyObject *Q_tup, PyObject *T_tup, double Q_up, double Delta_T, double Disp, int S1,
-		   double S1_value, double T0, double T1, double T2, double Q_accr, double T_accr)
->>>>>>> .r252
 {
-	double T_up = T0;
-	double Temp=0;
-	double Q_in = 0.0;
-	double T_in = 0.0;
-	int i;
-	double numerator = 0.0;
-	PyObject *Qitem, *Titem;
+	float dt, dx, U, T_sed, T_prev;
+	float Q_in, T_in, Q_up, T_up;
+	float Q_hyp, Q_accr, T_accr;
+	float Delta_T, Disp, S1_value, Temp;
+	int S1=0;
+	PyObject *Q_tup;
+	PyObject *T_tup;
+	float T0, T1, T2; // Grid cells for prev, this, next
+	if (!PyArg_ParseTuple(args, "ffffffOOfffiffffff", &dt, &dx, &U, &T_sed,
+														  &T_prev, &Q_hyp, &Q_tup, &T_tup,
+												 		  &Q_up, &Delta_T, &Disp, &S1,
+												 		  &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr))
+		return NULL;
+	Q_in = 0;
+	T_in = 0;
 	int size = PyTuple_Size(Q_tup);
-
-	if (size > 0)
+	int i;
+	float numerator=0;
+	for (i=0; i<size; i++)
 	{
-		for (i=0; i<size; i++)
+		float Q = PyFloat_AsDouble(PyTuple_GetItem(Q_tup,i));
+		float T = PyFloat_AsDouble(PyTuple_GetItem(T_tup,i));
+		if (Q > 0)
 		{
-			Qitem = PySequence_GetItem(Q_tup, i);
-			Titem = PySequence_GetItem(T_tup, i);
-			if ((Qitem == NULL) || (Titem == NULL))
-				PyErr_SetString(HeatSourceError, "Null value in the tributary discharge or temperature");
-			if ((PyFloat_Check(Qitem)) && (PyFloat_Check(Titem)) && (PyFloat_AsDouble(Qitem) > 0))
-			{
-				Q_in += PyFloat_AsDouble(Qitem);
-				numerator += PyFloat_AsDouble(Qitem)*PyFloat_AsDouble(Titem);
-			}
-			Py_DECREF(Qitem);
-			Py_DECREF(Titem);
+			Q_in += Q;
+			numerator += Q*T;
 		}
-		if ((numerator > 0) && (Q_in > 0))
-			T_in = numerator/Q_in;
 	}
+	if ((numerator > 0) && (Q_in > 0))
+		T_in = numerator/Q_in;
+
+	T_up = T0;
     // This is basically MixItUp from the VB code
-    double T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in);
+    float T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in);
     //Calculate temperature change from mass transfer from hyporheic zone
     T_mix = ((T_sed * Q_hyp) + (T_mix * (Q_up + Q_in))) / (Q_hyp + Q_up + Q_in);
     //Calculate temperature change from accretion inflows
@@ -867,110 +919,16 @@ MacCormick(double dt, double dx, double U, double T_sed, double T_prev, double Q
 	T_mix -= T_up;
 	T0 += T_mix;
 
-    double Dummy1 = -U * (T1 - T0) / dx;
-    double Dummy2 = Disp * (T2 - 2 * T1 + T0) / pow(dx,2);
-    double S = Dummy1 + Dummy2 + Delta_T / dt;
+    float Dummy1 = -U * (T1 - T0) / dx;
+    float Dummy2 = Disp * (T2 - 2 * T1 + T0) / pow(dx,2);
+    float S = Dummy1 + Dummy2 + Delta_T / dt;
 	if (S1 > 0)
 	{
 		Temp = T_prev + ((S1_value + S) / 2) * dt;
 	} else {
 		Temp = T1 + S * dt;
 	}
-
 	return Py_BuildValue("ff",Temp, S);
-}
-
-static char heatsource_CalcMacCormick__doc__[] =
-"Calculate central difference, first iteration"
-;
-
-static PyObject *
-heatsource_CalcMacCormick(PyObject *self, PyObject *args)
-{
-	double dt, dx, U, T_sed, T_prev, Q_up;
-	double Q_hyp, Q_accr, T_accr;
-	double Delta_T, Disp, S1_value;
-	int S1;
-	PyObject *Q_tup, *T_tup;
-	double T0, T1, T2; // Grid cells for prev, this, next
-	if (!PyArg_ParseTuple(args, "ddddddOOdddidddddd", &dt, &dx, &U, &T_sed,
-														  &T_prev, &Q_hyp, &Q_tup, &T_tup,
-												 		  &Q_up, &Delta_T, &Disp, &S1,
-												 		  &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr))
-		return NULL;
-	PyObject *result = MacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup,
-									  Q_up, Delta_T, Disp, S1, S1_value, T0, T1, T2, Q_accr, T_accr);
-
-	return Py_BuildValue("O",result);
-}
-
-static char heatsource_CalcFluxes__doc__[] =
-"Calculate all of the fluxes"
-;
-
-static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
-{
-	PyObject *ShaderList, *ContData, *C_args, *Q_tribs, *T_tribs;
-	double W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, SedDepth;
-	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt;
-	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w;
-	double U, T_alluv, T_prev, T_sed, Q_hyp, cloud, humidity, T_air, wind, Disp;
-	int hour, JD, daytime, has_prev, emergent, calcevap, penman;
-	if (!PyArg_ParseTuple(args, "OOdddddOOdddddOdiiidddd",
-								&ContData, &C_args, &d_w, &area, &P_w, &W_w, &U,
-								&Q_tribs, &T_tribs, &T_alluv, &T_prev, &T_sed, &Q_hyp,
-								&T_dn_prev, &ShaderList, &Disp, &hour, &JD, &daytime,
-								&Altitude, &Zenith, &Q_up_prev, &T_up_prev))
-		return NULL;
-	if (!PyArg_ParseTuple(ContData, "dddd", &cloud, &wind, &humidity, &T_air))
-		return NULL;
-	if (!PyArg_ParseTuple(C_args, "ddddddddddddddididdii",
-								  &W_b, &Elevation, &TopoFactor, &ViewToSky, &phi, &VDensity, &VHeight,
-								  &SedDepth, &dx, &dt, &SedThermCond, &SedThermDiff, &Q_accr, &T_accr,
-								  &has_prev, &SampleDist, &emergent, &wind_a, &wind_b, &calcevap, &penman))
-		return NULL;
-
-	//###################################################################
-	//## Calculate Solar Flux
-	double F_Solar[8] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
-	if (daytime)
-	{
-		CalcSolarFlux(F_Solar, hour, JD, Altitude, Zenith, cloud,
-							    d_w, W_b, Elevation, TopoFactor, ViewToSky,
-							    SampleDist, phi, emergent, VDensity, VHeight, ShaderList);
-	}
-	PyObject *S = Py_BuildValue("(ffffffff)", F_Solar[0],F_Solar[1],
-						 F_Solar[2],F_Solar[3],F_Solar[4],F_Solar[5],
-						 F_Solar[6],F_Solar[7]);
-	return Py_BuildValue("OOOff", S,G, MacC, F_Total, Delta_T);
-//	SetStringObject(node, (char *)"F_Solar", F_Solar);
-	//####################################################################
-	//## Calculate Ground Fluxes
-/*	double F_Ground[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
-	CalcGroundFluxes(F_Ground, cloud, humidity, T_air, wind, Elevation,
-					  phi, VHeight, ViewToSky, SedDepth, dx, dt,
-					  SedThermCond, SedThermDiff, T_alluv, P_w,
-					  W_w, emergent, penman, wind_a, wind_b,
-					  calcevap, T_prev, T_sed, Q_hyp, F_Solar[5], F_Solar[7]);
-	// order: {F_Conduction,T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_evap, F_conv, R_evap}
-
-	//#### Calculate and set total flux (With lots of error and reference checking!)
-	double F_Total =  F_Solar[6] + F_Ground[0] + F_Ground[2] + F_Ground[6] + F_Ground[7];
-	//////////////////////////////////////////
-
-	//#### Calculate and set delta T
-	double Delta_T = F_Total * dt / ((area / W_w) * 4182 * 998.2); // Vars are Cp (J/kg *C) and P (kgS/m3)
-	//##################################################################
-	//## Calculate first MacCormick run
-	T_sed = F_Ground[1];
-	PyObject *G = Py_BuildValue("(fffffffff)",F_Ground[0],F_Ground[1],
-						 F_Ground[2],F_Ground[3],F_Ground[4],F_Ground[5],
-						 F_Ground[6],F_Ground[7],F_Ground[8]);
-	if (!has_prev)
-		return Py_BuildValue("OOff", S, G, F_Total, Delta_T);
-	PyObject *MacC = MacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
-								Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr);
-*/
 
 }
 
@@ -980,11 +938,6 @@ static PyObject * heatsource_CalcFluxes(PyObject *self, PyObject *args)
 
 static struct PyMethodDef heatsource_methods[] = {
 	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
-<<<<<<< .mine
-=======
-	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},
-	{"CalcFluxes", (PyCFunction) heatsource_CalcFluxes, METH_VARARGS, heatsource_CalcFluxes__doc__},
->>>>>>> .r252
 	{"CalcSolarFlux", (PyCFunction) heatsource_CalcSolarFlux, METH_VARARGS,  heatsource_CalcSolarFlux__doc__},
 	{"CalcGroundFluxes", (PyCFunction) heatsource_CalcGroundFluxes, METH_VARARGS,  heatsource_CalcGroundFluxes__doc__},
 	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},

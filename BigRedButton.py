@@ -79,7 +79,6 @@ class HSProfile(object):
             n = count.next()
             if not n%60: # every hour
                 self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
-                print "%i of %i timesteps"% (n,int(timesteps))
                 PumpWaitingMessages()
                 if force_quit:
                     self.HS.PB("Simulation stopped by user")
@@ -110,7 +109,7 @@ class HSProfile(object):
         message = "Finished in %i seconds (%0.3f mettaseconds). Water Balance: %0.3f/%0.3f" %\
                     (total_time, mettaseconds, total_inflow, out)
         self.HS.PB(message)
-#        print message
+
 def RunHS(sheet):
     try:
         HSP = HSProfile(sheet)

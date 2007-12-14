@@ -133,15 +133,18 @@ class StreamNode(StreamChannel):
 #        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
 #            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
 #            self.GroundFlux_THW(time)
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-                _HS.CalcGroundFluxes(self.ContData[bc_hour][0], self.ContData[bc_hour][1],self.ContData[bc_hour][2],self.ContData[bc_hour][3],
+        old, test = \
+                        _HS.CalcGroundFluxes(self.ContData[bc_hour][0], self.ContData[bc_hour][1],self.ContData[bc_hour][2],self.ContData[bc_hour][3],
                                     Elev, self.phi, VHeight, VTS, self.SedDepth, dx,
                                     dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
                                     self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
                                     IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
+
+
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = test
 
         self.T, self.S1 = _HS.CalcMacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
                                           self.prev_km.Q_prev, self.Delta_T, self.Disp,
@@ -185,8 +188,7 @@ class StreamNode(StreamChannel):
 #        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
 #            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
 #            self.GroundFlux_THW(time)
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
+        old, test = \
                 _HS.CalcGroundFluxes(self.ContData[bc_hour][0], self.ContData[bc_hour][1],self.ContData[bc_hour][2],self.ContData[bc_hour][3],
                                     Elev, self.phi, VHeight, VTS, self.SedDepth, dx,
                                     dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
@@ -194,6 +196,9 @@ class StreamNode(StreamChannel):
                                     IniParams["calcevap"], self.T_prev, self.T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
         self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
         self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
+
+        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = test
 
         if not self.prev_km:
             self.T = self.T_bc[bc_hour]
@@ -208,6 +213,18 @@ class StreamNode(StreamChannel):
         # now that we have a temperature estimate for this node and don't need the previous node's
         # previous temperature
         self.prev_km.MacCormick2(bc_hour)
+
+    def MacCormick2(self, hour):
+        #===================================================
+        #Set control temps
+        if not self.prev_km:
+            return
+        #===================================================
+        self.T, S = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
+                                    self.Q_tribs[hour], self.T_tribs[hour], self.prev_km.Q, self.Delta_T, self.Disp,
+                                    True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
+#        self.T = self.MacCormick2_THW(hour)
+
 
     def CalcFluxes_THW(self, hour, bc_hour, JD, Daytime, Altitude, Zenith, dir):
         if Daytime:
