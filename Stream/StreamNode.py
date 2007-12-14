@@ -105,114 +105,46 @@ class StreamNode(StreamChannel):
         self.T = None
         # Calculate solar position (C module)
         Altitude, Zenith, Daytime, dir = self.head.SolarPos
-        # Set some local variables if they're used more than once
-        Elev = self.Elevation
-        VTS = self.ViewToSky
-        emerg = IniParams["emergent"]
-        VHeight = self.VHeight
-        cloud = self.ContData[bc_hour][0]
-        dt = self.dt
-        dx = self.dx
-        T_sed = self.T_sed
-        T_prev = self.T_prev
-        Q_hyp = self.Q_hyp
-        ############################################
-        ## Solar Flux Calculation, C-style
-        # Testing method, these should return the same (to 1.0e-6 or so) result
-#       self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"], Daytime)
-        if Daytime:
-            self.F_Solar = _HS.CalcSolarFlux(hour, JD, Altitude, Zenith, cloud, self.d_w,
-                                              self.W_b, Elev, self.TopoFactor, VTS,
-                                              IniParams["transsample"], self.phi, emerg,
-                                              self.VDensity, VHeight, self.ShaderList[dir])
-            self.F_DailySum[1] += self.F_Solar[1]
-            self.F_DailySum[4] += self.F_Solar[4]
-        else:
-            self.F_Solar = [0]*8
-        #Testing method, these should return the same (to 1.0e-6 or so) result
-#        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-#            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-#            self.GroundFlux_THW(time)
-        old, test = \
-                        _HS.CalcGroundFluxes(self.ContData[bc_hour][0], self.ContData[bc_hour][1],self.ContData[bc_hour][2],self.ContData[bc_hour][3],
-                                    Elev, self.phi, VHeight, VTS, self.SedDepth, dx,
-                                    dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
-                                    self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
-                                    IniParams["calcevap"], T_prev, T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
-        self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
-        self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
+        try:
+            self.F_Solar, \
+                (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, self.T, self.S = \
+                _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
+                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
+#                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
+        except _HS.HeatSourceError:
+            raise
+        self.F_DailySum[1] += self.F_Solar[1]
+        self.F_DailySum[4] += self.F_Solar[4]
 
-
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = test
-
-        self.T, self.S1 = _HS.CalcMacCormick(dt, dx, self.U, T_sed, T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
-                                          self.prev_km.Q_prev, self.Delta_T, self.Disp,
-                                          False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
 #            self.T, self.S1 = self.MacCormick_THW(bc_hour)
-        self.prev_km.MacCormick2(bc_hour)
 
     def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
         # Calculate solar position (C module)
-        if self.prev_km: # Get position from headwater boundary node
-            Altitude, Zenith, Daytime, dir = self.head.SolarPos
-            self.CalcHeat = self.CalcHeat_Opt
-        else: # Calculate position and store to a tuple
-            Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
-            self.SolarPos = Altitude, Zenith, Daytime, dir
-        # Set some local variables if they're used more than once
-        Elev = self.Elevation
-        VTS = self.ViewToSky
-        emerg = IniParams["emergent"]
-        VHeight = self.VHeight
-        dt = self.dt
-        dx = self.dx
-        Q_hyp = self.Q_hyp
-        ############################################
-        ## Solar Flux Calculation, C-style
-        # Testing method, these should return the same (to 1.0e-6 or so) result
-#       self.F_Solar = self.Solar_THW(JD,time, hour, Altitude,Zenith,dir,IniParams["transsample"], Daytime)
-        if Daytime:
-            self.F_Solar = _HS.CalcSolarFlux(hour, JD, Altitude, Zenith, self.ContData[bc_hour][0], self.d_w,
-                                              self.W_b, Elev, self.TopoFactor, VTS,
-                                              IniParams["transsample"], self.phi, emerg,
-                                              self.VDensity, VHeight, self.ShaderList[dir])
-            self.F_DailySum[1] += self.F_Solar[1]
-            self.F_DailySum[4] += self.F_Solar[4]
-        else:
-            self.F_Solar = [0]*8
-        #Testing method, these should return the same (to 1.0e-6 or so) result
-#        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-#            self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = \
-#            self.GroundFlux_THW(time)
-        old, test = \
-                _HS.CalcGroundFluxes(self.ContData[bc_hour][0], self.ContData[bc_hour][1],self.ContData[bc_hour][2],self.ContData[bc_hour][3],
-                                    Elev, self.phi, VHeight, VTS, self.SedDepth, dx,
-                                    dt, self.SedThermCond, self.SedThermDiff, self.T_alluv, self.P_w,
-                                    self.W_w, emerg, IniParams["penman"], IniParams["wind_a"], IniParams["wind_b"],
-                                    IniParams["calcevap"], self.T_prev, self.T_sed, Q_hyp, self.F_Solar[5], self.F_Solar[7])
-        self.F_Total = self.F_Solar[6] + self.F_Conduction + self.F_Evaporation + self.F_Convection + self.F_Longwave
-        self.Delta_T = self.F_Total * self.dt / ((self.A / self.W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
+#        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+        Altitude, Zenith, Daytime, dir = self.CalcSolarPosition_THW(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+        self.SolarPos = Altitude, Zenith, Daytime, dir
+        try:
+            self.F_Solar, \
+                (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
+                _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
+                            hour, JD, Daytime,Altitude, Zenith, 0.0, 0.0)
+#                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
+        except _HS.HeatSourceError:
+            raise
+        self.F_DailySum[1] += self.F_Solar[1]
+        self.F_DailySum[4] += self.F_Solar[4]
 
-        self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E = test
-
-        if not self.prev_km:
-            self.T = self.T_bc[bc_hour]
-            self.T_prev = self.T_bc[bc_hour]
-            return
-
-        self.T, self.S1 = _HS.CalcMacCormick(dt, dx, self.U, self.T_sed, self.T_prev, Q_hyp, self.Q_tribs[bc_hour], self.T_tribs[bc_hour],
-                                          self.prev_km.Q_prev, self.Delta_T, self.Disp,
-                                          False, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
-#            self.T, self.S1 = self.MacCormick_THW(bc_hour)
-        # Call the second MacCormick calculation for the upstream node,
-        # now that we have a temperature estimate for this node and don't need the previous node's
-        # previous temperature
-        self.prev_km.MacCormick2(bc_hour)
+        self.T = self.T_bc[bc_hour]
+        self.T_prev = self.T_bc[bc_hour]
 
     def MacCormick2(self, hour):
         #===================================================

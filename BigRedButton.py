@@ -54,7 +54,7 @@ class HSProfile(object):
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
         [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
-#        [x.MacCormick2(solar_time) for x in self.reachlist]
+        [x.MacCormick2(solar_time) for x in self.reachlist]
     def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
     def run_sh(self,time,hydro_time, solar_time, JD, JDC, offset):
