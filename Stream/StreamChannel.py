@@ -50,7 +50,6 @@ class StreamChannel(object):
                     "E", # Evaporation volume inm m^3
                     "dt", # This is the timestep (for kinematic wave movement, etc.)
                     "phi", # Porosity of the bed
-                    "K_h", # Horizontal bed conductivity
                     "Log",  # Global logging class
                     "Disp", # Dispersion due to shear stress
                     "next_km", "prev_km",
@@ -79,13 +78,12 @@ class StreamChannel(object):
         Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
                 _HS.CalcFlows(self.U, self.W_w, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont,
                              self.Q, up.Q, up.Q_prev, inputs, -1)
-
         self.Q_prev = self.Q
         self.Q = Q
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
 
         if Q < 0.003: #Channel is not going dry
-            self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
+            print "The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime)
 
     def CalcDischarge_BoundaryNode(self, time, hour):
         Q_bc = self.Q_bc[hour]
@@ -99,7 +97,7 @@ class StreamChannel(object):
         self.Q = Q
         self.Q_hyp = Q * self.hyp_exch # Hyporheic discharge
         if Q < 0.003: #Channel is going dry
-            self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
+            print "The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime)
 
     def CalculateDischarge(self, time, hour):
         """Return the discharge for the current timestep
@@ -118,15 +116,14 @@ class StreamChannel(object):
         """
         inputs = self.Q_in + sum(self.Q_tribs[hour]) - self.Q_out - self.E
         # Check if we are a spatial or temporal boundary node
-        if self.prev_km and self.Q_prev: # No, there's an upstream channel and a previous timestep
-            self.Q_mass += inputs
-            up = self.prev_km
+        if self.prev_km: # There's an upstream channel, but no previous timestep.
+            # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
+            Q = self.prev_km.Q_prev + inputs # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
             Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
-                    _HS.CalcFlows(self.U, self.W_w, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont,
-                                 self.Q, up.Q, up.Q_prev, inputs, -1)
+                    _HS.CalcFlows(0.0, 0.0, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont, 0.0, 0.0, 0.0, inputs, Q)
             # If we hit this once, we remap so we can avoid the if statements in the future.
             self.CalculateDischarge = self.CalcDischarge_Opt
-        elif not self.prev_km: # We're a spatial boundary, use the boundary condition
+        else: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
             Q_bc = self.Q_bc[hour]
             self.Q_mass += Q_bc
@@ -134,12 +131,6 @@ class StreamChannel(object):
             Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
                     _HS.CalcFlows(0.0, 0.0, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont, 0.0, 0.0, 0.0, inputs, Q_bc)
             self.CalculateDischarge = self.CalcDischarge_BoundaryNode
-        elif not self.Q_prev: # There's an upstream channel, but no previous timestep.
-            # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
-            Q = self.prev_km.Q_prev + inputs # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
-            Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
-                    _HS.CalcFlows(0.0, 0.0, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont, 0.0, 0.0, 0.0, inputs, Q)
-        else: raise Exception("WTF?")
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q  or Q

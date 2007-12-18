@@ -1,5 +1,6 @@
 from __future__ import division
 import math, bisect
+from itertools import count
 from warnings import warn
 from ..Dieties import Chronos
 from ..Dieties import IniParams
@@ -7,6 +8,7 @@ from StreamChannel import StreamChannel
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
 from heatsource import heatsource as _HS
+from heatsource.heatsource import HeatSourceError
 Outfile = open("E:\evans.out","w")
 
 class StreamNode(StreamChannel):
@@ -22,7 +24,6 @@ class StreamNode(StreamChannel):
              "Zone", "T_bc", # Initialization parameters, Zone and boundary conditions
              "Delta_T", # Current temperature calculated from only local fluxes
              "T", "T_prev", # Current and previous stream temperature
-             "Flux", # Dictionary to hold heat flux values
              "TopoFactor", # was Topo_W+Topo_S+Topo_E/(90*3) in original code. From Above stream surface solar flux calculations
              "ShaderList", # List of angles and attributes to determine sun shading.
              "F_DailySum", # Specific sums of solar fluxes
@@ -44,6 +45,7 @@ class StreamNode(StreamChannel):
         self.S1 = 0
         self.Log = Logger
         self.ShaderList = ()
+
     def close(self): del Q_mb, self.T_bc, self.CalcHeat, self.CalculateDischarge
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
@@ -86,10 +88,6 @@ class StreamNode(StreamChannel):
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
-        # This was emptied, but kept in case we want unanticipated initialization later.
-        # ...
-        # (Say "unanticipated initialization" 3 times, fast.)
-        # ...
         has_prev = self.prev_km is not None
         if has_prev:
             self.CalcHeat = self.CalcHeat_Opt
@@ -108,7 +106,7 @@ class StreamNode(StreamChannel):
         try:
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, self.T, self.S = \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, self.T, self.S1 = \
                 _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
@@ -119,27 +117,40 @@ class StreamNode(StreamChannel):
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-#            self.T, self.S1 = self.MacCormick_THW(bc_hour)
+#        T1, S1 = self.MacCormick_THW(bc_hour)
+
+#        T2, S2 = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
+#                                    self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.prev_km.Q, self.Delta_T, self.Disp,
+#                                    0.0, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
+
+#        print self, T0, T1, T2, S0, S1, S2
+#        self.T = T1
+#        self.S1 = S1
 
     def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
         # Calculate solar position (C module)
-#        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
-        Altitude, Zenith, Daytime, dir = self.CalcSolarPosition_THW(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+#        Altitude, Zenith, Daytime, dir = self.CalcSolarPosition_THW(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
         self.SolarPos = Altitude, Zenith, Daytime, dir
+
         try:
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                  self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
                 _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
-                            self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                            hour, JD, Daytime,Altitude, Zenith, 0.0, 0.0)
+                            self.Q_hyp, self.next_km.T_prev, self.ShaderList[dir], self.Disp,
+                            hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0)
 #                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
         except _HS.HeatSourceError:
             raise
+#        print self.F_Solar
+#        print self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
+#                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E
+#        print
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
@@ -185,7 +196,7 @@ class StreamNode(StreamChannel):
         if self.Disp * dt / (dx ** 2) > 0.5:
             self.Disp = (0.45 * (dx ** 2)) / dt
 
-    def MacCormick_THW(self, bc_hour, Delta_T):
+    def MacCormick_THW(self, bc_hour):
         dt = self.dt
         dx = self.dx
         mix = 0
@@ -199,7 +210,7 @@ class StreamNode(StreamChannel):
                 Dummy1 = -self.U * (T1 - T0) / dx
                 self.CalcDispersion()
                 Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / (dx ** 2)
-                S1 = Dummy1 + Dummy2 + Delta_T / dt
+                S1 = Dummy1 + Dummy2 + self.Delta_T / dt
                 T = T1 + S1 * dt
             else:
                 T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev

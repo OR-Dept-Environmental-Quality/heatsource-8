@@ -272,7 +272,6 @@ void CalcMuskingum(double Value[], double Q_est, double U, double W_w, double S,
     double C1 = (0.5*dt - K * X) / D;
     double C2 = (0.5*dt + K * X) / D;
     double C3 = (K * (1 - X) - 0.5*dt) / D;
-    // TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
 	// change the array values then exit
 	Value[0] = C1;
 	Value[1] = C2;
@@ -348,6 +347,7 @@ void GetSolarFlux(double Value[], int hour, int JD, double Altitude,
 	double diffuse_5 = 0.0;
 	double diffuse_6 = 0.0;
 	double diffuse_7 = 0.0;
+
     //#############################################################
     //Route solar radiation to the stream surface
     //   Flux_Solar(x) and Flux_Diffuse = Solar flux at various positions
@@ -384,7 +384,6 @@ void GetSolarFlux(double Value[], int hour, int JD, double Altitude,
         (0.009 - 0.078 * Clearness_Index);
     diffuse_1 = direct_1 * (Diffuse_Fraction) * (1 - 0.65 * pow(cloud,2));
     direct_1 *= (1 - Diffuse_Fraction);
-
     //########################################################
     //======================================================
     //2 - Above Land Cover
@@ -797,10 +796,12 @@ heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
 	}
 
 	double solar[8] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
-	GetSolarFlux(solar, hour, JD, Altitude, Zenith, cloud, d_w, W_b,
+	if (daytime)
+	{
+		GetSolarFlux(solar, hour, JD, Altitude, Zenith, cloud, d_w, W_b,
 					Elevation, TopoFactor, ViewToSky, SampleDist, phi, emergent,
 					VDensity, VHeight, rip, veg, FullSunAngle, TopoShadeAngle, BankShadeAngle);
-
+	}
 	double ground[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 	GetGroundFluxes(ground, cloud, wind, humidity, T_air, Elevation,
 					phi, VHeight, ViewToSky, SedDepth, dx,
@@ -820,7 +821,7 @@ heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
 									  ground[0],ground[1],ground[2],ground[3],ground[4],ground[5],ground[6],ground[7],ground[8],
 									  F_Total, Delta_T);
 	double Mac[2] = {0.0,0.0};
-	MacCormick(Mac, dt, dx, U, T_sed, T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
+	MacCormick(Mac, dt, dx, U, ground[1], T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
 				Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr);
 
 	return Py_BuildValue("(ffffffff)(fffffffff)ffff",solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],

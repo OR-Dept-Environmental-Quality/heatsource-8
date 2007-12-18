@@ -23,7 +23,7 @@ class HSProfile(object):
     def __init__(self,worksheet,run_type=0):
         self.ErrLog = Logger
         self.HS = HeatSourceInterface(join(worksheet), self.ErrLog, run_type)
-        self.Reach = self.HS.Reach
+        self.reachlist = sorted(self.HS.Reach.itervalues(),reverse=True)
         self.cur_hour = None
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         if run_type == 0: self.run_all = self.run_hs
@@ -43,10 +43,9 @@ class HSProfile(object):
         Chronos.Start(start, dt, stop, spin)
         Chronos.dst = timedelta(hours=IniParams["daylightsavings"]) # adjust for daylight savings time
         dt_out = timedelta(minutes=60)
-        #self.Output = O(dt_out, self.Reach, start)
+        self.Output = O(dt_out, self.HS.Reach, start)
         ##########################################################
 
-        self.reachlist = sorted(self.Reach.itervalues(),reverse=True)
     def close(self):
         print "Deleting HSProfile"
 #        self.HS.close()
@@ -77,30 +76,33 @@ class HSProfile(object):
             JDC = Chronos.JDC
             offset = Chronos.TZOffset(time)
             n = count.next()
-            if not n%60: # every hour
+            if not (time.minute + time.second): # every hour
                 self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
                 PumpWaitingMessages()
                 if force_quit:
                     self.HS.PB("Simulation stopped by user")
                     break
-                if not n%1440:
+                if not time.hour:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
-            hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
-            if time < start:
-                solar_time = (time + timedelta(days=start.day-solar_time.day)).isoformat(" ")[:-12]+":00:00"
+                hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
+                if time < start:
+                    solar_time = (time + timedelta(days=start.day-solar_time.day)).isoformat(" ")[:-12]+":00:00"
             try:
                 self.run_all(time,hydro_time, solar_time, JD, JDC, offset)
             except HeatSourceError, (stderr):
                 msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
-                msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
+                try:
+                    msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
+                except TypeError:
+                    msg += `stderr`+"\nThe model run has been halted. You may ignore any further error messages."
                 msgbox(msg)
                 raise SystemExit
 
             out += self.reachlist[-1].Q
-            #self.Output(time)
+            self.Output(time)
             time = Chronos.Tick()
 
-        #self.Output.flush()
+        self.Output.flush()
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         balances = [x.Q_mb for x in self.reachlist]
@@ -109,6 +111,8 @@ class HSProfile(object):
         message = "Finished in %i seconds (%0.3f mettaseconds). Water Balance: %0.3f/%0.3f" %\
                     (total_time, mettaseconds, total_inflow, out)
         self.HS.PB(message)
+        print message
+
 
 def RunHS(sheet):
     try:
