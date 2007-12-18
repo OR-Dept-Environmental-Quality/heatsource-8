@@ -117,16 +117,6 @@ class StreamNode(StreamChannel):
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-#        T1, S1 = self.MacCormick_THW(bc_hour)
-
-#        T2, S2 = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
-#                                    self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.prev_km.Q, self.Delta_T, self.Disp,
-#                                    0.0, 0.0, self.prev_km.T_prev, self.T_prev, self.next_km.T_prev, self.Q_in, self.T_in)
-
-#        print self, T0, T1, T2, S0, S1, S2
-#        self.T = T1
-#        self.S1 = S1
-
     def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
         # Reset temperatures
         self.T_prev = self.T
@@ -147,10 +137,6 @@ class StreamNode(StreamChannel):
 #                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
         except _HS.HeatSourceError:
             raise
-#        print self.F_Solar
-#        print self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-#                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E
-#        print
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 

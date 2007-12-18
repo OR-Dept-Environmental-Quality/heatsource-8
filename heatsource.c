@@ -829,7 +829,6 @@ heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
 									  F_Total, Delta_T, Mac[0], Mac[1]);
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /* List of methods defined in the module */
