@@ -43,7 +43,7 @@ class HSProfile(object):
         Chronos.Start(start, dt, stop, spin)
         Chronos.dst = timedelta(hours=IniParams["daylightsavings"]) # adjust for daylight savings time
         dt_out = timedelta(minutes=60)
-        #self.Output = O(dt_out, self.HS.Reach, start)
+        self.Output = O(dt_out, self.HS.Reach, start)
         ##########################################################
 
     def close(self):
@@ -99,10 +99,10 @@ class HSProfile(object):
                 raise SystemExit
 
             out += self.reachlist[-1].Q
-            #self.Output(time)
+            self.Output(time)
             time = Chronos.Tick()
 
-        #self.Output.flush()
+        self.Output.flush()
         total_time = (datetime.today()-time1).seconds
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         balances = [x.Q_mb for x in self.reachlist]
