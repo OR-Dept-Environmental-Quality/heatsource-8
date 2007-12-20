@@ -33,7 +33,7 @@ class HSProfile(object):
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams["dt"])
-        start = IniParams["date"]
+        start = IniParams["modelstart"]
         if self.run_type==1:
             stop = start + timedelta(days=1)
         else:

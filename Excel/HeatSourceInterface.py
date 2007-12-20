@@ -30,24 +30,53 @@ class HeatSourceInterface(ExcelDocument):
         self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
         #######################################################
         # Grab the initialization parameters from the Excel file.
-        lst = ("name", "length", "date", "end", "flushdays", "timezone", "daylightsavings",
-               "dt", "dx", "longsample", "transsample", "inflowsites", "contsites",
-               "calcevap", "evapmethod", "wind_a", "wind_b", "calcalluvium",
-               "alluviumtemp", "emergent", "lidar", "lcdensity", "outputdir")
-
-        vals = [i[0] for i in self.GetValue("B3:B25","Heat Source Inputs")]
-        for i in xrange(len(lst)):
-            IniParams[lst[i]] = vals[i]
-        IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
+        lst = {"name": "B4",
+               "length": "B5",
+               "outputdir": "B6",
+               "date": "B8",
+               "modelstart": "B9",
+               "modelend": "B10",
+               "end": "B11",
+               "flushdays": "B12",
+               "timezone": "B13",
+               "daylightsavings": "B14",
+               "dt": "E4",
+               "dx": "E5",
+               "longsample": "E6",
+               "transsample": "E7",
+               "inflowsites": "E8",
+               "contsites": "E9",
+               "calcevap": "E11",
+               "evapmethod": "E12",
+               "wind_a": "E13",
+               "wind_b": "E14",
+               "calcalluvium": "E15",
+               "alluviumtemp": "E16",
+               "emergent": "E17",
+               "lidar": "E18",
+               "lcdensity": "E19" }
+        for k,v in lst.iteritems():
+            IniParams[k] = self.GetValue(v, "Heat Source Inputs")
+        IniParams["penman"] = False
+        if IniParams["calcevap"]:
+            IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
         # Make the date a datetime instance
         IniParams["date"] = Chronos.MakeDatetime(IniParams["date"])
         IniParams["end"] = Chronos.MakeDatetime(IniParams["end"])
+        if IniParams["modelstart"] is None:
+            IniParams["modelstart"] = IniParams["date"]
+        else:
+            IniParams["modelstart"] = Chronos.MakeDatetime(IniParams["modelstart"])
+        if IniParams["modelend"] is None:
+            IniParams["modelend"] = IniParams["end"]
+        else:
+            IniParams["modelend"] = Chronos.MakeDatetime(IniParams["modelend"])
         IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
         # Set up the log file in the outputdir
         self.log.SetFile(normpath(join(IniParams["outputdir"],"outfile.log")))
         ######################################################
         # Calculate the length of the simulation period in days and the number of hours
-        IniParams["simperiod"] = (IniParams["end"]-IniParams["date"]).days + 1
+        IniParams["simperiod"] = (IniParams["modelend"]-IniParams["modelstart"]).days + 1
         self.Hours = int(IniParams["simperiod"] * 24)
 
         # Get a single list of all of the boundary condition times by pulling a whole column from the sheet

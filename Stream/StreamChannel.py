@@ -58,7 +58,7 @@ class StreamChannel(object):
         for attr in slots:
             setattr(self,attr,None)
         self.Q_mass = 0
-        self.starttime = Chronos.MakeDatetime(IniParams["date"])
+        self.starttime = Chronos.MakeDatetime(IniParams["modelstart"])
 
 
     def __repr__(self):
@@ -168,7 +168,7 @@ class StreamChannel(object):
         dt = self.dt
 
         # Check the celerity to ensure stability. These tests are from the VB code.
-        if dt >= (2 * K * (1 - X)) or dt > (self.dx/c_k):  #Unstable - Decrease dt or increase dx
+        if dt >= (2 * K * (1 - X)):  #Unstable - Decrease dt or increase dx
             raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
 
         # These calculations are from Chow's "Applied Hydrology"
