@@ -1,12 +1,13 @@
 from __future__ import division
 from itertools import imap, dropwhile, izip, chain, repeat
-import math, time, operator, bisect, weakref, copy
+from math import ceil, log, degrees, atan
 from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from os.path import exists, join, split, normpath
 from sys import exit
 from win32gui import PumpWaitingMessages
+from bisect import bisect
 
 from ..Stream.StreamNode import StreamNode
 from ..Dieties import IniParams
@@ -30,16 +31,16 @@ class HeatSourceInterface(ExcelDocument):
         self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
         #######################################################
         # Grab the initialization parameters from the Excel file.
-        lst = {"name": "B4",
-               "length": "B5",
-               "outputdir": "B6",
-               "date": "B8",
-               "modelstart": "B9",
-               "modelend": "B10",
-               "end": "B11",
-               "flushdays": "B12",
-               "timezone": "B13",
-               "daylightsavings": "B14",
+        lst = {"name": "C4",
+               "length": "C5",
+               "outputdir": "C6",
+               "date": "C8",
+               "modelstart": "C9",
+               "modelend": "C10",
+               "end": "C11",
+               "flushdays": "C12",
+               "timezone": "C13",
+               "daylightsavings": "C14",
                "dt": "E4",
                "dx": "E5",
                "longsample": "E6",
@@ -60,7 +61,7 @@ class HeatSourceInterface(ExcelDocument):
         IniParams["penman"] = False
         if IniParams["calcevap"]:
             IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
-        # Make the date a datetime instance
+        # Make the dates into datetime instances of the start/stop dates
         IniParams["date"] = Chronos.MakeDatetime(IniParams["date"])
         IniParams["end"] = Chronos.MakeDatetime(IniParams["end"])
         if IniParams["modelstart"] is None:
@@ -72,12 +73,15 @@ class HeatSourceInterface(ExcelDocument):
         else:
             IniParams["modelend"] = Chronos.MakeDatetime(IniParams["modelend"])
         IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
+        # Make sure the output directory ends in a slash (VB chokes if not)
+        if IniParams["outputdir"][-1] != "\\":
+            raise Exception("Output directory needs to have a trailing backslash")
         # Set up the log file in the outputdir
         self.log.SetFile(normpath(join(IniParams["outputdir"],"outfile.log")))
         ######################################################
         # Calculate the length of the simulation period in days and the number of hours
         IniParams["simperiod"] = (IniParams["modelend"]-IniParams["modelstart"]).days + 1
-        self.Hours = int(IniParams["simperiod"] * 24)
+        self.Hours = (((IniParams["end"]-IniParams["date"]).days + 1) * 24)
 
         # Get a single list of all of the boundary condition times by pulling a whole column from the sheet
         # and stripping off the blank values. This will store ALL times, not only those that we're running.
@@ -225,7 +229,7 @@ class HeatSourceInterface(ExcelDocument):
         for site in xrange(int(IniParams["inflowsites"])):
             # Get the stream node corresponding to the kilometer of this inflow site.
             km = self.GetValue((site + 4, 9),"Flow Data")
-            key = bisect.bisect(l,km)-1
+            key = bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
             # Strip off the flow and temp columns
             flow_col = [x[site*2] for x in data]
@@ -263,7 +267,7 @@ class HeatSourceInterface(ExcelDocument):
             if km is None or not isinstance(km, float):
                 # This is a bad dataset if there's no kilometer
                 raise Exception("Must have a stream kilometer (e.g. 15.3) for each continuous data node!")
-            key = bisect.bisect(l,km)-1
+            key = bisect(l,km)-1
             node = self.Reach[l[key]] # Index by kilometer
             # Append this node to a list of all nodes which have continuous data
             self.ContDataSites.append(node.km)
@@ -408,7 +412,7 @@ class HeatSourceInterface(ExcelDocument):
         # if we end up with a fraction, that means that there's a node at the end that
         # is not a perfect multiple of the sample distance. We might end up ending at
         # stream kilometer 0.5, for instance, in that case
-        num_nodes = int(math.ceil((self.Num_Q_Var-1)/self.multiple))
+        num_nodes = int(ceil((self.Num_Q_Var-1)/self.multiple))
         for i in range(0, num_nodes):
             node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
             for k,v in data.iteritems():
@@ -514,7 +518,7 @@ class HeatSourceInterface(ExcelDocument):
                     VH = Vheight + SH
                     # Calculate the riparian extinction value
                     try:
-                        RE = -math.log(1-Vdens)/10
+                        RE = -log(1-Vdens)/10
                     except:
                         if Vdens == 1: RE = 1 # cannot take log of 0, RE is full if it's zero
                         else: raise
@@ -526,15 +530,15 @@ class HeatSourceInterface(ExcelDocument):
                     if LC_Distance < 0:
                         LC_Distance = 0.00001
                     # Calculate the minimum sun angle needed for full sun
-                    T_Full += math.degrees(math.atan(VH/LC_Distance)), # It gets added to a tuple of full sun values
+                    T_Full += degrees(atan(VH/LC_Distance)), # It gets added to a tuple of full sun values
                     # Now get the maximum of bank shade and topographic shade for this
                     # direction
-                    T_None += math.degrees(math.atan(SH/LC_Distance)), # likewise, a tuple of values
+                    T_None += degrees(atan(SH/LC_Distance)), # likewise, a tuple of values
                     ##########################################################
                     # Now we calculate the view to sky value
                     # LC_Angle is the vertical angle from the surface to the land-cover top. It's
                     # multiplied by the density as a kludge
-                    LC_Angle = math.degrees(math.atan(VH / LC_Distance) * Vdens)  #TODO: do we really want to multiply by Vdens?
+                    LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)  #TODO: do we really want to multiply by Vdens?
                     if not j or LC_Angle_Max < LC_Angle:
                         LC_Angle_Max = LC_Angle
                     if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
@@ -542,6 +546,7 @@ class HeatSourceInterface(ExcelDocument):
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
             node.ViewToSky = 1 - VTS_Total / (7 * 90)
             self.PB("Building VegZones", h, len(keys))
+
     def BuildZonesLidar(self):
         """Build zones if we are using LiDAR data"""
         self.CheckEarlyQuit()

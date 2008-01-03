@@ -6,7 +6,10 @@ class LoggerDiety(object):
         self._file = None
     def __del__(self): self._file.close()
     def SetFile(self, filename):
-        self._file = open(filename,"w")
+        try:
+            self._file = open(filename,"w")
+        except IOError:
+            raise IOError("Opening output directory failed. Make sure directory exists before running.")
     def __call__(self, message, n=None,t=None): self.write(message)
     def write(self, message):
         if message != self._last:

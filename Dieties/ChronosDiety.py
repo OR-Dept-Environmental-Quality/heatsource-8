@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-import time, math
+from time import strptime
 from ..Utils.TimeZones import TZ
 
 class ChronosDiety(object):
@@ -231,7 +231,7 @@ class ChronosDiety(object):
             if isinstance(t,tuple):
                 y,m,d,H,M,S = t
             else:
-                y,m,d,H,M,S = time.strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[:6] # Strip out the time info
+                y,m,d,H,M,S = strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[:6] # Strip out the time info
         except AttributeError, detail:
             if detail.__str__() == "'datetime.datetime' object has no attribute 'Format'":
                 y, m, d, H, M, S = t.timetuple()[:6]

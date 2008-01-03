@@ -1,11 +1,10 @@
 from __future__ import division
 from datetime import datetime, timedelta
-import time, weakref
 from ..Dieties import IniParams
 from ..Dieties import Chronos
-from os import path
-import os
-
+from time import localtime
+from os.path import join, exists
+from os import makedirs
 
 class Output(object):
     def __init__(self, dt_out, reach, write_time):
@@ -39,12 +38,12 @@ class Output(object):
                     }
 
         for key in self.files.iterkeys():
-            if not os.path.exists(path.join(IniParams["outputdir"])):
-                os.makedirs(path.join(IniParams["outputdir"]))
-            self.files[key][0] = open(path.join(IniParams["outputdir"], key), 'w')
+            if not exists(join(IniParams["outputdir"])):
+                makedirs(join(IniParams["outputdir"]))
+            self.files[key][0] = open(join(IniParams["outputdir"], key), 'w')
             self.files[key][0].write("Heat Source Hourly Output File:  ")
             self.files[key][0].write(self.files[key][1])
-            today = time.localtime()
+            today = localtime()
             self.files[key][0].write("     File created on %s/%s/%s" % (today[1], today[2], today[0]))
             self.files[key][0].write("\n\n")
             self.files[key][0].write("Datetime".ljust(14))

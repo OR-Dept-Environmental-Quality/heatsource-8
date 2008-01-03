@@ -1,5 +1,4 @@
 from __future__ import division
-import math, decimal, weakref
 from warnings import warn
 import heatsource.heatsource as _HS
 from ..Dieties import Chronos

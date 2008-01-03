@@ -1,5 +1,7 @@
 from __future__ import division
-import math, bisect
+
+from math import pi,exp,log10,log,sqrt,sin,cos,tan,atan,radians
+
 from itertools import count
 from warnings import warn
 from ..Dieties import Chronos
@@ -177,7 +179,7 @@ class StreamNode(StreamChannel):
         if not self.S:
             Shear_Velocity = self.U
         else:
-            Shear_Velocity = math.sqrt(9.8 * self.d_w * self.S)
+            Shear_Velocity = sqrt(9.8 * self.d_w * self.S)
         self.Disp = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
         if self.Disp * dt / (dx ** 2) > 0.5:
             self.Disp = (0.45 * (dx ** 2)) / dt
@@ -264,8 +266,6 @@ class StreamNode(StreamChannel):
         Cloud = self.ContData[0]
         FullSunAngle,TopoShadeAngle,BankShadeAngle,RipExtinction,VegetationAngle = self.ShaderList[Direction]
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces
-        pi,exp,log10,log,sqrt = math.pi,math.exp,math.log10,math.log,math.sqrt
-        sin,cos,tan,atan,radians = math.sin,math.cos,math.tan,math.atan,math.radians
         #======================================================
         # 0 - Edge of atmosphere
         # TODO: Original VB code's JulianDay calculation:
@@ -476,7 +476,6 @@ class StreamNode(StreamChannel):
         #Calculate Evaporation FLUX
         #===================================================
         #Atmospheric Variables
-        log,exp = math.log,math.exp
         Wind, Humidity, Air_T = self.ContData[hour][-3:]
         Pressure = 1013 - 0.1055 * self.Elevation #mbar
         Sat_Vapor = 6.1275 * exp(17.27 * self.T_prev / (237.3 + self.T_prev)) #mbar (Chapra p. 567)
@@ -533,7 +532,6 @@ class StreamNode(StreamChannel):
         return F_Cond, T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_Evap, F_Conv, E
 
     def CalcSolarPosition_THW(self, lat, lon, hour, minute, second, offset, JDC):
-        from math import sin, cos, atan, tan, sqrt, pow, pi, acos
         toRadians = pi/180.0
         toDegrees = 180.0/pi
         MeanObliquity = 23.0 + (26.0 + ((21.448 - JDC * (46.815 + JDC * (0.00059 - JDC * 0.001813))) / 60.0)) / 60.0

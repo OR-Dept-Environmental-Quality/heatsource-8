@@ -1,10 +1,11 @@
 from __future__ import division
-import win32com, win32com.client
-constants = win32com.client.constants
+from win32com.client import constants, Dispatch, gencache
 from pythoncom import CoInitialize,CoUninitialize
 from itertools import dropwhile
 from pywintypes import com_error
-import os
+from os.path import exists
+from os import remove
+
 
 borderTop = 3
 borderBottom = 4
@@ -44,9 +45,9 @@ class ExcelDocument(object):
         # is that we want to be able to catch unsaved changes, which is possible only if we catch
         # a reference to the active workbook.
         try:
-            self.app = win32com.client.gencache.EnsureDispatch("Excel.Application")
+            self.app = gencache.EnsureDispatch("Excel.Application")
         except:
-            self.app = win32com.client.Dispatch("Excel.Application")
+            self.app = Dispatch("Excel.Application")
         self.quit_excel = False
         self.PBtext = TextPB()
         # If we don't have an active workbook, open one
@@ -219,8 +220,8 @@ class ExcelDocument(object):
         If 'delete_existing' is specified and the file already
         exists, it will be deleted before saving.
         """
-        if delete_existing and os.path.exists(filename):
-            os.remove(filename)
+        if delete_existing and exists(filename):
+            remove(filename)
         self.app.ActiveWorkbook.SaveAs(filename)
 
     def PrintOut(self):

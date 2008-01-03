@@ -1,7 +1,8 @@
 from __future__ import division
 
-import gc
-import cProfile, sys, time, traceback, itertools, weakref
+from itertools import count
+from traceback import print_exc, format_tb
+from sys import exc_info
 from os.path import join, exists
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
@@ -68,16 +69,15 @@ class HSProfile(object):
             timesteps = (stop-flush).seconds/Chronos.dt.seconds
         else:
             timesteps = ((stop-flush).days*86400)/Chronos.dt.seconds
-        count = itertools.count()
+        cnt = count()
         out = 0
         time1 = datetime.today()
         while time < stop:
             JD = Chronos.JDay
             JDC = Chronos.JDC
             offset = Chronos.TZOffset(time)
-            n = count.next()
             if not (time.minute + time.second): # every hour
-                self.HS.PB("%i of %i timesteps"% (n,int(timesteps)))
+                self.HS.PB("%i of %i timesteps"% (cnt.next()*60,int(timesteps)))
                 PumpWaitingMessages()
                 if force_quit:
                     self.HS.PB("Simulation stopped by user")
@@ -103,12 +103,12 @@ class HSProfile(object):
             time = Chronos.Tick()
 
         self.Output.flush()
-        total_time = (datetime.today()-time1).seconds
+        total_time = (datetime.today()-time1).seconds/60
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         balances = [x.Q_mb for x in self.reachlist]
         total_inflow = sum(balances)
         mettaseconds = (total_time/timesteps/len(self.reachlist))*1e6
-        message = "Finished in %i seconds (%0.3f mettaseconds). Water Balance: %0.3f/%0.3f" %\
+        message = "Finished in %i minutes (%0.3f microseconds each cycle). Water Balance: %0.3f/%0.3f" %\
                     (total_time, mettaseconds, total_inflow, out)
         self.HS.PB(message)
         print message
@@ -121,27 +121,27 @@ def RunHS(sheet):
         del HSP
     except Exception, stderr:
         f = open("c:\\HSError.txt","w")
-        traceback.print_exc(file=f)
+        print_exc(file=f)
         f.close()
-        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
+        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 def RunSH(sheet):
     try:
         HSP = HSProfile(sheet,1)
         HSP.run()
     except Exception, stderr:
         f = open("c:\\HSError.txt","w")
-        traceback.print_exc(file=f)
+        print_exc(file=f)
         f.close()
-        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
+        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 def RunHY(sheet):
     try:
         HSP = HSProfile(sheet,2)
         HSP.run()
     except Exception, stderr:
         f = open("c:\\HSError.txt","w")
-        traceback.print_exc(file=f)
+        print_exc(file=f)
         f.close()
-        msgbox("".join(traceback.format_tb(sys.exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
+        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
 
 def quit(arg):
     global force_quit
