@@ -41,6 +41,7 @@ class HeatSourceInterface(ExcelDocument):
                "flushdays": "C12",
                "timezone": "C13",
                "daylightsavings": "C14",
+               "runmodule": "C16",
                "dt": "E4",
                "dx": "E5",
                "longsample": "E6",
@@ -78,6 +79,7 @@ class HeatSourceInterface(ExcelDocument):
             raise Exception("Output directory needs to have a trailing backslash")
         # Set up the log file in the outputdir
         self.log.SetFile(normpath(join(IniParams["outputdir"],"outfile.log")))
+        # Are we running the math in C or Python?
         ######################################################
         # Calculate the length of the simulation period in days and the number of hours
         IniParams["simperiod"] = (IniParams["modelend"]-IniParams["modelstart"]).days + 1
@@ -358,14 +360,14 @@ class HeatSourceInterface(ExcelDocument):
         # Pages we grab columns from, and the columns that we grab
         ttools = ["km","Longitude","Latitude"]
         morph = ["Elevation","S","W_b","z","n","SedThermCond","SedThermDiff","SedDepth",
-                 "hyp_exch","phi","FLIR_time","FLIR_temp","Q_cont","d_cont"]
+                 "hyp_percent","phi","FLIR_Time","FLIR_Temp","Q_cont","d_cont"]
         flow = ["Q_in","T_in","Q_out"]
         # Ways that we grab the columns
-        sums = ["hyp_exch","Q_in","Q_out"] # These are summed, not averaged
+        sums = ["hyp_percent","Q_in","Q_out"] # These are summed, not averaged
         mins = ["km"]
         aves = ["Longitude","Latitude","Elevation","S","W_b","z","n","SedThermCond",
                 "SedThermDiff","SedDepth","phi", "Q_cont","d_cont","T_in"]
-        ignore = ["FLIR_temp","FLIR_time"] # Ignore in the loop, set them manually
+        ignore = ["FLIR_Temp","FLIR_Time"] # Ignore in the loop, set them manually
 
         data = {}
         # Get all the columnar data from the sheets

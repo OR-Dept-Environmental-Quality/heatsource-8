@@ -52,11 +52,11 @@ class HSProfile(object):
 #        self.HS.close()
 #        del self.reachlist, self.run_all, self.Reach, self.HS, #self.Output
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
-        [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
+        [x.CalcDischarge(time,hydro_time) for x in self.reachlist]
         [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset, self.testfile) for x in self.reachlist]
         [x.MacCormick2(solar_time) for x in self.reachlist]
     def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
-        [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
+        [x.CalcDischarge(time,hydro_time) for x in self.reachlist]
     def run_sh(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
     def run(self): # Argument allows profiling and testing
@@ -105,7 +105,7 @@ class HSProfile(object):
         self.Output.flush()
         total_time = (datetime.today()-time1).seconds/60
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
-        balances = [x.Q_mb for x in self.reachlist]
+        balances = [x.Q_mass for x in self.reachlist]
         total_inflow = sum(balances)
         mettaseconds = (total_time/timesteps/len(self.reachlist))*1e6
         message = "Finished in %i minutes (%0.3f microseconds each cycle). Water Balance: %0.3f/%0.3f" %\
