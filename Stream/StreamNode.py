@@ -98,7 +98,7 @@ class StreamNode(StreamChannel):
                        IniParams["longsample"],IniParams["emergent"], IniParams["wind_a"], IniParams["wind_b"],
                        IniParams["calcevap"], IniParams["penman"])
 
-    def CalcHeat_Opt(self, hour, min, sec, bc_hour,JD,JDC,offset):
+    def CalcHeat_Opt(self, hour, min, sec, bc_hour,JD,JDC,offset, file=None):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
         # Reset temperatures
         self.T_prev = self.T
@@ -113,13 +113,15 @@ class StreamNode(StreamChannel):
                             self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
                             hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
-#                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
         except _HS.HeatSourceError:
             raise
+        Ground_py = self.GroundFlux_THW(bc_hour)
+        T, S1 = self.MacCormick_THW(bc_hour)
+
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-    def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset):
+    def CalcHeat(self, hour, min, sec, bc_hour,JD,JDC,offset, file):
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
@@ -127,7 +129,6 @@ class StreamNode(StreamChannel):
         Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
 #        Altitude, Zenith, Daytime, dir = self.CalcSolarPosition_THW(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
         self.SolarPos = Altitude, Zenith, Daytime, dir
-
         try:
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
@@ -139,6 +140,9 @@ class StreamNode(StreamChannel):
 #                self.CalcFluxes_THW(hour, bc_hour, JD, Daytime, Altitude, Zenith, dir)
         except _HS.HeatSourceError:
             raise
+#        if Daytime:
+#            file.write(",".join([`i` for i in (self, bc_hour, hour,min,sec)]) + ",")
+#            file.write(",".join([`i` for i in self.F_Solar]) + "\n")
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
@@ -167,9 +171,9 @@ class StreamNode(StreamChannel):
         if not self.prev_km:
             return
         #===================================================
-        self.T, S = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
-                                    self.Q_tribs[hour], self.T_tribs[hour], self.prev_km.Q, self.Delta_T, self.Disp,
-                                    True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
+#        self.T, S = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
+#                                    self.Q_tribs[hour], self.T_tribs[hour], self.prev_km.Q, self.Delta_T, self.Disp,
+#                                    True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
 #        self.T = self.MacCormick2_THW(hour)
 
 
@@ -180,31 +184,21 @@ class StreamNode(StreamChannel):
             Shear_Velocity = self.U
         else:
             Shear_Velocity = sqrt(9.8 * self.d_w * self.S)
-        self.Disp = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
-        if self.Disp * dt / (dx ** 2) > 0.5:
-            self.Disp = (0.45 * (dx ** 2)) / dt
+        Disp = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
+        if Disp * dt / (dx ** 2) > 0.5:
+            Disp = (0.45 * (dx ** 2)) / dt
+        return Disp
 
     def MacCormick_THW(self, bc_hour):
-        dt = self.dt
-        dx = self.dx
-        mix = 0
-        SkipNode = False
-        if self.prev_km:
-            if not SkipNode:
-                mix = self.MixItUp(bc_hour,self.prev_km.Q_prev, self.prev_km.T_prev) if self.Q else 0
-                T0 = self.prev_km.T_prev + mix
-                T1 = self.T_prev
-                T2 = self.next_km.T_prev if self.next_km else self.T_prev
-                Dummy1 = -self.U * (T1 - T0) / dx
-                self.CalcDispersion()
-                Dummy2 = self.Disp * (T2 - 2 * T1 + T0) / (dx ** 2)
-                S1 = Dummy1 + Dummy2 + self.Delta_T / dt
-                T = T1 + S1 * dt
-            else:
-                T = self.T_prev #TODO: This is wrong, really should be self.T_prev_prev
-        else:
-            T = self.T_bc[bc_hour]
-            T_prev = self.T_bc[bc_hour]
+        mix = self.MixItUp(bc_hour,self.prev_km.Q_prev, self.prev_km.T_prev) if self.Q else 0
+        T0 = self.prev_km.T_prev + mix
+        T1 = self.T_prev
+        T2 = self.next_km.T_prev if self.next_km else self.T_prev
+        Dummy1 = -self.U * (T1 - T0) / self.dx
+        Disp = self.CalcDispersion()
+        Dummy2 = Disp * (T2 - 2 * T1 + T0) / (self.dx ** 2)
+        S1 = Dummy1 + Dummy2 + self.Delta_T / self.dt
+        T = T1 + S1 * self.dt
         return T, S1
 
     def MacCormick_BoundaryNode(self,args):
@@ -258,13 +252,13 @@ class StreamNode(StreamChannel):
 #            T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in))) / (Q_accr + Q_up + Q_in)
         return T_mix - T_up
 
-    def Solar_THW(self,JD,hour,bc_hour, Altitude,Zenith,Dir, Daytime):
+    def Solar_THW(self,JD,hour,bc_hour, Altitude,Zenith,dir, Daytime):
         """Old method, now pushed down to a C module. This is left for testing only"""
         F_Direct = [0]*8
         F_Diffuse = [0]*8
         F_Solar = [0]*8
-        Cloud = self.ContData[0]
-        FullSunAngle,TopoShadeAngle,BankShadeAngle,RipExtinction,VegetationAngle = self.ShaderList[Direction]
+        Cloud = self.ContData[bc_hour][0]
+        FullSunAngle,TopoShadeAngle,BankShadeAngle,RipExtinction,VegetationAngle = self.ShaderList[dir]
         # Make all math functions local to save time by preventing failed searches of local, class and global namespaces
         #======================================================
         # 0 - Edge of atmosphere
@@ -423,7 +417,7 @@ class StreamNode(StreamChannel):
         return F_Solar
 
     def GroundFlux_THW(self, bc_hour):
-
+        from math import exp
         #SedThermCond units of W/(m *C)
         #SedThermDiff units of cm^2/sec
 
@@ -450,14 +444,14 @@ class StreamNode(StreamChannel):
         NetFlux_Sed = self.F_Solar[7] - F_Cond - Flux_Conduction_Alluvium - F_hyp
         DT_Sed = NetFlux_Sed * self.dt / (self.SedDepth * SedRhoCp)
         T_sed_new = self.T_sed + DT_Sed
+        if T_sed_new > 50 or T_sed_new < 0:
+            raise Exception("Sediment temperature not bounded in 0<=temp<=50")
 
         #=====================================================
         #Calculate Longwave FLUX
         #=====================================================
         #Atmospheric variables
-        exp = math.exp
-        Humidity, Air_T = self.ContData[hour][-2:] # Last two elements in tuple
-        Pressure = 1013 - 0.1055 * self.Elevation #mbar
+        Cloud, Wind, Humidity, Air_T = self.ContData[bc_hour]
         Sat_Vapor = 6.1275 * exp(17.27 * Air_T / (237.3 + Air_T)) #mbar (Chapra p. 567)
         Air_Vapor = Humidity * Sat_Vapor
         Sigma = 5.67e-8 #Stefan-Boltzmann constant (W/m2 K4)
@@ -476,7 +470,6 @@ class StreamNode(StreamChannel):
         #Calculate Evaporation FLUX
         #===================================================
         #Atmospheric Variables
-        Wind, Humidity, Air_T = self.ContData[hour][-3:]
         Pressure = 1013 - 0.1055 * self.Elevation #mbar
         Sat_Vapor = 6.1275 * exp(17.27 * self.T_prev / (237.3 + self.T_prev)) #mbar (Chapra p. 567)
         Air_Vapor = Humidity * Sat_Vapor

@@ -1,12 +1,9 @@
 from __future__ import division
 from warnings import warn
-import heatsource.heatsource as _HS
-from ..Dieties import Chronos
 from ..Dieties import IniParams
+from ..Dieties import Chronos
 
-class Nothing(object):
-    """Class that returns None when called"""
-    def __call__(self): return None
+import heatsource.heatsource as _HS
 
 class StreamChannel(object):
     """Class that describes the geometry of a stream channel
@@ -138,42 +135,3 @@ class StreamChannel(object):
 
         if Q < 0.003: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
-
-    def CalcHydroStability(self):
-        """Ensure stability of the timestep using the technique from pg 82 of the HS manual
-
-        This is only used if we are not using Muskingum routing, at least in the original code."""
-        #Maxdt = 1e6
-        #for node in reach:
-        #    Dummy = node.dx / (node.Velocity[0] + math.sqrt(9.861 * node.Depth[0]))
-        #    if Dummy < Maxdt: Maxdt = Dummy
-        #    Dummy = (node.Rh ** (4 / 3)) / (9.861 * node.Velocity[0] * (node.N ** 2))
-        #    if Dummy < Maxdt: Maxdt = Dummy
-        #if Maxdt < iniparams.dt: dt = Maxdt
-        #else: dt = iniparams.dt
-        #return dt
-        pass
-
-    def GetMuskingum_THW(self, Q_est):
-        """Return the values for the Muskigum routing coefficients
-        using current timestep and optional discharge"""
-        #Calculate an initial geometry based on an estimated discharge (typically (t,x-1))
-        # Taken from the VB source.
-        c_k = (5/3) * self.U  # Wave celerity
-        X = 0.5 * (1 - Q_est / (self.W_w * self.S * self.dx * c_k))
-        if X > 0.5: X = 0.5
-        elif X < 0.0: X = 0.0
-        K = self.dx / c_k
-        dt = self.dt
-
-        # Check the celerity to ensure stability. These tests are from the VB code.
-        if dt >= (2 * K * (1 - X)):  #Unstable - Decrease dt or increase dx
-            raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
-
-        # These calculations are from Chow's "Applied Hydrology"
-        D = K * (1 - X) + 0.5 * dt
-        C1 = (0.5*dt - K * X) / D
-        C2 = (0.5*dt + K * X) / D
-        C3 = (K * (1 - X) - 0.5*dt) / D
-        # TODO: reformulate this using an updated model, such as Moramarco, et.al., 2006
-        return C1, C2, C3

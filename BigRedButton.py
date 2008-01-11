@@ -46,14 +46,14 @@ class HSProfile(object):
         dt_out = timedelta(minutes=60)
         self.Output = O(dt_out, self.HS.Reach, start)
         ##########################################################
-
+        self.testfile = open("E:\\solar_new.txt","w")
     def close(self):
         print "Deleting HSProfile"
 #        self.HS.close()
 #        del self.reachlist, self.run_all, self.Reach, self.HS, #self.Output
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
-        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
+        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset, self.testfile) for x in self.reachlist]
         [x.MacCormick2(solar_time) for x in self.reachlist]
     def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHydraulics(time,hydro_time) for x in self.reachlist]
@@ -111,6 +111,7 @@ class HSProfile(object):
         message = "Finished in %i minutes (%0.3f microseconds each cycle). Water Balance: %0.3f/%0.3f" %\
                     (total_time, mettaseconds, total_inflow, out)
         self.HS.PB(message)
+        self.testfile.close()
         print message
 
 

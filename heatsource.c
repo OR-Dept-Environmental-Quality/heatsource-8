@@ -553,7 +553,7 @@ void GetGroundFluxes(double Value[], double Cloud, double Wind, double Humidity,
     //======================================================
     //Calculate the changes in temperature in the substrate conduction layer
     // Negative hyporheic flow is heat into sediment
-    double F_hyp = Q_hyp * rhow *H2O_HeatCapacity * (T_sed - T_prev) / ( W_w * dx);
+    double F_hyp = Q_hyp * rhow * H2O_HeatCapacity * (T_sed - T_prev) / ( W_w * dx);
     //Temperature change in substrate from solar exposure and conducted heat
     double NetFlux_Sed = F_Solar7 - F_Conduction - Flux_Conduction_Alluvium - F_hyp;
     double DT_Sed = NetFlux_Sed * dt / (SedDepth * SedRhoCp);
