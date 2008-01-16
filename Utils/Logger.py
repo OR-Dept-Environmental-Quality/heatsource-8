@@ -4,7 +4,11 @@ class LoggerDiety(object):
     def __init__(self):
         self._last = None
         self._file = None
-    def __del__(self): self._file.close()
+    def __del__(self):
+        try:
+            self._file.close()
+        except AttributeError:
+            pass
     def SetFile(self, filename):
         try:
             self._file = open(filename,"w")

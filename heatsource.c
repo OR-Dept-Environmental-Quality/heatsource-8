@@ -314,7 +314,7 @@ static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
 	if (Q_new > 0.003)
 		GetStreamGeometry(Value, Q_new, W_b, z, n, S, D_est, dx, dt);
 
-	PyObject *result = Py_BuildValue("(ffffffff)", Q_new, Value[0],Value[1],Value[2],
+	PyObject *result = Py_BuildValue("f(fffffff)", Q_new, Value[0],Value[1],Value[2],
 						 Value[3],Value[4],Value[5],Value[6]);
 	return result;
 }
@@ -824,7 +824,7 @@ heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
 	MacCormick(Mac, dt, dx, U, ground[1], T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
 				Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr);
 
-	return Py_BuildValue("(ffffffff)(fffffffff)ffff",solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
+	return Py_BuildValue("(ffffffff)(fffffffff)ff(ff)",solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
 									  ground[0],ground[1],ground[2],ground[3],ground[4],ground[5],ground[6],ground[7],ground[8],
 									  F_Total, Delta_T, Mac[0], Mac[1]);
 }

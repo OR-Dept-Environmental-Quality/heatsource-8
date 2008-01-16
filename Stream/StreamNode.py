@@ -9,6 +9,7 @@ from ..Dieties import IniParams
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
 _HS = None # Placeholder for heatsource module
+import PyHeatsource as pyHS
 Outfile = open("E:\evans.out","w")
 
 class StreamNode(object):
@@ -118,6 +119,7 @@ class StreamNode(object):
         else:
             import heatsource
             _HS = heatsource.heatsource
+
         self.CalcDischarge = self.CalculateDischarge
         self.C_args = (self.W_b, self.Elevation, self.TopoFactor, self.ViewToSky, self.phi, self.VDensity, self.VHeight,
                        self.SedDepth, self.dx, self.dt, self.SedThermCond, self.SedThermDiff, self.Q_in, self.T_in, has_prev,
@@ -130,11 +132,12 @@ class StreamNode(object):
         self.Q_mass += inputs
         up = self.prev_km
         try:
-            Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
-                    _HS.CalcFlows(self.U, self.W_w, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont,
+            Q, (self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp) = \
+                _HS.CalcFlows(self.U, self.W_w, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont,
                                  self.Q, up.Q, up.Q_prev, inputs, -1)
         except _HS.HeatSourceError, (stderr):
             self.CatchException(stderr)
+
         self.Q_prev = self.Q
         self.Q = Q
         self.Q_hyp = Q * self.hyp_percent # Hyporheic discharge
@@ -147,11 +150,12 @@ class StreamNode(object):
         self.Q_mass += Q_bc
         # We fill the discharge arguments with 0 because it is unused in the boundary case
         try:
-            Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
+            Q, (self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp) = \
                     _HS.CalcFlows(self.U, self.W_w, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont,
                                   0.0, 0.0, 0.0, 0.0, Q_bc)
         except _HS.HeatSourceError, (stderr):
             self.CatchException(stderr)
+
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
         self.Q_prev = self.Q
@@ -181,7 +185,7 @@ class StreamNode(object):
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
             Q = self.prev_km.Q_prev + inputs # Add upstream node's discharge at THIS timestep- prev_km.Q would be next timestep.
             try:
-                Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
+                Q, (self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp) = \
                         _HS.CalcFlows(0.0, 0.0, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont, 0.0, 0.0, 0.0, inputs, Q)
             except _HS.HeatSourceError, (stderr):
                 self.CatchException(stderr)
@@ -193,7 +197,7 @@ class StreamNode(object):
             self.Q_mass += Q_bc
             # We pad the arguments with 0 because some are unused (or currently None) in the boundary case
             try:
-                Q, self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp = \
+                Q, (self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp) = \
                         _HS.CalcFlows(0.0, 0.0, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont, 0.0, 0.0, 0.0, inputs, Q_bc)
             except _HS.HeatSourceError, (stderr):
                 self.CatchException(stderr)
@@ -220,7 +224,7 @@ c_k: %3.4f""" % stderr
 
         msg += "\nThe model run has been halted. You may ignore any further error messages."
         msgbox(msg)
-        raise SystemExit
+        raise Exception(msg)
 
     def CalcHeat_Opt(self, hour, min, sec, bc_hour,JD,JDC,offset, file=None):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
@@ -231,14 +235,14 @@ c_k: %3.4f""" % stderr
         try:
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, self.T, self.S1 = \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, (self.T, self.S1) = \
                 _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
                             hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
+
         except _HS.HeatSourceError, (stderr):
             self.CatchException(stderr)
-        T, S1 = self.MacCormick_THW(bc_hour)
 
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
