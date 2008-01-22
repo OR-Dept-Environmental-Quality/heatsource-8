@@ -73,6 +73,8 @@ class HeatSourceInterface(ExcelDocument):
             IniParams["modelend"] = IniParams["end"]
         else:
             IniParams["modelend"] = Chronos.MakeDatetime(IniParams["modelend"])
+        # make sure alluvium temp is present and a floating point number.
+        IniParams["alluviumtemp"] = 0.0 if not IniParams["alluviumtemp"] else float(IniParams["alluviumtemp"])
         IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
         # Make sure the output directory ends in a slash (VB chokes if not)
         if IniParams["outputdir"][-1] != "\\":
@@ -593,4 +595,3 @@ class HeatSourceInterface(ExcelDocument):
             node.T_sed = self.T_bc[mindate]
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
-        node.T_alluv = IniParams["alluviumtemp"] if IniParams["calcalluvium"] else 0.0

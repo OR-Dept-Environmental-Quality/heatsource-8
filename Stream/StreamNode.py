@@ -9,7 +9,6 @@ from ..Dieties import IniParams
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
 _HS = None # Placeholder for heatsource module
-import PyHeatsource as pyHS
 Outfile = open("E:\evans.out","w")
 
 class StreamNode(object):
@@ -27,7 +26,7 @@ class StreamNode(object):
                 "ShaderList", # List of angles and attributes to determine sun shading.
                 "F_DailySum", "F_Total", # Specific sums of solar fluxes
                 "SedThermCond", "SedThermDiff", "SedDepth", # Sediment conduction values
-                "hyp_percent", "T_alluv", # Percent hyporheic exchange and alluvium temperature
+                "hyp_percent", # Percent hyporheic exchange
                 "F_Solar", # List of important solar fluxes
                 "S",        # Slope
                 "n",        # Manning's n
@@ -123,8 +122,8 @@ class StreamNode(object):
         self.CalcDischarge = self.CalculateDischarge
         self.C_args = (self.W_b, self.Elevation, self.TopoFactor, self.ViewToSky, self.phi, self.VDensity, self.VHeight,
                        self.SedDepth, self.dx, self.dt, self.SedThermCond, self.SedThermDiff, self.Q_in, self.T_in, has_prev,
-                       IniParams["longsample"],IniParams["emergent"], IniParams["wind_a"], IniParams["wind_b"],
-                       IniParams["calcevap"], IniParams["penman"])
+                       IniParams["transsample"],IniParams["emergent"], IniParams["wind_a"], IniParams["wind_b"],
+                       IniParams["calcevap"], IniParams["penman"], IniParams["calcalluvium"], IniParams["alluviumtemp"])
 
     def CalcDischarge_Opt(self,time,hour):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
@@ -237,7 +236,7 @@ c_k: %3.4f""" % stderr
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                  self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, (self.T, self.S1) = \
                 _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
                             hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
 
@@ -258,7 +257,7 @@ c_k: %3.4f""" % stderr
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                  self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
                 _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_alluv, self.T_prev, self.T_sed,
+                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_prev, self.T_sed,
                             self.Q_hyp, self.next_km.T_prev, self.ShaderList[dir], self.Disp,
                             hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0)
         except _HS.HeatSourceError, (stderr):

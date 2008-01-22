@@ -2,8 +2,6 @@ from __future__ import division
 from math import pow, sqrt, sin, log, atan, sin, cos, pi, tan, acos, exp,radians, degrees, log10
 from random import randint
 from bisect import bisect
-from ..Dieties import IniParams
-
 
 class HeatSourceError(Exception): pass
 
@@ -241,7 +239,7 @@ def GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b, Elevation, TopoFac
         zone = 0
         for vegangle in VegetationAngle:  #Loop to find if shading is occuring from veg. in that zone
             if Altitude < vegangle:  #veg shading is occurring from this zone
-                Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (IniParams["longsample"]/cos(radians(Altitude))))))
+                Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (SampleDist/cos(radians(Altitude))))))
             zone += 1
         F_Direct[3] = Dummy1
         F_Diffuse[3] = F_Diffuse[2] * ViewToSky
@@ -260,7 +258,7 @@ def GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b, Elevation, TopoFac
         F_Diffuse[4] = F_Diffuse[3]
 
     #Account for emergent vegetation
-    if IniParams["emergent"]:
+    if emergent:
         pathEmergent = VHeight / sin(radians(Altitude))
         if pathEmergent > W_b:
             pathEmergent = W_b
@@ -348,7 +346,7 @@ def GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b, Elevation, TopoFac
     return F_Solar
 
 def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewToSky, SedDepth, dx,
-                    dt, SedThermCond, SedThermDiff, FAlluvium, P_w, W_w, emergent, penman, wind_a,
+                    dt, SedThermCond, SedThermDiff, calcalluv, T_alluv, P_w, W_w, emergent, penman, wind_a,
                     wind_b, calcevap, T_prev, T_sed, Q_hyp, F_Solar5, F_Solar7):
 
     #SedThermCond units of W/(m *C)
@@ -365,11 +363,8 @@ def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewT
 
     #Conduction flux (positive is heat into stream)
     F_Cond = SedThermCond * (T_sed - T_prev) / (SedDepth / 2)             #units of (W / m2)
-    #Calculate the conduction flux between deeper alluvium & substrate
-    if IniParams["calcalluvium"]:
-        Flux_Conduction_Alluvium = SedThermCond * (T_sed - T_alluv) / (SedDepth / 2)
-    else:
-        Flux_Conduction_Alluvium = 0
+    #Calculate the conduction flux between deeper alluvium & substrate conditionally
+    Flux_Conduction_Alluvium = SedThermCond * (T_sed - T_alluv) / (SedDepth / 2) if calcalluv else 0.0
 
     #Hyporheic flux (negative is heat into sediment)
     F_hyp = Q_hyp * rhow * H2O_HeatCapacity * (T_sed - T_prev) / (W_w * dx)
@@ -407,7 +402,7 @@ def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewT
     Air_Vapor = Humidity * Sat_Vapor
     #===================================================
     #Calculate the frictional reduction in wind velocity
-    if IniParams["emergent"] and VHeight > 0:
+    if emergent and VHeight > 0:
         Zd = 0.7 * VHeight
         Zo = 0.1 * VHeight
         Zm = 2
@@ -419,7 +414,7 @@ def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewT
         Friction_Velocity = Wind
     #===================================================
     #Wind Function f(w)
-    Wind_Function = float(IniParams["wind_a"]) + float(IniParams["wind_b"]) * Friction_Velocity #m/mbar/s
+    Wind_Function = float(wind_a) + float(wind_b) * Friction_Velocity #m/mbar/s
 #        Wind_Function = 0.000000001505 + 0.0000000016 * Friction_Velocity #m/mbar/s
 
     #===================================================
@@ -427,7 +422,7 @@ def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewT
     LHV = 1000 * (2501.4 + (1.83 * T_prev)) #J/kg
     #===================================================
     #Use Jobson Wind Function
-    if IniParams["penman"]:
+    if penman:
         #Calculate Evaporation FLUX
         P = 998.2 # kg/m3
         Gamma = 1003.5 * Pressure / (LHV * 0.62198) #mb/*C  Cuenca p 141
@@ -453,7 +448,7 @@ def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewT
             Bowen = 1
         F_Conv = F_Evap * Bowen
     F_Conv = F_Evap * Bowen
-    E = Evap_Rate*W_w if IniParams["calcevap"] else 0
+    E = Evap_Rate*W_w if calcevap else 0
     return F_Cond, T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_Evap, F_Conv, E
 
 def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T, Disp, S1,
@@ -495,13 +490,13 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
 
     return Temp, S
 
-def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T_alluv, T_prev,
+def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T_prev,
                    T_sed, Q_hyp, T_dn_prev, ShaderList, Disp, hour, JD, daytime, Altitude, Zenith,
                    Q_up_prev, T_up_prev):
     cloud, wind, humidity, T_air = ContData
     W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, \
         SedDepth, dx, dt, SedThermCond, SedThermDiff, Q_accr, T_accr, \
-        has_prev, SampleDist, emergent, wind_a, wind_b, calcevap, penman = C_args
+        has_prev, SampleDist, emergent, wind_a, wind_b, calcevap, penman, calcalluv, T_alluv = C_args
 
     solar = [0]*8
     if daytime:
@@ -511,7 +506,7 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
 
     ground = GetGroundFluxes(cloud, wind, humidity, T_air, Elevation,
                     phi, VHeight, ViewToSky, SedDepth, dx,
-                    dt, SedThermCond, SedThermDiff, T_alluv, P_w,
+                    dt, SedThermCond, SedThermDiff, calcalluv, T_alluv, P_w,
                     W_w, emergent, penman, wind_a, wind_b,
                     calcevap, T_prev, T_sed, Q_hyp, solar[5],
                     solar[7])

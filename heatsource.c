@@ -528,10 +528,9 @@ void GetSolarFlux(double Value[], int hour, int JD, double Altitude,
 
 void GetGroundFluxes(double Value[], double Cloud, double Wind, double Humidity, double T_air, double Elevation,
 					double phi, double VHeight, double ViewToSky, double SedDepth, double dx,
-					double dt, double SedThermCond, double SedThermDiff, double FAlluvium, double P_w,
-					double W_w, int emergent, int penman, double wind_a, double wind_b,
-					int calcevap, double T_prev, double T_sed, double Q_hyp, double F_Solar5,
-					double F_Solar7)
+					double dt, double SedThermCond, double SedThermDiff, int calcalluv, double T_alluv,
+					double P_w, double W_w, int emergent, int penman, double wind_a, double wind_b,
+					int calcevap, double T_prev, double T_sed, double Q_hyp, double F_Solar5, double F_Solar7)
 {
 	//#################################################################
 	// Bed Conduction Flux
@@ -546,9 +545,9 @@ void GetGroundFluxes(double Value[], double Cloud, double Wind, double Humidity,
     //Calculate the conduction flux between deeper alluvium & substrate
 	double Flux_Conduction_Alluvium = 0.0;
 
-    if (FAlluvium > 0)
+    if (calcalluv)
     {
-        Flux_Conduction_Alluvium = SedThermCond * (T_sed - FAlluvium) / (SedDepth / 2);
+        Flux_Conduction_Alluvium = SedThermCond * (T_sed - T_alluv) / (SedDepth / 2);
     }
     //======================================================
     //Calculate the changes in temperature in the substrate conduction layer
@@ -762,19 +761,20 @@ heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
 	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt;
 	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w;
 	double U, T_alluv, T_prev, T_sed, Q_hyp, cloud, humidity, T_air, wind, Disp;
-	int hour, JD, daytime, has_prev, emergent, calcevap, penman;
-	if (!PyArg_ParseTuple(args, "OOdddddOOdddddOdiiidddd",
+	int hour, JD, daytime, has_prev, emergent, calcevap, penman, calcalluv;
+	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdiiidddd",
 								&ContData, &C_args, &d_w, &area, &P_w, &W_w, &U,
-								&Q_tribs, &T_tribs, &T_alluv, &T_prev, &T_sed, &Q_hyp,
+								&Q_tribs, &T_tribs, &T_prev, &T_sed, &Q_hyp,
 								&T_dn_prev, &ShaderList, &Disp, &hour, &JD, &daytime,
 								&Altitude, &Zenith, &Q_up_prev, &T_up_prev))
 		return NULL;
 	if (!PyArg_ParseTuple(ContData, "dddd", &cloud, &wind, &humidity, &T_air))
 		return NULL;
-	if (!PyArg_ParseTuple(C_args, "ddddddddddddddididdii",
+	if (!PyArg_ParseTuple(C_args, "ddddddddddddddididdiiid",
 								  &W_b, &Elevation, &TopoFactor, &ViewToSky, &phi, &VDensity, &VHeight,
 								  &SedDepth, &dx, &dt, &SedThermCond, &SedThermDiff, &Q_accr, &T_accr,
-								  &has_prev, &SampleDist, &emergent, &wind_a, &wind_b, &calcevap, &penman))
+								  &has_prev, &SampleDist, &emergent, &wind_a, &wind_b, &calcevap,
+								  &penman, &calcalluv, &T_alluv))
 		return NULL;
 
 	// Now deal with Shader list. The first three values are angles, the 4th value is
@@ -805,10 +805,9 @@ heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
 	double ground[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 	GetGroundFluxes(ground, cloud, wind, humidity, T_air, Elevation,
 					phi, VHeight, ViewToSky, SedDepth, dx,
-					dt, SedThermCond, SedThermDiff, T_alluv, P_w,
-					W_w, emergent, penman, wind_a, wind_b,
-					calcevap, T_prev, T_sed, Q_hyp, solar[5],
-					solar[7]);
+					dt, SedThermCond, SedThermDiff, calcalluv, T_alluv,
+					P_w, W_w, emergent, penman, wind_a, wind_b,
+					calcevap, T_prev, T_sed, Q_hyp, solar[5], solar[7]);
 
 	double F_Total =  solar[6] + ground[0] + ground[2] + ground[6] + ground[7];
 	//////////////////////////////////////////
