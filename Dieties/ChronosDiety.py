@@ -196,7 +196,7 @@ class ChronosDiety(object):
 
         Takes a datetime object and returns the signed integer offset from UTC"""
         t = t or self.__current
-        return 24 - (t.utcoffset().seconds/3600)
+        return 24 - t.utcoffset().seconds/3600 - self.dst.seconds/3600
     def GetUTC(self, t=None):
         """GetUTC([time])-> datetime
 
