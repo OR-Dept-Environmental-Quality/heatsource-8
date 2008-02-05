@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from win32gui import PumpWaitingMessages
 from Utils.easygui import msgbox
+from time import mktime
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties import Chronos
@@ -17,8 +18,6 @@ from Utils.Output import Output as O
 from heatsource import HeatSourceError, CalcMacCormick
 
 from __version__ import version_info
-
-force_quit = False
 
 class HSProfile(object):
     def __init__(self,worksheet,run_type=0):
@@ -60,7 +59,6 @@ class HSProfile(object):
     def run_sh(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
     def run(self): # Argument allows profiling and testing
-        global force_quit
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
@@ -78,15 +76,12 @@ class HSProfile(object):
             offset = Chronos.TZOffset(time)
             if not (time.minute + time.second): # every hour
                 self.HS.PB("%i of %i timesteps"% (cnt.next()*60,int(timesteps)))
-                PumpWaitingMessages()
-                if force_quit:
-                    self.HS.PB("Simulation stopped by user")
-                    break
+                print PumpWaitingMessages()
                 if not time.hour:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
-                hydro_time = solar_time = time.isoformat(" ")[:-12]+":00:00" # Reformat time to "YYYY-MM-DD HH:00:00"
+                hydro_time = solar_time = mktime(time.timetuple())
                 if time < start:
-                    solar_time = (time + timedelta(days=start.day-solar_time.day)).isoformat(" ")[:-12]+":00:00"
+                    solar_time = mktime((time + timedelta(days=start.day-solar_time.day)).timetuple())
             try:
                 self.run_all(time,hydro_time, solar_time, JD, JDC, offset)
             except HeatSourceError, (stderr):
@@ -143,10 +138,3 @@ def RunHY(sheet):
         print_exc(file=f)
         f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
-
-def quit(arg):
-    global force_quit
-    if arg:
-        force_quit = True
-    else:
-        force_quit = False

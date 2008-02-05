@@ -8,6 +8,8 @@ from ..Dieties import Chronos
 from ..Dieties import IniParams
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
+from ..Utils.InterpolatorDict import Interpolator
+
 _HS = None # Placeholder for heatsource module
 Outfile = open("E:\evans.out","w")
 
@@ -72,8 +74,9 @@ class StreamNode(object):
             setattr(self, attr, x)
         self.T = 0.0
         self.Q_mass = 0
-        for attr in ["ContData", "T_tribs", "Q_tribs"]:
-            setattr(self, attr, {})
+        self.ContData = {}
+        self.T_tribs = Interpolator(dt=IniParams["dt"])
+        self.Q_tribs = Interpolator(dt=IniParams["dt"])
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
         # and other things the C module needs
         for attr in ["F_Conduction","F_Convection","F_Longwave","F_Evaporation"]:

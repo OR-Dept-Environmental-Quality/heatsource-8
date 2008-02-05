@@ -8,11 +8,13 @@ from os.path import exists, join, split, normpath
 from sys import exit
 from win32gui import PumpWaitingMessages
 from bisect import bisect
+from time import mktime
 
 from ..Stream.StreamNode import StreamNode
 from ..Dieties import IniParams
 from ..Dieties import Chronos
 from ExcelDocument import ExcelDocument
+from ..Utils.InterpolatorDict import Interpolator
 #Flag_HS values:
 #    0: Flow Router
 #    1: Heat Source
@@ -25,10 +27,6 @@ class HeatSourceInterface(ExcelDocument):
         self.run_type = run_type
         self.log = log
         self.Reach = {}
-        # Make empty Dictionaries for the boundary conditions
-        self.Q_bc = {}
-        self.T_bc = {}
-        self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
         #######################################################
         # Grab the initialization parameters from the Excel file.
         lst = {"name": "C4",
@@ -96,7 +94,12 @@ class HeatSourceInterface(ExcelDocument):
         timelist = [i for i in dropwhile(lambda x:x=='' or x==None,timelist)]
         timelist.reverse()
         # Make sure that they are only value at the top of the hour
-        self.timelist = [Chronos.MakeDatetime(i).isoformat(" ")[:-12]+":00:00" for i in timelist]
+        self.timelist = [mktime(Chronos.MakeDatetime(i).timetuple()) for i in timelist]
+
+        # Make empty Dictionaries for the boundary conditions
+        self.Q_bc = Interpolator(dt = IniParams["dt"])
+        self.T_bc = Interpolator(dt = IniParams["dt"])
+        self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
 
         # Calculate the number of stream node inputs
         # The former subroutine in VB did this by getting each row's value
@@ -148,6 +151,7 @@ class HeatSourceInterface(ExcelDocument):
             # Set a headwater node
             self.Reach[key].head = head
             self.Reach[key].Initialize()
+            # check for a zero slope. We store all of them before checking so we can print a lengthy error that no-one will ever read.
             if self.Reach[key].S <= 0.0: slope_problems.append(key)
         if len(slope_problems):
             raise Exception ("The following reaches have zero slope. Kilometers: %s" %",".join(['%0.3f'%i for i in slope_problems]))
@@ -204,7 +208,7 @@ class HeatSourceInterface(ExcelDocument):
 
         # Now set the discharge and temperature boundary condition dictionaries.
         for I in xrange(self.Hours):
-            time = C.MakeDatetime(time_col[I]).isoformat(" ")[:-6]
+            time = mktime(C.MakeDatetime(time_col[I]).timetuple())
             # Get the flow boundary condition
             val = flow_col[I]
             if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
@@ -252,6 +256,7 @@ class HeatSourceInterface(ExcelDocument):
                 node.Q_tribs[timelist[hour]] += flow_col[hour], #Append to tuple
                 node.T_tribs[timelist[hour]] += temp_col[hour],
             self.PB("Reading inflow data",site, IniParams["inflowsites"])
+
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""

@@ -481,7 +481,7 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
     T0 += T_mix
 
     Dummy1 = -U * (T1 - T0) / dx
-    Dummy2 = Disp * (T2 - 2 * T1 + T0) / pow(dx,2)
+    Dummy2 = Disp * (T2 - 2 * T1 + T0) / (dx**2)
     S = Dummy1 + Dummy2 + Delta_T / dt
     if S1:
         Temp = T_prev + ((S1_value + S) / 2) * dt
