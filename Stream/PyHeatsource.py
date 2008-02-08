@@ -461,7 +461,8 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
         for i in xrange(len(Q_tup)):
             Qitem = Q_tup[i]
             Titem = T_tup[i]
-            if Qitem is None or Titem is None:
+            # make sure there's a value for discharge. Temp can be blank if discharge is negative (withdrawl)
+            if Qitem is None or (Qitem > 0 and Titem is None):
                 raise HeatSourceError("Problem with null value in tributary discharge or temperature")
             if Qitem > 0:
                 Q_in += Qitem
@@ -521,3 +522,15 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
                 Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr)
 
     return solar, ground, F_Total, Delta_T, Mac
+
+#try:
+#    from psyco import bind
+#    bind(CalcSolarPosition)
+#    bind(GetStreamGeometry)
+#    bind(CalcMuskingum)
+#    bind(CalcFlows)
+#    bind(GetSolarFlux)
+#    bind(GetGroundFluxes)
+#    bind(CalcMacCormick)
+#    bind(CalcHeatFluxes)
+#except ImportError: pass

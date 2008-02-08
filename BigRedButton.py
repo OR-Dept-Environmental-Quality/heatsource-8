@@ -19,6 +19,11 @@ from heatsource import HeatSourceError, CalcMacCormick
 
 from __version__ import version_info
 
+try:
+    from psyco.classes import psyobj
+    object = psyobj
+except ImportError: pass
+
 class HSProfile(object):
     def __init__(self,worksheet,run_type=0):
         self.ErrLog = Logger
@@ -30,6 +35,7 @@ class HSProfile(object):
         elif run_type == 1: self.run_all = self.run_sh
         elif run_type == 2: self.run_all = self.run_hy
         else: raise Exception("Bad run_type: %i" %`run_type`)
+        self.interp = IniParams["interp"]
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams["dt"])
@@ -76,12 +82,17 @@ class HSProfile(object):
             offset = Chronos.TZOffset(time)
             if not (time.minute + time.second): # every hour
                 self.HS.PB("%i of %i timesteps"% (cnt.next()*60,int(timesteps)))
-                print PumpWaitingMessages()
+                PumpWaitingMessages()
                 if not time.hour:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
                 hydro_time = solar_time = mktime(time.timetuple())
+                # If we're not interpolating the values, set the time to the top of the hour
+                # This is done by subtracting the remainder of the time when we divide by
+                # one hour's worth of seconds
+                if self.interp: hydro_time = solar_time = hydro_time-(hydro_time%3600)
                 if time < start:
                     solar_time = mktime((time + timedelta(days=start.day-solar_time.day)).timetuple())
+                    if self.interp: solar_time = solar_time - (solar_time%3600)
             try:
                 self.run_all(time,hydro_time, solar_time, JD, JDC, offset)
             except HeatSourceError, (stderr):

@@ -6,6 +6,11 @@ from time import localtime
 from os.path import join, exists
 from os import makedirs
 
+try:
+    from psyco.classes import psyobj
+    object = psyobj
+except ImportError: pass
+
 class Output(object):
     def __init__(self, dt_out, reach, write_time):
         self.dt_out = dt_out

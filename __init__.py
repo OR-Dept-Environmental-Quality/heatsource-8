@@ -1,1 +1,1 @@
-version = 8.0
+from __version__ import *

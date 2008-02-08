@@ -3,8 +3,6 @@ from time import mktime
 from collections import defaultdict
 from bisect import bisect
 
-
-
 class Interpolator(defaultdict):
     def __init__(self, *args, **kwargs):
         """Linearly interpolated dictionary class
@@ -33,3 +31,8 @@ class Interpolator(defaultdict):
                 except TypeError: val = y0 + ((y1-y0)*(key-x0))/(x1-x0),
             return val
         else: return y0 + ((y1-y0)*(key-x0))/(x1-x0)
+
+try:
+    from psyco import bind
+    bind(Interpolator.__missing__)
+except ImportError: pass

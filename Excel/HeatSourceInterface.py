@@ -1,5 +1,5 @@
 from __future__ import division
-from itertools import imap, dropwhile, izip, chain, repeat
+from itertools import dropwhile, izip, chain, repeat
 from math import ceil, log, degrees, atan
 from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
@@ -40,6 +40,7 @@ class HeatSourceInterface(ExcelDocument):
                "timezone": "C13",
                "daylightsavings": "C14",
                "runmodule": "C16",
+               "interp": "C17",
                "dt": "E4",
                "dx": "E5",
                "longsample": "E6",
@@ -54,7 +55,7 @@ class HeatSourceInterface(ExcelDocument):
                "alluviumtemp": "E16",
                "emergent": "E17",
                "lidar": "E18",
-               "lcdensity": "E19" }
+               "lcdensity": "E19"}
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
         IniParams["penman"] = False
@@ -97,8 +98,12 @@ class HeatSourceInterface(ExcelDocument):
         self.timelist = [mktime(Chronos.MakeDatetime(i).timetuple()) for i in timelist]
 
         # Make empty Dictionaries for the boundary conditions
-        self.Q_bc = Interpolator(dt = IniParams["dt"])
-        self.T_bc = Interpolator(dt = IniParams["dt"])
+        if IniParams["interp"]:
+            self.Q_bc = Interpolator(dt = IniParams["dt"])
+            self.T_bc = Interpolator(dt = IniParams["dt"])
+        else:
+            self.Q_bc = {}
+            self.T_bc = {}
         self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
 
         # Calculate the number of stream node inputs

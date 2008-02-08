@@ -6,7 +6,6 @@ from pywintypes import com_error
 from os.path import exists
 from os import remove
 
-
 borderTop = 3
 borderBottom = 4
 borderLeft = 1

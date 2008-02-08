@@ -2,20 +2,13 @@ from datetime import datetime, timedelta
 from time import strptime
 from ..Utils.TimeZones import TZ
 
-class ChronosDiety(object):
-    """This class provides a clock to be used in the model timestepping.
+try:
+    from psyco.classes import psyobj
+    object = psyobj
+except ImportError: pass
 
-    This is a class that is the God of Time, and thus seen from The Model as
-    the end-all-be-all of time. Like Helios, there is only one Chronos, telling
-    us when we are in time.
-    The basic functionality of this class comes from the __iter__() method,
-    which will iterate over a certain timespan, given a certain timestep,
-    and will return the current timestep value as a datetime object. This
-    allows use of the datetime object in calculations, and for dictionary
-    or object keys, for instance as an index in a AttrList.TimeList object.
-    The class also stores the current time in a TheTime attribute, which can
-    be accessed by anyone
-    """
+class ChronosDiety(object):
+    """This class provides a clock to be used in the model timestepping."""
     def __init__(self):
         # Some timedelta objects with standard time amounts
         self.day = timedelta(days=1)

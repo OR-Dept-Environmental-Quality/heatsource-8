@@ -4,6 +4,8 @@ from math import pi,exp,log10,log,sqrt,sin,cos,tan,atan,radians
 
 from itertools import count
 from warnings import warn
+from time import ctime
+
 from ..Dieties import Chronos
 from ..Dieties import IniParams
 from ..Utils.Logger import Logger
@@ -13,9 +15,15 @@ from ..Utils.InterpolatorDict import Interpolator
 _HS = None # Placeholder for heatsource module
 Outfile = open("E:\evans.out","w")
 
+#try:
+#    from psyco.classes import psyobj
+#    object = psyobj
+#except ImportError: pass
+
 class StreamNode(object):
     """Definition of an individual stream segment"""
-    __slots__ = ["Latitude", "Longitude", "Elevation", # Geographic params
+    def __init__(self, **kwargs):
+        __slots = ["Latitude", "Longitude", "Elevation", # Geographic params
                 "FLIR_Temp", "FLIR_Time", # FLIR data
                 "T_sed", "T_in", "T_tribs", # Temperature attrs
                 "VHeight", "VDensity", "Overhang", #Vegetation params
@@ -66,17 +74,20 @@ class StreamNode(object):
                 "CalcHeat", "CalcDischarge", # Reference to correct heat calculation method
                 "SolarPos" # Solar position variables (headwater node only)
                 ]
-    def __init__(self, **kwargs):
         # Define members in __slots__ to ensure that later member names cannot be added accidentally
         # Set all the attributes to bare lists, or set from the constructor
-        for attr in self.__slots__:
+        for attr in __slots:
             x = kwargs[attr] if attr in kwargs.keys() else None
             setattr(self, attr, x)
         self.T = 0.0
         self.Q_mass = 0
         self.ContData = {}
-        self.T_tribs = Interpolator(dt=IniParams["dt"])
-        self.Q_tribs = Interpolator(dt=IniParams["dt"])
+        if IniParams["interp"]:
+            self.T_tribs = Interpolator(dt=IniParams["dt"])
+            self.Q_tribs = Interpolator(dt=IniParams["dt"])
+        else:
+            self.T_tribs = {}
+            self.Q_tribs = {}
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
         # and other things the C module needs
         for attr in ["F_Conduction","F_Convection","F_Longwave","F_Evaporation"]:
@@ -213,8 +224,8 @@ class StreamNode(object):
         if Q < 0.003: #Channel is going dry
             self.Log.write("The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime))
 
-    def CatchException(self, sterr, time):
-        msg = "At %s and time %s\n"%(self,time.isoformat(" ") )
+    def CatchException(self, stderr, time):
+        msg = "At %s and time %s\n"%(self,ctime(time) )
         if isinstance(stderr,tuple):
             msg += """%s\n\tVariables causing this affliction:
 dt: %4.0f
@@ -222,7 +233,7 @@ dx: %4.0f
 K: %4.4f
 X: %3.4f
 c_k: %3.4f""" % stderr
-        else: msg += stderr
+        else: msg += stderr.message
 
         msg += "\nThe model run has been halted. You may ignore any further error messages."
         msgbox(msg)
@@ -244,7 +255,7 @@ c_k: %3.4f""" % stderr
                             hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
 
         except _HS.HeatSourceError, (stderr):
-            self.CatchException(stderr)
+            self.CatchException(stderr, bc_hour)
 
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
@@ -355,3 +366,4 @@ c_k: %3.4f""" % stderr
         T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp)
 #            T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in))) / (Q_accr + Q_up + Q_in)
         return T_mix - T_up
+
