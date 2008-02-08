@@ -19,6 +19,11 @@ directionDown = -4121
 directionLeft = -4131
 directionRight = -4152
 
+try:
+    from psyco.classes import psyobj
+    object = psyobj
+except InputError: pass
+
 class TextPB(object):
     def __init__(self):
         self.bar = "---->"
