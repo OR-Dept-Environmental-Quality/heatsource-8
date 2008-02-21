@@ -58,7 +58,7 @@ class HSProfile(object):
 #        del self.reachlist, self.run_all, self.Reach, self.HS, #self.Output
     def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcDischarge(time,hydro_time) for x in self.reachlist]
-        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset, self.testfile) for x in self.reachlist]
+        [x.CalcHeat(time.hour, time.minute, time.second,solar_time,JD,JDC,offset) for x in self.reachlist]
         [x.MacCormick2(solar_time) for x in self.reachlist]
     def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
         [x.CalcDischarge(time,hydro_time) for x in self.reachlist]
@@ -69,10 +69,10 @@ class HSProfile(object):
         stop = Chronos.stop
         start = Chronos.start
         flush = start-timedelta(days=IniParams["flushdays"])
-        if (stop-start).seconds:
-            timesteps = (stop-flush).seconds/Chronos.dt.seconds
-        else:
-            timesteps = ((stop-flush).days*86400)/Chronos.dt.seconds
+        # Number of timesteps is based on the division of the timesteps into the hour. In other words
+        # 1 day with a 1 minute dt is 1440 timesteps, while a 3 minute dt is only 480 timesteps. Thus,
+        # We define the timesteps by dividing dt (now in seconds) by 3600
+        timesteps = int(((stop-flush).days*24*(3600/IniParams["dt"])))#/Chronos.dt.seconds
         cnt = count()
         out = 0
         time1 = datetime.today()
@@ -81,7 +81,9 @@ class HSProfile(object):
             JDC = Chronos.JDC
             offset = Chronos.TZOffset(time)
             if not (time.minute + time.second): # every hour
-                self.HS.PB("%i of %i timesteps"% (cnt.next()*60,int(timesteps)))
+                ts = cnt.next() # Number of actual timesteps per tick
+                hr = 60/(IniParams["dt"]/60) # Number of timesteps in one hour
+                self.HS.PB("%i of %i timesteps"% (ts*hr,timesteps))
                 PumpWaitingMessages()
                 if not time.hour:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day

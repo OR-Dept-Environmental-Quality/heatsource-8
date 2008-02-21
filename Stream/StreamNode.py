@@ -239,7 +239,7 @@ c_k: %3.4f""" % stderr
         msgbox(msg)
         raise Exception(msg)
 
-    def CalcHeat_Opt(self, hour, min, sec, bc_hour,JD,JDC,offset, file=None):
+    def CalcHeat_Opt(self, hour, min, sec, bc_hour,JD,JDC,offset):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
         # Reset temperatures
         self.T_prev = self.T
@@ -260,7 +260,7 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-    def CalcHeat_BoundaryNode(self, hour, min, sec, bc_hour,JD,JDC,offset, file):
+    def CalcHeat_BoundaryNode(self, hour, min, sec, bc_hour,JD,JDC,offset):
         # Reset temperatures
         self.T_prev = self.T
         self.T = None

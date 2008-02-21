@@ -58,6 +58,8 @@ class HeatSourceInterface(ExcelDocument):
                "lcdensity": "E19"}
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
+        for key in ["inflowsites","flushdays"]:
+            IniParams[key] = 0.0 if not IniParams[key] else IniParams[key]
         IniParams["penman"] = False
         if IniParams["calcevap"]:
             IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
@@ -74,7 +76,10 @@ class HeatSourceInterface(ExcelDocument):
             IniParams["modelend"] = Chronos.MakeDatetime(IniParams["modelend"])
         # make sure alluvium temp is present and a floating point number.
         IniParams["alluviumtemp"] = 0.0 if not IniParams["alluviumtemp"] else float(IniParams["alluviumtemp"])
-        IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
+        if 60%IniParams["dt"] > 1e-7:
+            raise Exception("I'm sorry, your timestep (%0.2f) must evenly divide into 60 minutes." % IniParams["dt"])
+        else:
+            IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
         # Make sure the output directory ends in a slash (VB chokes if not)
         if IniParams["outputdir"][-1] != "\\":
             raise Exception("Output directory needs to have a trailing backslash")
@@ -158,8 +163,9 @@ class HeatSourceInterface(ExcelDocument):
             self.Reach[key].Initialize()
             # check for a zero slope. We store all of them before checking so we can print a lengthy error that no-one will ever read.
             if self.Reach[key].S <= 0.0: slope_problems.append(key)
-        if len(slope_problems):
-            raise Exception ("The following reaches have zero slope. Kilometers: %s" %",".join(['%0.3f'%i for i in slope_problems]))
+        if self.run_type != 1: # zeros are alright in shade calculations
+            if len(slope_problems):
+                raise Exception ("The following reaches have zero slope. Kilometers: %s" %",".join(['%0.3f'%i for i in slope_problems]))
 
     def close(self):
         del self.T_bc, self.Reach
@@ -216,7 +222,10 @@ class HeatSourceInterface(ExcelDocument):
             time = mktime(C.MakeDatetime(time_col[I]).timetuple())
             # Get the flow boundary condition
             val = flow_col[I]
-            if val == 0 or not val: raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
+            if val == 0 or not val:
+                if self.run_type != 1:
+                    raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
+                else: val = 0
             self.Q_bc[time] = val
             # Temperature boundary condition
             t_val = temp_col[I]
@@ -300,10 +309,14 @@ class HeatSourceInterface(ExcelDocument):
                 if wind_col[i] is None: wind_col[i] = 0.0
             # test humidity and make sure it's greater than 0
             for hum_val in humid_col:
-                if hum_val < 0: raise Exception("Humidity (value of %s in Continuous Data) must be greater than zero" % `hum_val`)
+                if self.run_type != 1: # Alright in shade-a-lator
+                    if hum_val < 0: raise Exception("Humidity (value of %s in Continuous Data) must be greater than zero" % `hum_val`)
+                else: hum_val = 0.0
             # Air temp cannot be blank
             for air_val in air_col:
-                if air_val is None: raise Exception("Must have values for Air Temp in Continuous Data sheet")
+                if self.run_type != 1: # Alright in shade-a-lator
+                    if air_val is None: raise Exception("Must have values for Air Temp in Continuous Data sheet")
+                else: air_val = 0.0
             # Now set the ContData dictionary to a tuple holding the data
             for hour in xrange(self.Hours):
                 node.ContData[timelist[hour]] = cloud_col[hour], wind_col[hour], humid_col[hour], air_col[hour]
@@ -552,7 +565,7 @@ class HeatSourceInterface(ExcelDocument):
                     # Now we calculate the view to sky value
                     # LC_Angle is the vertical angle from the surface to the land-cover top. It's
                     # multiplied by the density as a kludge
-                    LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)  #TODO: do we really want to multiply by Vdens?
+                    LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)
                     if not j or LC_Angle_Max < LC_Angle:
                         LC_Angle_Max = LC_Angle
                     if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
@@ -603,5 +616,10 @@ class HeatSourceInterface(ExcelDocument):
             node.T = self.T_bc[mindate]
             node.T_prev = self.T_bc[mindate]
             node.T_sed = self.T_bc[mindate]
+        if self.run_type ==1: #we're in shadealator
+            for i in ["d_w", "A", "P_w", "W_w", "U", "Disp","Q_hyp","Q_prev","Q"]:
+                if getattr(node, i) is None:
+                    setattr(node, i, 0.01)
+
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
