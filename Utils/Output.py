@@ -30,7 +30,6 @@ class Output(object):
                         "Hyd_DA.txt": [None, "Ave Depth (m)"],
                         "Hyd_DM.txt": [None, "Max Depth (m)"],
                         "Hyd_Flow.txt": [None, "Flow Rate (cms)"],
-                        "Hyd_Froude.txt": [None, "Densiometric Froude"],
                         "Hyd_Hyp.txt": [None, "Hyporheic Exchange (cms)"],
                         "Hyd_Vel.txt": [None, "Flow Velocity (m/s)"],
                         "Hyd_WT.txt": [None, "Top Width (m)"],
@@ -39,7 +38,7 @@ class Output(object):
                         "Temp_H20.txt": [None, "Stream Temperature (*C)"],
                         "Temp_Sed.txt": [None, "Sediment Temperature (*C)"],
                         "VTS.txt": [None, "View to Sky"],
-                        "Hyd_Disp.txt": [None, "Hydraulic Dispersion (units/unit)"]
+                        "Hyd_Disp.txt": [None, "Hydraulic Dispersion (m2/s)"]
                     }
 
         for key in self.files.iterkeys():
@@ -84,7 +83,6 @@ class Output(object):
                     "Hyd_DA.txt": node.A / node.W_w,
                     "Hyd_DM.txt": node.d_w,
                     "Hyd_Flow.txt": node.Q,
-                    "Hyd_Froude.txt": -999,    #TODO: check to see if calculated
                     "Hyd_Hyp.txt": node.Q_hyp,
                     "Hyd_Vel.txt": node.U,
                     "Hyd_WT.txt": node.W_w,
