@@ -5,6 +5,7 @@ from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from os.path import exists, join, split, normpath
+from os import unlink
 from sys import exit
 from win32gui import PumpWaitingMessages
 from bisect import bisect
@@ -15,6 +16,7 @@ from ..Dieties import IniParams
 from ..Dieties import Chronos
 from ExcelDocument import ExcelDocument
 from ..Utils.InterpolatorDict import Interpolator
+from ..Utils.easygui import buttonbox
 #Flag_HS values:
 #    0: Flow Router
 #    1: Heat Source
@@ -172,7 +174,10 @@ class HeatSourceInterface(ExcelDocument):
 
     def CheckEarlyQuit(self):
         """Checks a value to see whether the user wants to stop the model before we completely set everything up"""
-        PumpWaitingMessages()
+        if exists("c:\\quit_heatsource"):
+            unlink("c:\\quit_heatsource")
+            self.QuitMessage()
+
 
     def SetAtmosphericData(self):
         """For each node without continuous data, use closest (up or downstream) node's data"""
@@ -622,3 +627,20 @@ class HeatSourceInterface(ExcelDocument):
                     setattr(node, i, 0.01)
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
+    def QuitMessage(self):
+        mess =(("Do you really want to quit Heat Source", "Quit Heat Source",
+                ["Cancel", "Yes, quit"]),
+               ("Heatsource was developed for real men, not wimps.\nReal men don't quit.\n\nDo you seriously want to quit?", "Environmental Modeling Faux Pas",
+                ["Naw, you're right", "Seriously, quit"]),
+               ("Dude! You realize that I'm going to call you names and fuck with you for the rest of the day if you do this.\n\nI mean seriously, I won't be responsible for the names people will call you in the hallways!\n\nDo you seriously want to go through with this?","Are you really going to be a quitter!?",
+                ["Wow, thanks! Keep going","Man, shut up and quit already!"]),
+               ("Alright, I'm quitting.\nLook, man, don't come bitch to me when people snub you at cocktail parties!\nYou're the one who flip-flopped on this one!\n\n\n(A Harvard man wouldn't have quit.)","Confirmed: You are a wimp.",
+                ["Wimps, press here."]))
+
+        for i in xrange(len(mess)):
+            m = mess[i]
+            b = buttonbox(m[0], m[1], m[2])
+            if b == m[2][-1]:
+                if i < 3: continue
+                else: raise Exception("Model stopped by a wimpy, flip-flopping quitter (Probably a Democrat).")
+            else: return

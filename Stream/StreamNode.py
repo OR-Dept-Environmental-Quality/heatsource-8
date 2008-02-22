@@ -291,7 +291,6 @@ c_k: %3.4f""" % stderr
             self.T_prev = self.T_bc[mktime(Chronos.MakeDatetime(time).timetuple())]
         else:
             Q_bc = self.Q_bc[hour]
-        print time, self.T
 
 
     def MacCormick2(self, hour):
