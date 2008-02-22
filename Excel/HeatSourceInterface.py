@@ -620,6 +620,5 @@ class HeatSourceInterface(ExcelDocument):
             for i in ["d_w", "A", "P_w", "W_w", "U", "Disp","Q_hyp","Q_prev","Q"]:
                 if getattr(node, i) is None:
                     setattr(node, i, 0.01)
-
         node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation

@@ -4,7 +4,7 @@ from math import pi,exp,log10,log,sqrt,sin,cos,tan,atan,radians
 
 from itertools import count
 from warnings import warn
-from time import ctime
+from time import ctime, mktime
 
 from ..Dieties import Chronos
 from ..Dieties import IniParams
@@ -159,7 +159,11 @@ class StreamNode(object):
             print "The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime)
 
     def CalcDischarge_BoundaryNode(self, time, hour):
-        Q_bc = self.Q_bc[hour]
+        # Check if we have interpolation on, and use the appropriate time
+        if IniParams["interp"]:
+            Q_bc = self.Q_bc[mktime(Chronos.MakeDatetime(time).timetuple())]
+        else:
+            Q_bc = self.Q_bc[hour]
         self.Q_mass += Q_bc
         # We fill the discharge arguments with 0 because it is unused in the boundary case
         try:
@@ -239,8 +243,9 @@ c_k: %3.4f""" % stderr
         msgbox(msg)
         raise Exception(msg)
 
-    def CalcHeat_Opt(self, hour, min, sec, bc_hour,JD,JDC,offset):
+    def CalcHeat_Opt(self, time, HMS, bc_hour,JD,JDC,offset):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
+        hour, min, sec = HMS
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
@@ -260,7 +265,8 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-    def CalcHeat_BoundaryNode(self, hour, min, sec, bc_hour,JD,JDC,offset):
+    def CalcHeat_BoundaryNode(self, time, HMS, bc_hour,JD,JDC,offset):
+        hour, min, sec = HMS
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
@@ -279,8 +285,14 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-        self.T = self.T_bc[bc_hour]
-        self.T_prev = self.T_bc[bc_hour]
+        # Check if we have interpolation on, and use the appropriate time
+        if IniParams["interp"]:
+            self.T = self.T_bc[mktime(Chronos.MakeDatetime(time).timetuple())]
+            self.T_prev = self.T_bc[mktime(Chronos.MakeDatetime(time).timetuple())]
+        else:
+            Q_bc = self.Q_bc[hour]
+        print time, self.T
+
 
     def MacCormick2(self, hour):
         #===================================================
