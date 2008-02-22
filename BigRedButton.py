@@ -138,7 +138,7 @@ def QuitMessage():
                 ["Naw, you're right", "Seriously, quit"]),
                ("Dude! You realize that I'm going to call you names and fuck with you for the rest of the day if you do this.\n\nI mean seriously, I won't be responsible for the names people will call you in the hallways!\n\nDo you seriously want to go through with this?","Are you really going to be a quitter!?",
                 ["Wow, thanks! Keep going","Man, shut up and quit already!"]),
-               ("Alright, I'm quitting.\nLook, man, don't come bitch to me when people snub you at cocktail parties!\nYou're the one who flip-flopped on this one!\n\n\n(A Harvard man wouldn't have quit.)","Confirmed: You are a wimp.",
+               ("Alright, I'm quitting.\n\nLook, man, don't come bitch to me when people snub you at cocktail parties!\n\nYou're the one who flip-flopped on this one!\n\n\n(A Harvard man wouldn't have quit.)","Confirmed: You are a wimp.",
                 ["Wimps, press here."]))
 
         for i in xrange(len(mess)):
