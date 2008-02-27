@@ -4,13 +4,13 @@ from math import pi,exp,log10,log,sqrt,sin,cos,tan,atan,radians
 
 from itertools import count
 from warnings import warn
-from time import ctime, mktime
+from time import ctime, mktime, localtime, asctime
 
 from ..Dieties import Chronos
 from ..Dieties import IniParams
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
-from ..Utils.InterpolatorDict import Interpolator
+from ..Utils.Dictionaries import Interpolator
 
 _HS = None # Placeholder for heatsource module
 Outfile = open("E:\evans.out","w")
@@ -82,12 +82,8 @@ class StreamNode(object):
         self.T = 0.0
         self.Q_mass = 0
         self.ContData = {}
-        if IniParams["interp"]:
-            self.T_tribs = Interpolator(dt=IniParams["dt"])
-            self.Q_tribs = Interpolator(dt=IniParams["dt"])
-        else:
-            self.T_tribs = {}
-            self.Q_tribs = {}
+        self.T_tribs = Interpolator(dt=IniParams["dt"])
+        self.Q_tribs = Interpolator(dt=IniParams["dt"])
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
         # and other things the C module needs
         for attr in ["F_Conduction","F_Convection","F_Longwave","F_Evaporation"]:
@@ -139,9 +135,13 @@ class StreamNode(object):
                        IniParams["transsample"],IniParams["emergent"], IniParams["wind_a"], IniParams["wind_b"],
                        IniParams["calcevap"], IniParams["penman"], IniParams["calcalluvium"], IniParams["alluviumtemp"])
 
-    def CalcDischarge_Opt(self,time,hour):
+    def CalcDischarge_Opt(self,time):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
-        inputs = self.Q_in + sum(self.Q_tribs[hour]) - self.Q_out - self.E
+        print self, self.Q_tribs[time]
+        try:
+            inputs = self.Q_in + sum(self.Q_tribs[time]) - self.Q_out - self.E
+        except:
+            pass
         self.Q_mass += inputs
         up = self.prev_km
         try:
@@ -158,12 +158,8 @@ class StreamNode(object):
         if Q < 0.003: #Channel is not going dry
             print "The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime)
 
-    def CalcDischarge_BoundaryNode(self, time, hour):
-        # Check if we have interpolation on, and use the appropriate time
-        if IniParams["interp"]:
-            Q_bc = self.Q_bc[mktime(Chronos.MakeDatetime(time).timetuple())]
-        else:
-            Q_bc = self.Q_bc[hour]
+    def CalcDischarge_BoundaryNode(self, time):
+        Q_bc = self.Q_bc[time]
         self.Q_mass += Q_bc
         # We fill the discharge arguments with 0 because it is unused in the boundary case
         try:
@@ -181,7 +177,7 @@ class StreamNode(object):
         if Q < 0.003: #Channel is going dry
             print "The channel is going dry at %s, model time: %s." % (self, Chronos.TheTime)
 
-    def CalculateDischarge(self, time, hour):
+    def CalculateDischarge(self, time):
         """Return the discharge for the current timestep
 
         This method uses the GetKnownDischarges() and GetMuskigum() methods (in C module) to
@@ -196,7 +192,7 @@ class StreamNode(object):
         Python datetime object and can (should) be None if we are not at a spatial boundary. dt is
         the timestep in minutes, which cannot be None.
         """
-        inputs = self.Q_in + sum(self.Q_tribs[hour]) - self.Q_out - self.E
+        inputs = self.Q_in + sum(self.Q_tribs[time]) - self.Q_out - self.E
         # Check if we are a spatial or temporal boundary node
         if self.prev_km: # There's an upstream channel, but no previous timestep.
             # In this case, we sum the incoming flow which is upstream's current timestep plus inputs.
@@ -210,7 +206,7 @@ class StreamNode(object):
             self.CalcDischarge = self.CalcDischarge_Opt
         else: # We're a spatial boundary, use the boundary condition
             # At spatial boundaries, we return the boundary conditions from Q_bc
-            Q_bc = self.Q_bc[hour]
+            Q_bc = self.Q_bc[time]
             self.Q_mass += Q_bc
             # We pad the arguments with 0 because some are unused (or currently None) in the boundary case
             try:
@@ -243,7 +239,7 @@ c_k: %3.4f""" % stderr
         msgbox(msg)
         raise Exception(msg)
 
-    def CalcHeat_Opt(self, time, HMS, bc_hour,JD,JDC,offset):
+    def CalcHeat_Opt(self, time, HMS,JD,JDC,offset):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
         hour, min, sec = HMS
         # Reset temperatures
@@ -254,8 +250,8 @@ c_k: %3.4f""" % stderr
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                  self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, (self.T, self.S1) = \
-                _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_prev, self.T_sed,
+                _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+                            self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
                             hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
 
@@ -265,8 +261,9 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-    def CalcHeat_BoundaryNode(self, time, HMS, bc_hour,JD,JDC,offset):
+    def CalcHeat_BoundaryNode(self, time, HMS,JD,JDC,offset):
         hour, min, sec = HMS
+        print asctime(localtime(time))
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
@@ -276,8 +273,8 @@ c_k: %3.4f""" % stderr
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
                  self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
-                _HS.CalcHeatFluxes(self.ContData[bc_hour], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
-                            self.Q_tribs[bc_hour], self.T_tribs[bc_hour], self.T_prev, self.T_sed,
+                _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
+                            self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp, self.next_km.T_prev, self.ShaderList[dir], self.Disp,
                             hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0)
         except _HS.HeatSourceError, (stderr):
@@ -286,21 +283,18 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[4] += self.F_Solar[4]
 
         # Check if we have interpolation on, and use the appropriate time
-        if IniParams["interp"]:
-            self.T = self.T_bc[mktime(Chronos.MakeDatetime(time).timetuple())]
-            self.T_prev = self.T_bc[mktime(Chronos.MakeDatetime(time).timetuple())]
-        else:
-            Q_bc = self.Q_bc[hour]
+        self.T = self.T_bc[time]
+        self.T_prev = self.T_bc[time]
 
 
-    def MacCormick2(self, hour):
+    def MacCormick2(self, time):
         #===================================================
         #Set control temps
         if not self.prev_km:
             return
         #===================================================
         self.T, S = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
-                                    self.Q_tribs[hour], self.T_tribs[hour], self.prev_km.Q, self.Delta_T, self.Disp,
+                                    self.Q_tribs[time], self.T_tribs[time], self.prev_km.Q, self.Delta_T, self.Disp,
                                     True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
 
     def CalcDispersion(self):
@@ -315,7 +309,7 @@ c_k: %3.4f""" % stderr
             Disp = (0.45 * (dx ** 2)) / dt
         return Disp
 
-    def MacCormick_THW(self, bc_hour):
+    def MacCormick_THW(self, time):
         mix = self.MixItUp(bc_hour,self.prev_km.Q_prev, self.prev_km.T_prev) if self.Q else 0
         T0 = self.prev_km.T_prev + mix
         T1 = self.T_prev
@@ -327,19 +321,19 @@ c_k: %3.4f""" % stderr
         T = T1 + S1 * self.dt
         return T, S1
 
-    def MacCormick_BoundaryNode(self,args):
+    def MacCormick_BoundaryNode(self, time):
         if not args[12]: # We're running the first time if we have no S value.
-            self.T = self.T_bc[hour]
-            self.T_prev = self.T_bc[hour]
+            self.T = self.T_bc[time]
+            self.T_prev = self.T_bc[time]
         else:
             pass
 
-    def MacCormick2_THW(self,hour):
+    def MacCormick2_THW(self, time):
         SkipNode = False
         if self.prev_km:
             print self.prev_km.T
             if not SkipNode:
-                mix = self.MixItUp(hour, self.prev_km.Q, self.prev_km.T) if self.Q else 0
+                mix = self.MixItUp(time, self.prev_km.Q, self.prev_km.T) if self.Q else 0
                 T0 = self.prev_km.T + mix
                 T1 = self.T
                 T2 = self.next_km.T if self.next_km else self.T
@@ -357,12 +351,12 @@ c_k: %3.4f""" % stderr
             raise Exception("Unstable model")
         return T
 
-    def MixItUp(self, bc_hour, Q_up, T_up):
+    def MixItUp(self, time, Q_up, T_up):
         Q_in = 0
         T_in = 0
-        for i in xrange(len(self.Q_tribs[bc_hour])):
-            Q_in += self.Q_tribs[bc_hour][i] if self.Q_tribs[bc_hour][i] > 0 else 0
-            T_in += self.T_tribs[bc_hour][i] if self.Q_tribs[bc_hour][i] > 0 else 0
+        for i in xrange(len(self.Q_tribs[time])):
+            Q_in += self.Q_tribs[time][i] if self.Q_tribs[time][i] > 0 else 0
+            T_in += self.T_tribs[time][i] if self.Q_tribs[time][i] > 0 else 0
 
         # Hyporheic flows if available
         Q_hyp = self.Q_hyp or 0

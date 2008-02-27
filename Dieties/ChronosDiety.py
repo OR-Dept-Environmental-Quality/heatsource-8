@@ -40,7 +40,6 @@ class ChronosDiety(object):
         self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
         self.__jd = None # Placeholder for current julian day
         self.TheTime = self.__spin_current #TheTime should always return the current clock time, even in spin-up
-
     def Tick(self):
         """Tick() -> datetime
 

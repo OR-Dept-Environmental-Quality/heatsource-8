@@ -1,5 +1,5 @@
 from __future__ import division
-from itertools import dropwhile, izip, chain, repeat
+from itertools import ifilter, izip, chain, repeat
 from math import ceil, log, degrees, atan
 from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
@@ -9,13 +9,13 @@ from os import unlink
 from sys import exit
 from win32gui import PumpWaitingMessages
 from bisect import bisect
-from time import mktime
+from time import mktime, localtime, asctime
 
 from ..Stream.StreamNode import StreamNode
 from ..Dieties import IniParams
 from ..Dieties import Chronos
 from ExcelDocument import ExcelDocument
-from ..Utils.InterpolatorDict import Interpolator
+from ..Utils.Dictionaries import Interpolator, Windowed
 from ..Utils.easygui import buttonbox
 #Flag_HS values:
 #    0: Flow Router
@@ -42,7 +42,6 @@ class HeatSourceInterface(ExcelDocument):
                "timezone": "C13",
                "daylightsavings": "C14",
                "runmodule": "C16",
-               "interp": "C17",
                "dt": "E4",
                "dx": "E5",
                "longsample": "E6",
@@ -76,6 +75,8 @@ class HeatSourceInterface(ExcelDocument):
             IniParams["modelend"] = IniParams["end"]
         else:
             IniParams["modelend"] = Chronos.MakeDatetime(IniParams["modelend"])
+        for attr in ["wind_a","wind_b"]:
+            if IniParams[attr] is None: IniParams[attr] = 0.0
         # make sure alluvium temp is present and a floating point number.
         IniParams["alluviumtemp"] = 0.0 if not IniParams["alluviumtemp"] else float(IniParams["alluviumtemp"])
         if 60%IniParams["dt"] > 1e-7:
@@ -93,24 +94,9 @@ class HeatSourceInterface(ExcelDocument):
         IniParams["simperiod"] = (IniParams["modelend"]-IniParams["modelstart"]).days + 1
         self.Hours = (((IniParams["end"]-IniParams["date"]).days + 1) * 24)
 
-        # Get a single list of all of the boundary condition times by pulling a whole column from the sheet
-        # and stripping off the blank values. This will store ALL times, not only those that we're running.
-        # In other words, if we have data for 6 days, but are only running one day, this will get all six days
-        # worth of boundary condition times. It's alright for now, not too much data storage or iteration
-        timelist = [i for i in self.GetColumn(5,"Continuous Data")[4:]]
-        timelist.reverse()
-        timelist = [i for i in dropwhile(lambda x:x=='' or x==None,timelist)]
-        timelist.reverse()
-        # Make sure that they are only value at the top of the hour
-        self.timelist = [mktime(Chronos.MakeDatetime(i).timetuple()) for i in timelist]
-
         # Make empty Dictionaries for the boundary conditions
-        if IniParams["interp"]:
-            self.Q_bc = Interpolator(dt = IniParams["dt"])
-            self.T_bc = Interpolator(dt = IniParams["dt"])
-        else:
-            self.Q_bc = {}
-            self.T_bc = {}
+        self.Q_bc = Interpolator(dt = IniParams["dt"])
+        self.T_bc = Interpolator(dt = IniParams["dt"])
         self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
 
         # Calculate the number of stream node inputs
@@ -131,6 +117,7 @@ class HeatSourceInterface(ExcelDocument):
         self.multiple = int(self.dx/self.long) #We have this many samples per distance step
         #####################
 
+        self.GetFlowPage()
         # Now we start through the steps of building a stream reach full of nodes
         self.GetBoundaryConditions()
         self.BuildNodes()
@@ -178,7 +165,6 @@ class HeatSourceInterface(ExcelDocument):
             unlink("c:\\quit_heatsource")
             self.QuitMessage()
 
-
     def SetAtmosphericData(self):
         """For each node without continuous data, use closest (up or downstream) node's data"""
         self.CheckEarlyQuit()
@@ -223,20 +209,64 @@ class HeatSourceInterface(ExcelDocument):
         temp_col = [x[2] for x in data]
 
         # Now set the discharge and temperature boundary condition dictionaries.
-        for I in xrange(self.Hours):
-            time = mktime(C.MakeDatetime(time_col[I]).timetuple())
+        for i in xrange(self.Hours):
+            time = mktime(C.MakeDatetime(time_col[i]).timetuple())
             # Get the flow boundary condition
-            val = flow_col[I]
+            val = flow_col[i]
             if val == 0 or not val:
                 if self.run_type != 1:
-                    raise Exception("Missing flow boundary condition for day %i " % int(I / 24))
+                    raise Exception("Missing flow boundary condition for day %i " % int(i / 24))
                 else: val = 0
             self.Q_bc[time] = val
             # Temperature boundary condition
-            t_val = temp_col[I]
+            t_val = temp_col[i] if temp_col[i] is not None else 0.0
             #if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
             self.T_bc[time] = t_val
-            self.PB("Reading boundary conditions",I,self.Hours)
+            self.PB("Reading boundary conditions",i,self.Hours)
+
+    def GetTimelist(self, sheet):
+        """Return list of floating point time values corresponding to the data available in the sheet"""
+                # Sheetname: (column, starting row)
+        nums = {'Continuous Data': (5, 4),
+                'Flow Data': (11, 3)}
+        col, row = nums[sheet]
+        timelist = [i for i in ifilter(None,self.GetColumn(col,sheet)[row:])]
+        # Make sure that they are only value at the top of the hour
+        return tuple([mktime(Chronos.MakeDatetime(i).timetuple()) for i in timelist])
+
+    def GetModelDates(self):
+        "Return the start and ending dates of the model run, as floating point values"
+        start = mktime(IniParams["modelstart"].timetuple())
+        # We end at the last second of a day, so we replace the hours, minutes and seconds
+        t = [i for i in IniParams["modelend"].timetuple()]
+        t[3:6] = [23,59,59]
+        end = mktime(t)
+        return start, end
+
+    def GetFlowPage(self):
+        sheetname = "Flow Data"
+        tm = lambda flt: asctime(localtime(flt))
+        # Get a list of the timestamps that we have data for, and use that to grab the data block
+        timelist = self.GetTimelist(sheetname)
+        print [tm(i) for i in timelist]
+        Rstart, Cstart = 4,12
+        Rend = Rstart + len(timelist) - 1
+        Cend = int(IniParams["inflowsites"]*2) + Cstart - 1
+        rng = ((Rstart, Cstart),(Rend, Cend))
+        # the data block is a list of lists, each corresponding to a timestamp.
+        data = self.GetValue(rng, sheetname)
+        #Make a windowed dictionary and subset it.
+        d = Windowed()
+        for i in xrange(len(timelist)):
+            d[timelist[i]] = data[i]
+        start, end = self.GetModelDates()
+        # Subset the dictionary and include the value immediately after the ending time
+        datadict = d.View(start, end, aft=1)
+
+        print tm(start), tm(end)
+        print tm(min(timelist))
+        print tm(min(datadict.keys())), tm(max(datadict.keys()))
+        raise Exception
 
     def GetInflowData(self):
         """Get accumulation data from the "Flow Data" page"""
@@ -245,7 +275,7 @@ class HeatSourceInterface(ExcelDocument):
         # Local variables for reach and timelist
         l = self.Reach.keys()
         l.sort()
-        timelist = self.timelist
+        timelist = self.GetTimelist("Flow Data")
         # Get the data block from the worksheet
         Rstart,Cstart = 4,12
         Rend = Rstart+self.Hours-1
@@ -313,15 +343,17 @@ class HeatSourceInterface(ExcelDocument):
             for i in xrange(len(wind_col)):
                 if wind_col[i] is None: wind_col[i] = 0.0
             # test humidity and make sure it's greater than 0
-            for hum_val in humid_col:
-                if self.run_type != 1: # Alright in shade-a-lator
-                    if hum_val < 0: raise Exception("Humidity (value of %s in Continuous Data) must be greater than zero" % `hum_val`)
-                else: hum_val = 0.0
+            for i in xrange(len(humid_col)):
+                if humid_col[i] < 0 or humid_col[i] is None:
+                    if self.run_type == 1: # Alright in shade-a-lator
+                        humid_col[i] = 0.0
+                    else: raise Exception("Humidity (value of %s in Continuous Data) must be greater than zero" % `hum_val`)
             # Air temp cannot be blank
-            for air_val in air_col:
-                if self.run_type != 1: # Alright in shade-a-lator
-                    if air_val is None: raise Exception("Must have values for Air Temp in Continuous Data sheet")
-                else: air_val = 0.0
+            for i in xrange(len(air_col)):
+                if air_col[i] is None:
+                    if self.run_type == 1: # Alright in shade-a-lator
+                        air_col[i] = 0.0
+                    else: raise Exception("Must have values for Air Temp in Continuous Data sheet")
             # Now set the ContData dictionary to a tuple holding the data
             for hour in xrange(self.Hours):
                 node.ContData[timelist[hour]] = cloud_col[hour], wind_col[hour], humid_col[hour], air_col[hour]
@@ -352,11 +384,8 @@ class HeatSourceInterface(ExcelDocument):
         """Take a list of iterables and remove all values of None or empty strings"""
         # Remove None values at the end of each individual list
         for i in xrange(len(lst)):
-            l = [x for x in lst[i]]
-            l.reverse()
-            l = [x for x in dropwhile(lambda x:x==None, l)]
-            l.reverse()
-            lst[i] = l
+            # strip out values of None from the tuple, returning a new tuple
+            lst[i] = [x for x in ifilter(lambda x: x!=None, lst[i])]
         # Remove blank strings from within the list
         for l in lst:
             n = []
@@ -601,11 +630,11 @@ class HeatSourceInterface(ExcelDocument):
 
     def InitializeNode(self, node):
         """Perform some initialization of the StreamNode, and write some values to spreadsheet"""
-        timelist = self.timelist
+        timelist = self.GetTimelist("Flow Data")
         # Initialize each nodes tribs dictionary to a tuple
-        for hour in xrange(self.Hours):
-            node.Q_tribs[timelist[hour]] = ()
-            node.T_tribs[timelist[hour]] = ()
+        for time in timelist:
+            node.Q_tribs[time] = ()
+            node.T_tribs[time] = ()
         ##############################################################
         #Now that we have a stream node, we set the node's dx value, because
         # we have most nodes that are long-sample-distance times multiple,
@@ -617,15 +646,17 @@ class HeatSourceInterface(ExcelDocument):
             node.T, node.T_prev, node.T_sed = 0.0, 0.0, 0.0
         else:
             if self.T_bc[mindate] is None:
-                raise Exception("Boundary temperature conditions cannot be blank")
+                # Shade-a-lator doesn't need a boundary condition
+                if self.run_type == 1: self.T_bc[mindate] = 0.0
+                else:  raise Exception("Boundary temperature conditions cannot be blank")
             node.T = self.T_bc[mindate]
             node.T_prev = self.T_bc[mindate]
             node.T_sed = self.T_bc[mindate]
         if self.run_type ==1: #we're in shadealator
-            for i in ["d_w", "A", "P_w", "W_w", "U", "Disp","Q_hyp","Q_prev","Q"]:
+            for i in ["d_w", "A", "P_w", "W_w", "U", "Disp","Q_prev","Q"]:
                 if getattr(node, i) is None:
                     setattr(node, i, 0.01)
-        node.Q_hyp = 0 # Assume zero hyporheic flow unless otherwise calculated
+        node.Q_hyp = 0.0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
     def QuitMessage(self):
         mess =(("Do you really want to quit Heat Source", "Quit Heat Source",

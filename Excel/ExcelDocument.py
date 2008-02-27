@@ -1,7 +1,6 @@
 from __future__ import division
 from win32com.client import constants, Dispatch, gencache
 from pythoncom import CoInitialize,CoUninitialize
-from itertools import dropwhile
 from pywintypes import com_error
 from os.path import exists
 from os import remove

@@ -36,7 +36,6 @@ class HSProfile(object):
         elif run_type == 1: self.run_all = self.run_sh
         elif run_type == 2: self.run_all = self.run_hy
         else: raise Exception("Bad run_type: %i" %`run_type`)
-        self.interp = IniParams["interp"]
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams["dt"])
@@ -57,16 +56,8 @@ class HSProfile(object):
         print "Deleting HSProfile"
 #        self.HS.close()
 #        del self.reachlist, self.run_all, self.Reach, self.HS, #self.Output
-    def run_hs(self,time,hydro_time, solar_time, JD, JDC, offset):
-        HMS = time.hour, time.minute, time.second
-        [x.CalcDischarge(time,hydro_time) for x in self.reachlist]
-        [x.CalcHeat(time, HMS, solar_time,JD,JDC,offset) for x in self.reachlist]
-        [x.MacCormick2(solar_time) for x in self.reachlist]
-    def run_hy(self,time,hydro_time, solar_time, JD, JDC, offset):
-        [x.CalcDischarge(time,hydro_time) for x in self.reachlist]
-    def run_sh(self,time,hydro_time, solar_time, JD, JDC, offset):
-        HMS = time.hour, time.minute, time.second
-        [x.CalcHeat(time, HMS, solar_time,JD,JDC,offset) for x in self.reachlist]
+
+    ###############################################################
     def run(self): # Argument allows profiling and testing
         time = Chronos.TheTime
         stop = Chronos.stop
@@ -87,17 +78,11 @@ class HSProfile(object):
                 ts = cnt.next() # Number of actual timesteps per tick
                 hr = 60/(IniParams["dt"]/60) # Number of timesteps in one hour
                 self.HS.PB("%i of %i timesteps"% (ts*hr,timesteps))
+                # Update the Excel status bar
                 PumpWaitingMessages()
+                # Reset the flux daily sum for a new day
                 if not time.hour:
-                    for nd in self.reachlist: nd.F_DailySum = [0]*5 # Reset values for new day
-                hydro_time = solar_time = mktime(time.timetuple())
-                # If we're not interpolating the values, set the time to the top of the hour
-                # This is done by subtracting the remainder of the time when we divide by
-                # one hour's worth of seconds
-                if self.interp: hydro_time = solar_time = hydro_time-(hydro_time%3600)
-                if time < start:
-                    solar_time = mktime((time + timedelta(days=start.day-solar_time.day)).timetuple())
-                    if self.interp: solar_time = solar_time - (solar_time%3600)
+                    for nd in self.reachlist: nd.F_DailySum = [0]*5
                 # Check to see if the user pressed the stop button. Pretty crappy kludge here- VB code writing an
                 # empty file- but I basically got to lazy to figure out how to interact with the underlying
                 # COM API without using a threading interface.
@@ -105,7 +90,7 @@ class HSProfile(object):
                     unlink("c:\\quit_heatsource")
                     QuitMessage()
             try:
-                self.run_all(time,hydro_time, solar_time, JD, JDC, offset)
+                self.run_all(time, JD, JDC, offset)
             except HeatSourceError, (stderr):
                 msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
                 try:
@@ -130,6 +115,24 @@ class HSProfile(object):
         self.HS.PB(message)
         self.testfile.close()
         print message
+    #############################################################
+    ## three different versions of the run() routine, depending on the run_type
+    def run_hs(self,time,JD, JDC, offset):
+        HMS = time.hour, time.minute, time.second
+        time = mktime(time.timetuple())
+        [x.CalcDischarge(time) for x in self.reachlist]
+        [x.CalcHeat(time, HMS,JD,JDC,offset) for x in self.reachlist]
+        [x.MacCormick2(time) for x in self.reachlist]
+
+    def run_hy(self,time,JD, JDC, offset):
+        time = mktime(time.timetuple())
+        [x.CalcDischarge(time) for x in self.reachlist]
+
+    def run_sh(self,time, JD, JDC, offset):
+        HMS = time.hour, time.minute, time.second
+        time = mktime(time.timetuple())
+        [x.CalcHeat(time, HMS,JD,JDC,offset) for x in self.reachlist]
+
 
 def QuitMessage():
         mess =(("Do you really want to quit Heat Source", "Quit Heat Source",
