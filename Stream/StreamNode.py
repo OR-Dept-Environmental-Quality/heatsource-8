@@ -6,19 +6,21 @@ from itertools import count
 from warnings import warn
 from time import ctime, mktime, localtime, asctime
 
-from ..Dieties import Chronos
-from ..Dieties import IniParams
-from ..Utils.Logger import Logger
-from ..Utils.easygui import indexbox, msgbox
-from ..Utils.Dictionaries import Interpolator
+from Dieties import Chronos
+from Dieties import IniParams
+from Utils.Logger import Logger
+from Utils.easygui import indexbox, msgbox
+from Utils.Dictionaries import Interpolator
 
 _HS = None # Placeholder for heatsource module
 Outfile = open("E:\evans.out","w")
 
-#try:
-#    from psyco.classes import psyobj
-#    object = psyobj
-#except ImportError: pass
+try:
+    from __debug__ import psyco_optimize
+    if psyco_optimize:
+        from psyco.classes import psyobj
+        object = psyobj
+except ImportError: pass
 
 class StreamNode(object):
     """Definition of an individual stream segment"""
@@ -79,9 +81,11 @@ class StreamNode(object):
         for attr in __slots:
             x = kwargs[attr] if attr in kwargs.keys() else None
             setattr(self, attr, x)
+        self.__slots = __slots
+        self.__slots.sort()
         self.T = 0.0
         self.Q_mass = 0
-        self.ContData = {}
+        self.ContData = Interpolator(dt=IniParams["dt"])
         self.T_tribs = Interpolator(dt=IniParams["dt"])
         self.Q_tribs = Interpolator(dt=IniParams["dt"])
         # Create an internal dictionary that we can pass to the C module, this contains self.slots attributes
@@ -93,6 +97,12 @@ class StreamNode(object):
         self.Log = Logger
         self.ShaderList = ()
 
+    def GetNodeData(self):
+        data = {}
+        for attr in self.__slots:
+            data[attr] = getattr(self,attr)
+        return data
+    
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
         return self.km == cmp
@@ -127,7 +137,7 @@ class StreamNode(object):
             _HS = PyHeatsource
         else:
             import heatsource
-            _HS = heatsource.heatsource
+            _HS = heatsource
 
         self.CalcDischarge = self.CalculateDischarge
         self.C_args = (self.W_b, self.Elevation, self.TopoFactor, self.ViewToSky, self.phi, self.VDensity, self.VHeight,
@@ -137,11 +147,7 @@ class StreamNode(object):
 
     def CalcDischarge_Opt(self,time):
         """A Version of CalculateDischarge() that does not require checking for boundary conditions"""
-        print self, self.Q_tribs[time]
-        try:
-            inputs = self.Q_in + sum(self.Q_tribs[time]) - self.Q_out - self.E
-        except:
-            pass
+        inputs = self.Q_in + sum(self.Q_tribs[time]) - self.Q_out - self.E
         self.Q_mass += inputs
         up = self.prev_km
         try:
@@ -149,7 +155,7 @@ class StreamNode(object):
                 _HS.CalcFlows(self.U, self.W_w, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont,
                                  self.Q, up.Q, up.Q_prev, inputs, -1)
         except _HS.HeatSourceError, (stderr):
-            self.CatchException(stderr)
+            self.CatchException(stderr, time)
 
         self.Q_prev = self.Q
         self.Q = Q
@@ -167,7 +173,7 @@ class StreamNode(object):
                     _HS.CalcFlows(self.U, self.W_w, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont,
                                   0.0, 0.0, 0.0, 0.0, Q_bc)
         except _HS.HeatSourceError, (stderr):
-            self.CatchException(stderr)
+            self.CatchException(stderr, time)
 
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
@@ -201,7 +207,7 @@ class StreamNode(object):
                 Q, (self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp) = \
                         _HS.CalcFlows(0.0, 0.0, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont, 0.0, 0.0, 0.0, inputs, Q)
             except _HS.HeatSourceError, (stderr):
-                self.CatchException(stderr)
+                self.CatchException(stderr, time)
             # If we hit this once, we remap so we can avoid the if statements in the future.
             self.CalcDischarge = self.CalcDischarge_Opt
         else: # We're a spatial boundary, use the boundary condition
@@ -213,7 +219,7 @@ class StreamNode(object):
                 Q, (self.d_w, self.A, self.P_w, self.R_h, self.W_w, self.U, self.Disp) = \
                         _HS.CalcFlows(0.0, 0.0, self.W_b, self.S, self.dx, self.dt, self.z, self.n, self.d_cont, 0.0, 0.0, 0.0, inputs, Q_bc)
             except _HS.HeatSourceError, (stderr):
-                self.CatchException(stderr)
+                self.CatchException(stderr, time)
             self.CalcDischarge = self.CalcDischarge_BoundaryNode
 
         # Now we've got a value for Q(t,x), so the current Q becomes Q_prev.
@@ -233,6 +239,8 @@ dx: %4.0f
 K: %4.4f
 X: %3.4f
 c_k: %3.4f""" % stderr
+        elif isinstance(stderr, str):
+            msg += stderr
         else: msg += stderr.message
 
         msg += "\nThe model run has been halted. You may ignore any further error messages."
@@ -256,7 +264,7 @@ c_k: %3.4f""" % stderr
                             hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
 
         except _HS.HeatSourceError, (stderr):
-            self.CatchException(stderr, bc_hour)
+            self.CatchException(stderr, time)
 
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
@@ -277,7 +285,7 @@ c_k: %3.4f""" % stderr
                             self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp, self.next_km.T_prev, self.ShaderList[dir], self.Disp,
                             hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0)
-        except _HS.HeatSourceError, (stderr):
+        except _HS.HeatSourceError, (stderr, time):
             self.CatchException(stderr)
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]

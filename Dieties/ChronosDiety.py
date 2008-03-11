@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 from time import strptime
-from ..Utils.TimeZones import TZ
-
+from Utils.TimeZones import TZ
 try:
-    from psyco.classes import psyobj
-    object = psyobj
+    from __debug__ import psyco_optimize
+    if psyco_optimize:
+        from psyco.classes import psyobj
+        object = psyobj
 except ImportError: pass
 
 class ChronosDiety(object):

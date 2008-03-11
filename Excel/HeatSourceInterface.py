@@ -9,14 +9,14 @@ from os import unlink
 from sys import exit
 from win32gui import PumpWaitingMessages
 from bisect import bisect
-from time import mktime, localtime, asctime
+from time import mktime, localtime, asctime, strptime
 
-from ..Stream.StreamNode import StreamNode
-from ..Dieties import IniParams
-from ..Dieties import Chronos
+from Stream.StreamNode import StreamNode
+from Dieties import IniParams
+from Dieties import Chronos
 from ExcelDocument import ExcelDocument
-from ..Utils.Dictionaries import Interpolator, Windowed
-from ..Utils.easygui import buttonbox
+from Utils.Dictionaries import Interpolator
+from Utils.easygui import buttonbox
 #Flag_HS values:
 #    0: Flow Router
 #    1: Heat Source
@@ -60,21 +60,23 @@ class HeatSourceInterface(ExcelDocument):
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
         for key in ["inflowsites","flushdays"]:
-            IniParams[key] = 0.0 if not IniParams[key] else IniParams[key]
+            IniParams[key] = 0 if not IniParams[key] else IniParams[key]
+        for key in ["inflowsites","flushdays","contsites"]:
+            IniParams[key] = int(IniParams[key])
         IniParams["penman"] = False
         if IniParams["calcevap"]:
             IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
         # Make the dates into datetime instances of the start/stop dates
-        IniParams["date"] = Chronos.MakeDatetime(IniParams["date"])
-        IniParams["end"] = Chronos.MakeDatetime(IniParams["end"])
+        IniParams["date"] = mktime(strptime(IniParams["date"].Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
+        IniParams["end"] = mktime(strptime(IniParams["end"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
         if IniParams["modelstart"] is None:
             IniParams["modelstart"] = IniParams["date"]
         else:
-            IniParams["modelstart"] = Chronos.MakeDatetime(IniParams["modelstart"])
+            IniParams["modelstart"] = mktime(strptime(IniParams["modelstart"].Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
         if IniParams["modelend"] is None:
             IniParams["modelend"] = IniParams["end"]
         else:
-            IniParams["modelend"] = Chronos.MakeDatetime(IniParams["modelend"])
+            IniParams["modelend"] = mktime(strptime(IniParams["modelend"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
         for attr in ["wind_a","wind_b"]:
             if IniParams[attr] is None: IniParams[attr] = 0.0
         # make sure alluvium temp is present and a floating point number.
@@ -89,22 +91,11 @@ class HeatSourceInterface(ExcelDocument):
         # Set up the log file in the outputdir
         self.log.SetFile(normpath(join(IniParams["outputdir"],"outfile.log")))
         # Are we running the math in C or Python?
-        ######################################################
-        # Calculate the length of the simulation period in days and the number of hours
-        IniParams["simperiod"] = (IniParams["modelend"]-IniParams["modelstart"]).days + 1
-        self.Hours = (((IniParams["end"]-IniParams["date"]).days + 1) * 24)
 
         # Make empty Dictionaries for the boundary conditions
-        self.Q_bc = Interpolator(dt = IniParams["dt"])
-        self.T_bc = Interpolator(dt = IniParams["dt"])
+        self.Q_bc = Interpolator()
+        self.T_bc = Interpolator()
         self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
-
-        # Calculate the number of stream node inputs
-        # The former subroutine in VB did this by getting each row's value
-        # and incrementing a counter if the value was not blank. With the
-        # new DataSheet's __getitem__ functionality, we can merely access
-        # the sheet once, and return the length of that tuple
-        self.Num_Q_Var = self.LastRow("TTools Data") - 5
 
         # Some convenience variables
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
@@ -113,17 +104,15 @@ class HeatSourceInterface(ExcelDocument):
             raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
         self.long = IniParams["longsample"]
         self.dx = IniParams["dx"]
-        self.length = IniParams["length"]
         self.multiple = int(self.dx/self.long) #We have this many samples per distance step
         #####################
 
-        self.GetFlowPage()
         # Now we start through the steps of building a stream reach full of nodes
         self.GetBoundaryConditions()
         self.BuildNodes()
         if IniParams["lidar"]: self.BuildZonesLidar()
         else: self.BuildZonesNormal()
-        self.GetInflowData()
+        self.GetTributaryData()
         self.GetContinuousData()
         self.SetAtmosphericData()
         self.PB("Initializing StreamNodes")
@@ -197,32 +186,35 @@ class HeatSourceInterface(ExcelDocument):
         # Get the columns, which is faster than accessing cells
         self.PB("Reading boundary conditions")
         C = Chronos
-        # Starting and ending rows and columns for this worksheet
-        Rstart,Cstart = 5,5
-        Rend = Rstart+self.Hours-1
-        Cend = 8
-        rng = ((Rstart,Cstart),(Rend,Cend))
-        # Grab the data block and strip out time, flow and temp columns.
-        data = self.GetValue(rng,"Continuous Data")
-        time_col = [x[0] for x in data]
-        flow_col = [x[1] for x in data]
-        temp_col = [x[2] for x in data]
-
+        sheetname = "Continuous Data"
+        timelist = self.GetTimelist(sheetname)
+        Rstart, Cstart = 5,5
+        Rend = Rstart + len(timelist) - 1
+        Cend = 7
+        rng = ((Rstart, Cstart),(Rend, Cend))
+        # the data block is a tuple of tuples, each corresponding to a timestamp.
+        data = self.GetValue(rng, sheetname)
+        # Check out GetTributaryData() for details on this reformatting of the data
+        # for the progress bar
+        length = len(data)
+        c = count()
         # Now set the discharge and temperature boundary condition dictionaries.
-        for i in xrange(self.Hours):
-            time = mktime(C.MakeDatetime(time_col[i]).timetuple())
+
+        for i in xrange(len(timelist)):
+            time = timelist[i]
+            t, flow, temp = data[i]
             # Get the flow boundary condition
-            val = flow_col[i]
-            if val == 0 or not val:
+            if flow == 0 or not flow:
                 if self.run_type != 1:
-                    raise Exception("Missing flow boundary condition for day %i " % int(i / 24))
-                else: val = 0
-            self.Q_bc[time] = val
+                    raise Exception("Missing flow boundary condition for day %i " % asctime(localtime(time)))
+                else: flow = 0
+            self.Q_bc[time] = flow
             # Temperature boundary condition
-            t_val = temp_col[i] if temp_col[i] is not None else 0.0
-            #if t_val == 0 or not t_val: raise Exception("Missing temperature boundary condition for day %i" % int(I / 24) )
+            t_val = temp if temp is not None else 0.0
             self.T_bc[time] = t_val
-            self.PB("Reading boundary conditions",i,self.Hours)
+            self.PB("Reading boundary conditions",c.next(),length)
+        self.Q_bc = self.Q_bc.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
+        self.T_bc = self.T_bc.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
 
     def GetTimelist(self, sheet):
         """Return list of floating point time values corresponding to the data available in the sheet"""
@@ -232,132 +224,127 @@ class HeatSourceInterface(ExcelDocument):
         col, row = nums[sheet]
         timelist = [i for i in ifilter(None,self.GetColumn(col,sheet)[row:])]
         # Make sure that they are only value at the top of the hour
-        return tuple([mktime(Chronos.MakeDatetime(i).timetuple()) for i in timelist])
+        return tuple([mktime(strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")) for t in timelist])
 
-    def GetModelDates(self):
-        "Return the start and ending dates of the model run, as floating point values"
-        start = mktime(IniParams["modelstart"].timetuple())
-        # We end at the last second of a day, so we replace the hours, minutes and seconds
-        t = [i for i in IniParams["modelend"].timetuple()]
-        t[3:6] = [23,59,59]
-        end = mktime(t)
-        return start, end
-
-    def GetFlowPage(self):
-        sheetname = "Flow Data"
-        tm = lambda flt: asctime(localtime(flt))
-        # Get a list of the timestamps that we have data for, and use that to grab the data block
-        timelist = self.GetTimelist(sheetname)
-        print [tm(i) for i in timelist]
-        Rstart, Cstart = 4,12
-        Rend = Rstart + len(timelist) - 1
-        Cend = int(IniParams["inflowsites"]*2) + Cstart - 1
-        rng = ((Rstart, Cstart),(Rend, Cend))
-        # the data block is a list of lists, each corresponding to a timestamp.
-        data = self.GetValue(rng, sheetname)
-        #Make a windowed dictionary and subset it.
-        d = Windowed()
-        for i in xrange(len(timelist)):
-            d[timelist[i]] = data[i]
-        start, end = self.GetModelDates()
-        # Subset the dictionary and include the value immediately after the ending time
-        datadict = d.View(start, end, aft=1)
-
-        print tm(start), tm(end)
-        print tm(min(timelist))
-        print tm(min(datadict.keys())), tm(max(datadict.keys()))
-        raise Exception
-
-    def GetInflowData(self):
-        """Get accumulation data from the "Flow Data" page"""
-        self.CheckEarlyQuit()
-        self.PB("Reading Inflow Data")
-        # Local variables for reach and timelist
+    def GetLocations(self,sheetname):
+        """Return a list of kilometers corresponding to the inflow or continuous data sites"""
+        #                        Number of sites, row, column
+        d = {'Continuous Data': (IniParams["contsites"], 5, 3),
+             'Flow Data': (IniParams["inflowsites"], 4, 9)}
+        t = ()
         l = self.Reach.keys()
         l.sort()
-        timelist = self.GetTimelist("Flow Data")
-        # Get the data block from the worksheet
-        Rstart,Cstart = 4,12
-        Rend = Rstart+self.Hours-1
-        Cend = int((IniParams["inflowsites"]-1)*2 + Cstart+3)
-        rng = ((Rstart,Cstart),(Rend,Cend))
-        data = self.GetValue(rng,"Flow Data")
-
-        for site in xrange(int(IniParams["inflowsites"])):
-            # Get the stream node corresponding to the kilometer of this inflow site.
-            km = self.GetValue((site + 4, 9),"Flow Data")
+        ini, row, col = d[sheetname]
+        for site in xrange(ini):
+            km = self.GetValue((site + row, col),sheetname)
+            if km is None or not isinstance(km, float):
+                # This is a bad dataset if there's no kilometer
+                raise Exception("Must have a stream kilometer (e.g. 15.3) for each node in %s page!" % sheetname)
             key = bisect(l,km)-1
-            node = self.Reach[l[key]] # Index by kilometer
-            # Strip off the flow and temp columns
-            flow_col = [x[site*2] for x in data]
-            temp_col = [x[1+(site*2)] for x in data]
-            # then set the nodes Q_tribs and T_tribs dictionaries with the values, first checking
-            # whether there are improper blank fields.
-            for i in xrange(len(flow_col)):
-                # Here we test to make sure that the flow and temp columns are not blank
-                # Temp can be blank with negative flows because we don't need to mass balance with the temperature
-                if flow_col[i] is None or (flow_col[i] > 0 and temp_col[i] is None):
-                    if i > Rend: continue # Don't worry about blanks in later date/times if we're not modeling during that time
-                    raise Exception("Cannot have a tributary with blank flow or temperature conditions")
-            # Here, we actually set the tribs library, appending to a tuple. Q_ and T_tribs are
-            # tuples of values because we may have more than one input for a given node
-            for hour in xrange(self.Hours):
-                node.Q_tribs[timelist[hour]] += flow_col[hour], #Append to tuple
-                node.T_tribs[timelist[hour]] += temp_col[hour],
-            self.PB("Reading inflow data",site, IniParams["inflowsites"])
+            t += l[key], # Index by kilometer
+        return t
 
+    def GetTributaryData(self):
+        """Populate the tributary flow and temperature values for nodes from the Flow Data page"""
+        self.CheckEarlyQuit()
+        self.PB("Reading inflow data")
+        sheetname = "Flow Data"
+        # Get a list of the timestamps that we have data for, and use that to grab the data block
+        timelist = self.GetTimelist(sheetname)
+        Rstart, Cstart = 4,12
+        Rend = Rstart + len(timelist) - 1
+        Cend = IniParams["inflowsites"]*2 + Cstart - 1
+        rng = ((Rstart, Cstart),(Rend, Cend))
+        # the data block is a tuple of tuples, each corresponding to a timestamp.
+        data = self.GetValue(rng, sheetname)
+        # Current data is in the form:
+        # | Site 1   | Site 2   | Site 3   | ...
+        # ((0.3, 15.7, 0.3, 17.7, 0.02, 18.2), (, ...)
+        # Where every tuple is a data record corresponding to a time, and every
+        # two numbers in the tuple refer to a site's flow rate and temp. We want
+        # to change this to the form:
+        # | Site 1     | Site 2     | Site 3       | ...
+        # [((0.3, 15.7), (0.3, 17.7), (0.02, 18.2)), (, ...))]
+        # To facilitate each site having it's own two item tuple.
+        # The calls to tuple() just ensure that we are not making lists, which can
+        # be changed accidentally. Without them, the line is easier to understand:
+        # [zip(line[0:None:2],line[1:None:2]) for line in data]
+        data = [tuple(zip(line[0:None:2],line[1:None:2])) for line in data]
+
+        # Get a tuple of kilometers to use as keys to the location of each tributary
+        kms = self.GetLocations("Flow Data")
+        length = len(timelist)
+        tm = count() # Which datapoint time are we recording
+        nodelist = [] # Quick list of nodes with flow data
+        for time in timelist:
+            line = data.pop(0)
+            # Error checking?! Naw!!
+            c = count()
+            for flow, temp in line:
+                i = c.next()
+                node = self.Reach[kms[i]] # Index by kilometer
+                if node not in nodelist or not len(nodelist): nodelist.append(node)
+                if flow is None or (flow > 0 and temp is None):
+                    raise Exception("Cannot have a tributary with blank flow or temperature conditions")
+                # Here, we actually set the tribs library, appending to a tuple. Q_ and T_tribs are
+                # tuples of values because we may have more than one input for a given node
+                node.Q_tribs[time] += flow, #Append to tuple
+                node.T_tribs[time] += temp,
+            self.PB("Reading inflow data",tm.next(), length)
+
+        # Now we strip out the unnecessary values from the dictionaries. This is placed here
+        # at the end so we can dispose of it easily if necessary
+        for node in nodelist:
+            node.Q_tribs = node.Q_tribs.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
+            node.T_tribs = node.T_tribs.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
         # This is remarkably similar to GetInflowData. We get a block of data, then set the dictionary of the node
         self.CheckEarlyQuit()
         self.PB("Reading Continuous Data")
-        l = self.Reach.keys()
-        l.sort()
-        timelist = self.timelist
+        sheetname = "Continuous Data"
+        timelist = self.GetTimelist(sheetname)
         Rstart,Cstart = 5,9
-        Rend = Rstart+self.Hours-1
-        Cend = int((IniParams["contsites"])*5 + Cstart-1)
+        Rend = Rstart + len(timelist) - 1
+        Cend = IniParams["contsites"]*4 + Cstart-1
         rng = ((Rstart,Cstart),(Rend,Cend))
         data = self.GetValue(rng,"Continuous Data")
-        for site in xrange(int(IniParams["contsites"])):
-            km = self.GetValue((site + 5, 3),"Continuous Data")
-            if km is None or not isinstance(km, float):
-                # This is a bad dataset if there's no kilometer
-                raise Exception("Must have a stream kilometer (e.g. 15.3) for each continuous data node!")
-            key = bisect(l,km)-1
-            node = self.Reach[l[key]] # Index by kilometer
-            # Append this node to a list of all nodes which have continuous data
-            self.ContDataSites.append(node.km)
-
-            # We have a data block, so each row of data contains 4 elements. Here, we grab each
-            # element from each row in a list, then do some testing
-            cloud_col = [x[site*5] for x in data]    # Grab all of the values in a list
-            wind_col = [x[1+(site*5)] for x in data]
-            humid_col = [x[2+(site*5)] for x in data]
-            air_col =  [x[3+(site*5)] for x in data]
-            # Test cloudiness and default to zero if blank
-            for i in xrange(len(cloud_col)):
-                if cloud_col[i] is None: cloud_col[i] = 0.0
-            # Test wind and default to zero if blank
-            for i in xrange(len(wind_col)):
-                if wind_col[i] is None: wind_col[i] = 0.0
-            # test humidity and make sure it's greater than 0
-            for i in xrange(len(humid_col)):
-                if humid_col[i] < 0 or humid_col[i] is None:
+        # See GetTributaryData() for info on this crazy one-liner
+        data = [tuple(zip(line[0:None:4],line[1:None:4],line[2:None:4],line[3:None:4])) for line in data]
+        kms = self.GetLocations("Continuous Data")
+        tm = count() # Which datapoint time are we recording
+        length = len(timelist)
+        for time in timelist:
+            line = data.pop(0)
+            c = count()
+            for cloud, wind, humid, air in line:
+                i = c.next()
+                node = self.Reach[kms[i]] # Index by kilometer
+                # Append this node to a list of all nodes which have continuous data
+                self.ContDataSites.append(node.km)
+                # Perform some tests for data accuracy and validity
+                if cloud is None: cloud = 0.0
+                if wind is None: wind = 0.0
+                if humid < 0 or humid is None:
                     if self.run_type == 1: # Alright in shade-a-lator
-                        humid_col[i] = 0.0
+                        humid = 0.0
                     else: raise Exception("Humidity (value of %s in Continuous Data) must be greater than zero" % `hum_val`)
-            # Air temp cannot be blank
-            for i in xrange(len(air_col)):
-                if air_col[i] is None:
+                if air is None:
                     if self.run_type == 1: # Alright in shade-a-lator
-                        air_col[i] = 0.0
+                        air = 0.0
                     else: raise Exception("Must have values for Air Temp in Continuous Data sheet")
-            # Now set the ContData dictionary to a tuple holding the data
-            for hour in xrange(self.Hours):
-                node.ContData[timelist[hour]] = cloud_col[hour], wind_col[hour], humid_col[hour], air_col[hour]
-            self.PB("Reading continuous data", site, IniParams["contsites"])
+                node.ContData[time] = cloud, wind, humid, air
+            self.PB("Reading continuous data", tm.next(), length)
+        # Now we strip out the unnecessary values from the dictionaries. This is placed here
+        # at the end so we can dispose of it easily if necessary
+        for km in self.ContDataSites:
+            node = self.Reach[km]
+            try:
+                node.ContData = node.ContData.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
+            except AttributeError:
+                # We've already subset the dictionary from another node, no need to do it again
+                pass
 
     def zipper(self,iterable,mul=2):
         """Zippify list by grouping <mul> consecutive elements together
@@ -367,7 +354,7 @@ class HeatSourceInterface(ExcelDocument):
         >>> lst = [0,1,2,3,4,5,6,7,8,9]
         >>> zipper(lst)
         [[0],[1,2],[3,4][5,6],[7,8],[9]]
-        The first element is a length 1 list because we assume that it is a single element node.
+        The first element is a length 1 list because we assume that it is a single element node (headwaters).
         Note that the last element, 9, is alone as well, this method will figure out when there are not
         enough elements to make n equal length lists, and modify itself appropriately so that the remaining list
         will contain all leftover elements. The usefulness of this method is that it will allow us to average over each <mul> consecutive elements
@@ -402,8 +389,12 @@ class HeatSourceInterface(ExcelDocument):
         """Return an iterable that was run through the zipper
 
         Take an iterable and strip the values of None, then send to the zipper
-        and apply predicate to each value returned (zipper returns a list"""
-        # This is a way to safely apply a generic lambda function to an iterable
+        and apply predicate to each value returned (zipper returns a list)"""
+        # This is a way to safely apply a generic lambda function to an iterable.
+        # If I were paying attention to design, instead of just hacking away, I would
+        # have done this with decorators to modify the function. Now I'm too lazy to
+        # re-write it (well, not lazy, but I'm not paid as a programmer, and so I have
+        # "better" things to do than optimize our code.)
         # First we strip off the None values.
         stripNone = lambda y: [i for i in ifilterfalse(lambda x: x is None, y)]
         return [predicate(stripNone(x)) for x in self.zipper(iterable,self.multiple)]
@@ -473,17 +464,19 @@ class HeatSourceInterface(ExcelDocument):
         # if we end up with a fraction, that means that there's a node at the end that
         # is not a perfect multiple of the sample distance. We might end up ending at
         # stream kilometer 0.5, for instance, in that case
-        num_nodes = int(ceil((self.Num_Q_Var-1)/self.multiple))
+        vars = self.LastRow("TTools Data") - 5
+
+        num_nodes = int(ceil((vars-1)/self.multiple))
         for i in range(0, num_nodes):
             node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
             for k,v in data.iteritems():
                 setattr(node,k,v[i+1])# Add one to ignore boundary node
             self.InitializeNode(node)
             self.Reach[node.km] = node
-            self.PB("Building Stream Nodes", i, self.Num_Q_Var/self.multiple)
+            self.PB("Building Stream Nodes", i, vars/self.multiple)
         # Find the mouth node and calculate the actual distance
         mouth = self.Reach[min(self.Reach.keys())]
-        mouth_dx = (self.Num_Q_Var-1)%self.multiple or 1.0 # number of extra variables if we're not perfectly divisible
+        mouth_dx = (vars-1)%self.multiple or 1.0 # number of extra variables if we're not perfectly divisible
         mouth.dx = IniParams["longsample"] * mouth_dx
 
     def BuildZonesNormal(self):

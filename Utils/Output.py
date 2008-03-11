@@ -1,14 +1,16 @@
 from __future__ import division
 from datetime import datetime, timedelta
-from ..Dieties import IniParams
-from ..Dieties import Chronos
+from Dieties import IniParams
+from Dieties import Chronos
 from time import localtime
 from os.path import join, exists
 from os import makedirs
 
 try:
-    from psyco.classes import psyobj
-    object = psyobj
+    from __debug__ import psyco_optimize
+    if psyco_optimize:
+        from psyco.classes import psyobj
+        object = psyobj
 except ImportError: pass
 
 class Output(object):

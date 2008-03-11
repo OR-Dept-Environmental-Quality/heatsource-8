@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, with_statement
 
 from itertools import count
 from traceback import print_exc, format_tb
@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from win32gui import PumpWaitingMessages
 from Utils.easygui import msgbox, buttonbox
-from time import mktime
+from time import mktime, localtime
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties import Chronos
@@ -21,29 +21,49 @@ from heatsource import HeatSourceError, CalcMacCormick
 from __version__ import version_info
 
 try:
-    from psyco.classes import psyobj
-    object = psyobj
+    from __debug__ import psyco_optimize
+    if psyco_optimize:
+        from psyco.classes import psyobj
+        object = psyobj
 except ImportError: pass
 
-class HSProfile(object):
+class ModelControl(object):
     def __init__(self,worksheet,run_type=0):
         self.ErrLog = Logger
-        self.HS = HeatSourceInterface(join(worksheet), self.ErrLog, run_type)
-        self.reachlist = sorted(self.HS.Reach.itervalues(),reverse=True)
-        self.cur_hour = None
+        self.worksheet = join(worksheet)
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
-        if run_type == 0: self.run_all = self.run_hs
-        elif run_type == 1: self.run_all = self.run_sh
-        elif run_type == 2: self.run_all = self.run_hy
-        else: raise Exception("Bad run_type: %i" %`run_type`)
+
+    def PrintReach(self):
+        with open("c:\\Reach.txt","w") as f:
+            for node in self.HS.Reach.itervalues():
+                f.write("%s\n" % node)
+                for attr, val in node.GetNodeData().iteritems():
+                    if attr in ["C_args","FLIR_Time","FLIR_Temp","Log"]: continue
+                    try:
+                        f.write("\t%s: %s\n" % (attr,`val`))
+                    except TypeError:
+                        f.write("\t%s\n" % (attr, [`i` for i in attr]))
+        raise Exception("DONE")
+
+    def Initialize(self):
+        """Set up the model.
+
+        This is not in __init__() because of psyco and to faciliate the
+        ability to run concurrent models or store the ModelControl class
+        for Monte Carlo runs if we want to do that later."""
+        self.HS = HeatSourceInterface(self.worksheet, self.ErrLog, self.run_type)
+        self.reachlist = sorted(self.HS.Reach.itervalues(),reverse=True)
+        self.PrintReach()
+        self.cur_hour = None
+        if self.run_type == 0: self.run_all = self.run_hs
+        elif self.run_type == 1: self.run_all = self.run_sh
+        elif self.run_type == 2: self.run_all = self.run_hy
+        else: raise Exception("Bad run_type: %i" %`self.run_type`)
         ##########################################################
         # Create a Chronos iterator that controls all model time
         dt = timedelta(seconds=IniParams["dt"])
-        start = IniParams["modelstart"]
-        if self.run_type==1:
-            stop = start + timedelta(days=1)
-        else:
-            stop = start + timedelta(days=IniParams["simperiod"])
+        start = Chronos.MakeDatetime(localtime(IniParams["modelstart"])[:6])
+        stop = Chronos.MakeDatetime(localtime(IniParams["modelend"])[:6])
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start, dt, stop, spin)
@@ -52,13 +72,10 @@ class HSProfile(object):
         self.Output = O(dt_out, self.HS.Reach, start)
         ##########################################################
         self.testfile = open("E:\\solar_new.txt","w")
-    def close(self):
-        print "Deleting HSProfile"
-#        self.HS.close()
-#        del self.reachlist, self.run_all, self.Reach, self.HS, #self.Output
 
     ###############################################################
     def run(self): # Argument allows profiling and testing
+        self.Initialize()
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
@@ -181,3 +198,13 @@ def RunHY(sheet):
         print_exc(file=f)
         f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
+
+if __name__ == "__main__":
+    import cProfile
+    
+    #HSP = BigRedButton.HSProfile("E:\\transfer\\HS8_antelope_creek_new.xls")
+    HSP = ModelControl("Z:\\Library (weekly backup)\\Models_Software\\Heat Source\\Version 8.x\\tests\\compare_to_v7\Sim1-00_HS8_15mile.xls")
+    #HSP = BigRedButton.HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\NF_Malheur_shadealator.xls",1)
+    #HSP = BigRedButton.HSProfile("E:\\HSFiles\\Evans.xls")
+    HSP.run()
+    #cProfile.run('HSP.run()')

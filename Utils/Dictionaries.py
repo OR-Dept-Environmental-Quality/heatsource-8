@@ -11,7 +11,6 @@ class Interpolator(defaultdict):
         allow a linear interpolation between the
         all values, filling the dictionary with the results."""
         defaultdict.__init__(self)
-        self.step = kwargs["dt"]
         self.sortedkeys = None
 
     def __missing__(self,key):
@@ -27,22 +26,12 @@ class Interpolator(defaultdict):
         y1 = self[x1]
         val = None
         if isinstance(y0, tuple):
+            if not len(y0): return () # We have nothing in the tuple, so return a blank tuple (not 'val', which is None)
             for i in xrange(len(y0)):
-                try: val += y0 + ((y1-y0)*(key-x0))/(x1-x0), # add value to the tuple
-                except TypeError: val = y0 + ((y1-y0)*(key-x0))/(x1-x0),
+                try: val += y0[i] + ((y1[i]-y0[i])*(key-x0))/(x1-x0), # add value to the tuple
+                except TypeError: val = y0[i] + ((y1[i]-y0[i])*(key-x0))/(x1-x0),
             return val
         else: return y0 + ((y1-y0)*(key-x0))/(x1-x0)
-
-class Windowed(dict):
-    def __init__(self, *args, **kwargs):
-        """Dictionary class that can return a subset of itself
-
-        This class is a standard dictionary with an extra method
-        View(minkey, maxkey) which returns a dictionary instance
-        populated with only items with keys between minkey and
-        maxkey. If the keys do not have __cmp__() type methods
-        and cannot be sorted, then it will not work."""
-        dict.__init__(self)
 
     def View(self, minkey, maxkey, fore=None, aft=None):
         """Return dictionary subset
@@ -58,7 +47,7 @@ class Windowed(dict):
         min = bisect_left(keys, minkey) - (fore is not None)
         max = bisect_right(keys, maxkey) + (aft is not None)
 
-        d = {}
+        d = Interpolator()
         for k in keys[min:max]:
             d[k] = self[k]
         return d
