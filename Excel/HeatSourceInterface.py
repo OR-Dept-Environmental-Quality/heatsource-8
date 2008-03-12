@@ -582,7 +582,7 @@ class HeatSourceInterface(ExcelDocument):
                     # We shift closer to the stream by the amount of overhang
                     # This is a rather ugly cludge.
                     if not j: LC_Distance -= Overhang
-                    if LC_Distance < 0:
+                    if LC_Distance <= 0:
                         LC_Distance = 0.00001
                     # Calculate the minimum sun angle needed for full sun
                     T_Full += degrees(atan(VH/LC_Distance)), # It gets added to a tuple of full sun values
