@@ -307,11 +307,12 @@ class HeatSourceInterface(ExcelDocument):
         timelist = self.GetTimelist(sheetname)
         Rstart,Cstart = 5,9
         Rend = Rstart + len(timelist) - 1
-        Cend = IniParams["contsites"]*4 + Cstart-1
+        #We need five columns because stream temp data (which we ignore in heat source)
+        Cend = IniParams["contsites"]*5 + Cstart-1
         rng = ((Rstart,Cstart),(Rend,Cend))
         data = self.GetValue(rng,"Continuous Data")
         # See GetTributaryData() for info on this crazy one-liner
-        data = [tuple(zip(line[0:None:4],line[1:None:4],line[2:None:4],line[3:None:4])) for line in data]
+        data = [tuple(zip(line[0:None:5],line[1:None:5],line[2:None:5],line[3:None:5])) for line in data]
         kms = self.GetLocations("Continuous Data")
         tm = count() # Which datapoint time are we recording
         length = len(timelist)
