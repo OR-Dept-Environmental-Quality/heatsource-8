@@ -11,12 +11,12 @@ from win32gui import PumpWaitingMessages
 from bisect import bisect
 from time import mktime, localtime, asctime, strptime
 
-from Stream.StreamNode import StreamNode
-from Dieties import IniParams
-from Dieties import Chronos
+from ..Stream.StreamNode import StreamNode
+from ..Dieties import IniParams
+from ..Dieties import Chronos
 from ExcelDocument import ExcelDocument
-from Utils.Dictionaries import Interpolator
-from Utils.easygui import buttonbox
+from ..Utils.Dictionaries import Interpolator
+from ..Utils.easygui import buttonbox
 #Flag_HS values:
 #    0: Flow Router
 #    1: Heat Source
@@ -39,7 +39,7 @@ class HeatSourceInterface(ExcelDocument):
                "modelend": "C10",
                "end": "C11",
                "flushdays": "C12",
-               "timezone": "C13",
+               "offset": "C13",
                "daylightsavings": "C14",
                "runmodule": "C16",
                "dt": "E4",

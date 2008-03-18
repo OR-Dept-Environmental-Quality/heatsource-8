@@ -1,6 +1,6 @@
 from __future__ import division
 from win32com.client import constants, Dispatch, gencache
-from pythoncom import CoInitialize,CoUninitialize
+from pythoncom import CoInitialize, CoUninitialize
 from pywintypes import com_error
 from os.path import exists
 from os import remove
@@ -19,7 +19,7 @@ directionLeft = -4131
 directionRight = -4152
 
 try:
-    from __debug__ import psyco_optimize
+    from ..__debug__ import psyco_optimize
     if psyco_optimize:
         from psyco.classes import psyobj
         object = psyobj
@@ -30,20 +30,20 @@ class TextPB(object):
         self.bar = "---->"
         self.text = list(self.bar) + [" "]*60
 
-    def __call__(self,msg="",num=None,total=None):
-        self.text.insert(0,self.text.pop())
+    def __call__(self, msg="", num=None, total=None):
+        self.text.insert(0, self.text.pop())
         if num and total:
             msg = "%s %i%%" %(msg, (num/total)*100)
         elif num:
             msg = "%s %i%%" %(msg, num)
-        return "%s  | %s" %("".join(self.text),msg)
+        return "%s  | %s" %("".join(self.text), msg)
 
 class ExcelDocument(object):
     """
     Some convenience methods for Excel documents accessed
     through COM.
     """
-    def __init__(self,filename):
+    def __init__(self, filename):
         # The following code assumes that there is an active workbook (i.e. that Excel is running
         # and a workbook is open and active. This is because we should be calling this from the VB
         # macro which would activate the Heat Source workbook. The reason we do not call Open(excelfile)
@@ -104,7 +104,7 @@ class ExcelDocument(object):
         Return a column of data
         """
         strip = lambda x: x[0] if len(x) == 1 else x
-        lst = [strip(i) for i in self.GetValue((1,col,self.LastRow(sheet),col),sheet)]
+        lst = [strip(i) for i in self.GetValue((1, col, self.LastRow(sheet), col), sheet)]
         return tuple(lst)
 
     def GetRange(self, range, sheet=None):
@@ -112,20 +112,20 @@ class ExcelDocument(object):
         Get a range object for the specified range or single cell.
         """
         sheet = sheet if sheet else self.sheet
-        if isinstance(range,list) or isinstance(range,tuple):
+        if isinstance(range, list) or isinstance(range, tuple):
             #We have a sequence, lets make sure it's either (r1,c1,r2,c2) or ((r1,c1),(r2,c2))
             if len(range) == 4: # (r1,c1,r2,c2)
                 rng = "%s%i:%s%i" % (self.excelize(range[1]), range[0], self.excelize(range[3]), range[2])
             elif len(range) == 2: # ((r1,c1),(r2,c2))
-                if (isinstance(range[0],list) or isinstance(range[0],tuple)) and \
-                    (isinstance(range[1],list) or isinstance(range[1],tuple)):
+                if (isinstance(range[0], list) or isinstance(range[0], tuple)) and \
+                    (isinstance(range[1], list) or isinstance(range[1], tuple)):
                     rng = "%s%i:%s%i" % (self.excelize(range[0][1]), range[0][0], \
                                          self.excelize(range[1][1]), range[1][0])
-                elif isinstance(range[0],int) and isinstance(range[1],int):
+                elif isinstance(range[0], int) and isinstance(range[1], int):
                     rng = "%s%i" % (self.excelize(range[1]), range[0])
                 else: raise Exception
             else: raise Exception
-        elif isinstance(range,str): rng = range
+        elif isinstance(range, str): rng = range
         else: raise Exception
 
         return self.app.ActiveWorkbook.Sheets(sheet).Range(rng)
@@ -134,13 +134,13 @@ class ExcelDocument(object):
         """
         Set the value of 'cell' to 'value'.
         """
-        self.GetRange(cell,sheet).Value = value
+        self.GetRange(cell, sheet).Value = value
 
     def GetValue(self, cell, sheet=None):
         """
         Get the value of 'cell'.
         """
-        return self.GetRange(cell,sheet).Value
+        return self.GetRange(cell, sheet).Value
 
     def GetUsedRange(self, sheet=None):
         """
@@ -160,7 +160,7 @@ class ExcelDocument(object):
         return (self.LastColumn(sheet), self.LastRow(sheet))
 
     def Clear(self, cell, sheet=None):
-        self.GetRange(cell,sheet).Clear()
+        self.GetRange(cell, sheet).Clear()
 
     def SetBorder(self, range, side, line_style=borderSolid, color=colorBlack):
         """
@@ -264,17 +264,17 @@ class ExcelDocument(object):
         for exCh in excelIter():
             for ch in self.chars():
                 yield exCh+ch
-    def excelize(self,n):
+    def excelize(self, n):
         """
         Returns excel formated column number for n>=0.
         """
         div = int(n/26)
         if div==0:
-            if isinstance(n,float): n = int(n)
+            if isinstance(n, float): n = int(n)
             return chr(65+n)
         else:
             return self.excelize(div-1)+chr(65+n%26)
-    def deExcelize(self,s):
+    def deExcelize(self, s):
         """
         Returns an integer value for an excel formated column value.
         Expects a string containing only English letters

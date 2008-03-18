@@ -1,13 +1,13 @@
 from __future__ import division
 from datetime import datetime, timedelta
-from Dieties import IniParams
-from Dieties import Chronos
+from ..Dieties import IniParams
+from ..Dieties import Chronos
 from time import localtime
 from os.path import join, exists
 from os import makedirs
 
 try:
-    from __debug__ import psyco_optimize
+    from ..__debug__ import psyco_optimize
     if psyco_optimize:
         from psyco.classes import psyobj
         object = psyobj
@@ -58,61 +58,56 @@ class Output(object):
                 self.files[key][0].write(aaa.ljust(14))
             self.files[key][0].write("\n")
 
-    def flush(self):
-        for filename in self.files.itervalues():
-            filename[0].flush()
-            filename[0].close()
+    def close(self): [f.close() for f in self.files.itervalues()]
 
-    def __call__(self, TheTime):
-        if TheTime < self.write_time:
-            return
-        elif Chronos.CurrentTime < Chronos.start:
-            return
-        else:
+    def __call__(self):
+        TheTime = Chronos()
+        year, month, day, hour, minute, second, wk,jd,offset = Chronos.TimeTuple()
+        if (TheTime < self.write_time) or (Chronos() < Chronos.start): return
+        for node in self.nodes:
+            try:
+                test =  node.E / node.dx / node.W_w * 3600 * 1000,  #TODO: Check
+            except:
+                test = 9999
+            variables = {
+                "Heat_Cond.txt": node.F_Conduction,
+                "Heat_Conv.txt": node.F_Convection,
+                "Heat_Evap.txt": node.F_Evaporation,
+                "Heat_SR1.txt": node.F_Solar[1],
+                "Heat_SR4.txt": node.F_Solar[4],
+                "Heat_SR6.txt": node.F_Solar[6],
+                "Heat_TR.txt": node.F_Longwave,
+                "Hyd_DA.txt": node.A / node.W_w,
+                "Hyd_DM.txt": node.d_w,
+                "Hyd_Flow.txt": node.Q,
+                "Hyd_Hyp.txt": node.Q_hyp,
+                "Hyd_Vel.txt": node.U,
+                "Hyd_WT.txt": node.W_w,
+                "Rate_Evap.txt": test, #TODO: Check
+                "Temp_H20.txt": node.T,
+                "Temp_Sed.txt": node.T_sed,
+                "Hyd_Disp.txt": node.Disp
+            }
+            self.append(TheTime, variables, node)
+        self.write_time += self.dt_out
+        # Is the hour greater than the write_time's hour
+        if hour > localtime(self.write_time)[3]:  #new day, print daily outputs
             for node in self.nodes:
+                # TODO: What are we trying to accomplish here?
                 try:
-                    test =  node.E / node.dx / node.W_w * 3600 * 1000,  #TODO: Check
-                except:
-                    test = 9999
+                    shade = (node.F_DailySum[1] - node.F_DailySum[4]) / node.F_DailySum[1]
+                except ZeroDivisionError:
+                    shade = node.F_DailySum[4]
                 variables = {
-                    "Heat_Cond.txt": node.F_Conduction,
-                    "Heat_Conv.txt": node.F_Convection,
-                    "Heat_Evap.txt": node.F_Evaporation,
-                    "Heat_SR1.txt": node.F_Solar[1],
-                    "Heat_SR4.txt": node.F_Solar[4],
-                    "Heat_SR6.txt": node.F_Solar[6],
-                    "Heat_TR.txt": node.F_Longwave,
-                    "Hyd_DA.txt": node.A / node.W_w,
-                    "Hyd_DM.txt": node.d_w,
-                    "Hyd_Flow.txt": node.Q,
-                    "Hyd_Hyp.txt": node.Q_hyp,
-                    "Hyd_Vel.txt": node.U,
-                    "Hyd_WT.txt": node.W_w,
-                    "Rate_Evap.txt": test, #TODO: Check
-                    "Temp_H20.txt": node.T,
-                    "Temp_Sed.txt": node.T_sed,
-                    "Hyd_Disp.txt": node.Disp
+                    "Shade.txt": shade,
+                    "VTS.txt": node.ViewToSky
                 }
                 self.append(TheTime, variables, node)
-            self.write_time += self.dt_out
-            if TheTime.hour > self.write_time.hour:  #new day, print daily outputs
-                for node in self.nodes:
-                    # TODO: What are we trying to accomplish here?
-                    try:
-                        shade = (node.F_DailySum[1] - node.F_DailySum[4]) / node.F_DailySum[1]
-                    except ZeroDivisionError:
-                        shade = node.F_DailySum[4]
-                    variables = {
-                        "Shade.txt": shade,
-                        "VTS.txt": node.ViewToSky
-                    }
-                    self.append(TheTime, variables, node)
 
     def append(self, TheTime, variables, node):
-
         for key in variables.iterkeys():
             if not node.prev_km: # upstream most node has no previous kilometer
-                Excel_time = "%0.6f" % (TheTime.toordinal() - 693594 + (TheTime.hour +  (TheTime.minute + TheTime.second / 60) / 60 ) / 24)
+                Excel_time = "%0.6f" % Chronos.ExcelTime()
                 self.files[key][0].write(Excel_time.ljust(14))
             try:
                 dataf = "%0.4f" % variables[key]
@@ -122,21 +117,3 @@ class Output(object):
             self.files[key][0].write(dataf.ljust(14))
             if not node.km: # Mouth node is km=0.0 or, another way, km=False
                 self.files[key][0].write("\n")
-            #self.files[key][0].flush()
-
-            #    def dailyout(self):
-#        lastnode = self.reach[-1]
-#        for node in self.reach:
-#
-#
-#            for key in variables.iterkeys():
-#                if node == self.reach[0]:
-#                    Excel_time = "%0.6f" % (TheTime.toordinal() - 693594 + (TheTime.hour +  (TheTime.minute + TheTime.second / 60) / 60 ) / 24)
-#                    self.files[key].write(Excel_time.ljust(14))
-#                dataf = "%0.3f" % variables[key]
-#                self.files[key].write(dataf.ljust(14))
-#                if node == self.reach[-1]:
-#                    self.files[key].write("\n")
-#                self.files[key].flush()
-
-

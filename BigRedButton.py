@@ -1,15 +1,15 @@
-from __future__ import division, with_statement
+from __future__ import with_statement, division
+#from __future__ import with_statement # On separate line to satisfy PyDev bug
 
 from itertools import count
 from traceback import print_exc, format_tb
 from sys import exc_info
 from os.path import join, exists
 from os import unlink
-from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from win32gui import PumpWaitingMessages
 from Utils.easygui import msgbox, buttonbox
-from time import mktime, localtime
+from time import time as Time
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties import Chronos
@@ -28,19 +28,19 @@ try:
 except ImportError: pass
 
 class ModelControl(object):
-    def __init__(self,worksheet,run_type=0):
+    def __init__(self, worksheet, run_type=0):
         self.ErrLog = Logger
         self.worksheet = join(worksheet)
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
 
     def PrintReach(self):
-        with open("c:\\Reach.txt","w") as f:
+        with open("c:\\Reach.txt", "w") as f:
             for node in self.HS.Reach.itervalues():
                 f.write("%s\n" % node)
                 for attr, val in node.GetNodeData().iteritems():
-                    if attr in ["C_args","FLIR_Time","FLIR_Temp","Log"]: continue
+                    if attr in ["C_args", "FLIR_Time", "FLIR_Temp", "Log"]: continue
                     try:
-                        f.write("\t%s: %s\n" % (attr,`val`))
+                        f.write("\t%s: %s\n" % (attr, `val`))
                     except TypeError:
                         f.write("\t%s\n" % (attr, [`i` for i in attr]))
         raise Exception("DONE")
@@ -52,8 +52,7 @@ class ModelControl(object):
         ability to run concurrent models or store the ModelControl class
         for Monte Carlo runs if we want to do that later."""
         self.HS = HeatSourceInterface(self.worksheet, self.ErrLog, self.run_type)
-        self.reachlist = sorted(self.HS.Reach.itervalues(),reverse=True)
-        self.PrintReach()
+        self.reachlist = sorted(self.HS.Reach.itervalues(), reverse=True)
         self.cur_hour = None
         if self.run_type == 0: self.run_all = self.run_hs
         elif self.run_type == 1: self.run_all = self.run_sh
@@ -61,17 +60,16 @@ class ModelControl(object):
         else: raise Exception("Bad run_type: %i" %`self.run_type`)
         ##########################################################
         # Create a Chronos iterator that controls all model time
-        dt = timedelta(seconds=IniParams["dt"])
-        start = Chronos.MakeDatetime(localtime(IniParams["modelstart"])[:6])
-        stop = Chronos.MakeDatetime(localtime(IniParams["modelend"])[:6])
+        dt = IniParams["dt"]
+        start = IniParams["modelstart"]
+        stop = IniParams["modelend"]
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
-        Chronos.Start(start, dt, stop, spin)
-        Chronos.dst = timedelta(hours=IniParams["daylightsavings"]) # adjust for daylight savings time
-        dt_out = timedelta(minutes=60)
-        self.Output = O(dt_out, self.HS.Reach, start)
+        Chronos.Start(start, dt, stop, spin, IniParams["offset"], IniParams["daylightsavings"])
+        Chronos.dst = IniParams["daylightsavings"] # adjust for daylight savings time
+        self.Output = O(60, self.HS.Reach, start)
         ##########################################################
-        self.testfile = open("E:\\solar_new.txt","w")
+        self.testfile = open("E:\\solar_new.txt", "w")
 
     ###############################################################
     def run(self): # Argument allows profiling and testing
@@ -79,26 +77,25 @@ class ModelControl(object):
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
-        flush = start-timedelta(days=IniParams["flushdays"])
+        flush = start-(IniParams["flushdays"]*86400)
         # Number of timesteps is based on the division of the timesteps into the hour. In other words
         # 1 day with a 1 minute dt is 1440 timesteps, while a 3 minute dt is only 480 timesteps. Thus,
         # We define the timesteps by dividing dt (now in seconds) by 3600
-        timesteps = int(((stop-flush).days*24*(3600/IniParams["dt"])))#/Chronos.dt.seconds
+        timesteps = (stop-flush)/IniParams["dt"]
         cnt = count()
         out = 0
-        time1 = datetime.today()
+        time1 = Time()
         while time < stop:
-            JD = Chronos.JDay
-            JDC = Chronos.JDC
-            offset = Chronos.TZOffset(time)
-            if not (time.minute + time.second): # every hour
+            JD, JDC = Chronos.JD
+            year, month, day, hour, minute, second, weekday, jday, offset = Chronos.TimeTuple()
+            if not (minute + second): # every hour
                 ts = cnt.next() # Number of actual timesteps per tick
                 hr = 60/(IniParams["dt"]/60) # Number of timesteps in one hour
-                self.HS.PB("%i of %i timesteps"% (ts*hr,timesteps))
+                self.HS.PB("%i of %i timesteps"% (ts*hr, timesteps))
                 # Update the Excel status bar
                 PumpWaitingMessages()
                 # Reset the flux daily sum for a new day
-                if not time.hour:
+                if not hour:
                     for nd in self.reachlist: nd.F_DailySum = [0]*5
                 # Check to see if the user pressed the stop button. Pretty crappy kludge here- VB code writing an
                 # empty file- but I basically got to lazy to figure out how to interact with the underlying
@@ -107,9 +104,9 @@ class ModelControl(object):
                     unlink("c:\\quit_heatsource")
                     QuitMessage()
             try:
-                self.run_all(time, JD, JDC, offset)
+                self.run_all(time, hour, minute, second, JD, JDC, offset)
             except HeatSourceError, (stderr):
-                msg = "At %s and time %s\n"%(self,Chronos.TheTime.isoformat(" ") )
+                msg = "At %s and time %s\n"%(self, Chronos.PrettyTime())
                 try:
                     msg += stderr+"\nThe model run has been halted. You may ignore any further error messages."
                 except TypeError:
@@ -118,11 +115,11 @@ class ModelControl(object):
                 raise SystemExit
 
             out += self.reachlist[-1].Q
-            self.Output(time)
-            time = Chronos.Tick()
+            self.Output()
+            time = Chronos(True)
 
         self.Output.flush()
-        total_time = (datetime.today()-time1).seconds/60
+        total_time = (Time() - time1) /60
         total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
         balances = [x.Q_mass for x in self.reachlist]
         total_inflow = sum(balances)
@@ -134,21 +131,16 @@ class ModelControl(object):
         print message
     #############################################################
     ## three different versions of the run() routine, depending on the run_type
-    def run_hs(self,time,JD, JDC, offset):
-        HMS = time.hour, time.minute, time.second
-        time = mktime(time.timetuple())
+    def run_hs(self, time, H, M, S, JD, JDC, offset):
         [x.CalcDischarge(time) for x in self.reachlist]
-        [x.CalcHeat(time, HMS,JD,JDC,offset) for x in self.reachlist]
+        [x.CalcHeat(time, H, M, S, JD, JDC, offset) for x in self.reachlist]
         [x.MacCormick2(time) for x in self.reachlist]
 
-    def run_hy(self,time,JD, JDC, offset):
-        time = mktime(time.timetuple())
+    def run_hy(self, time, H, M, S, JD, JDC, offset):
         [x.CalcDischarge(time) for x in self.reachlist]
 
-    def run_sh(self,time, JD, JDC, offset):
-        HMS = time.hour, time.minute, time.second
-        time = mktime(time.timetuple())
-        [x.CalcHeat(time, HMS,JD,JDC,offset) for x in self.reachlist]
+    def run_sh(self, time, H, M, S, JD, JDC, offset):
+        [x.CalcHeat(time, H, M, S, JD, JDC, offset) for x in self.reachlist]
 
 
 def QuitMessage():
@@ -156,9 +148,9 @@ def QuitMessage():
                 ["Cancel", "Yes, quit"]),
                ("Heatsource was developed for real men, not wimps.\nReal men don't quit.\n\nDo you seriously want to quit?", "Environmental Modeling Faux Pas",
                 ["Naw, you're right", "Seriously, quit"]),
-               ("Dude! You realize that I'm going to call you names and fuck with you for the rest of the day if you do this.\n\nI mean seriously, I won't be responsible for the names people will call you in the hallways!\n\nDo you seriously want to go through with this?","Are you really going to be a quitter!?",
-                ["Wow, thanks! Keep going","Man, shut up and quit already!"]),
-               ("Alright, I'm quitting.\n\nLook, man, don't come bitch to me when people snub you at cocktail parties!\n\nYou're the one who flip-flopped on this one!\n\n\n(A Harvard man wouldn't have quit.)","Confirmed: You are a wimp.",
+               ("Dude! You realize that I'm going to call you names and fuck with you for the rest of the day if you do this.\n\nI mean seriously, I won't be responsible for the names people will call you in the hallways!\n\nDo you seriously want to go through with this?", "Are you really going to be a quitter!?",
+                ["Wow, thanks! Keep going", "Man, shut up and quit already!"]),
+               ("Alright, I'm quitting.\n\nLook, man, don't come bitch to me when people snub you at cocktail parties!\n\nYou're the one who flip-flopped on this one!\n\n\n(A Harvard man wouldn't have quit.)", "Confirmed: You are a wimp.",
                 ["Wimps, press here."]))
 
         for i in xrange(len(mess)):
@@ -176,35 +168,26 @@ def RunHS(sheet):
         HSP.run()
         del HSP
     except Exception, stderr:
-        f = open("c:\\HSError.txt","w")
+        f = open("c:\\HSError.txt", "w")
         print_exc(file=f)
         f.close()
-        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
+        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunSH(sheet):
     try:
-        HSP = HSProfile(sheet,1)
+        HSP = HSProfile(sheet, 1)
         HSP.run()
     except Exception, stderr:
-        f = open("c:\\HSError.txt","w")
+        f = open("c:\\HSError.txt", "w")
         print_exc(file=f)
         f.close()
-        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
+        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunHY(sheet):
     try:
-        HSP = HSProfile(sheet,2)
+        HSP = HSProfile(sheet, 2)
         HSP.run()
     except Exception, stderr:
-        f = open("c:\\HSError.txt","w")
+        f = open("c:\\HSError.txt", "w")
         print_exc(file=f)
         f.close()
-        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr,"HeatSource Error",err=True)
+        msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 
-if __name__ == "__main__":
-    import cProfile
-    
-    #HSP = BigRedButton.HSProfile("E:\\transfer\\HS8_antelope_creek_new.xls")
-    HSP = ModelControl("Z:\\Library (weekly backup)\\Models_Software\\Heat Source\\Version 8.x\\tests\\compare_to_v7\Sim1-00_HS8_15mile.xls")
-    #HSP = BigRedButton.HSProfile("C:\\Documents and Settings\\jmetta\\Desktop\\NF_Malheur_shadealator.xls",1)
-    #HSP = BigRedButton.HSProfile("E:\\HSFiles\\Evans.xls")
-    HSP.run()
-    #cProfile.run('HSP.run()')

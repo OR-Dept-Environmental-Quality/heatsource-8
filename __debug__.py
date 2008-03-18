@@ -1,1 +1,1 @@
-psyco_optimize = False
+psyco_optimize = True

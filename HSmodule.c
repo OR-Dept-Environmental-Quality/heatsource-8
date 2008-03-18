@@ -9,7 +9,7 @@
 
 static PyObject *HeatSourceError;
 
-static char heatsource_CalcSolarPosition__doc__[] =
+static char HSmodule_CalcSolarPosition__doc__[] =
 "CalcSolarPosition(*args)-> (Altitude, Zenith, Daytime, Direction) \
 \
 This method calculates the relative position of sun and returns a \
@@ -21,7 +21,7 @@ north and numbers proceed clockwise around the compass directions. \
 ;
 
 static PyObject *
-heatsource_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
+HSmodule_CalcSolarPosition(PyObject *self, PyObject *args, PyObject *kwargs)
 {
 	// Get all the arguments from the input tuple
 	double lat = PyFloat_AsDouble(PyTuple_GetItem(args,0));
@@ -278,7 +278,7 @@ void CalcMuskingum(double Value[], double Q_est, double U, double W_w, double S,
 	Value[2] = C3;
 }
 
-static char heatsource_CalcFlows__doc__[] =
+static char HSmodule_CalcFlows__doc__[] =
 "CalcFlows(*args)-> tuple of stream characteristics. \
 \
 This method takes values for discharge (Upstream, \
@@ -290,7 +290,7 @@ tuple of values with discharge, stream geometry and \
 dispersion."
 ;
 
-static PyObject * heatsource_CalcFlows(PyObject *self, PyObject *args)
+static PyObject * HSmodule_CalcFlows(PyObject *self, PyObject *args)
 {
 	double U, W_w, S, dx, dt, W_b, z, n, D_est;
 	double inputs, Q_up_prev, Q_up, Q, Q_bc;
@@ -713,7 +713,7 @@ void MacCormick(double Value[], double dt, double dx, double U, double T_sed, do
 	Value[1] = S;
 }
 
-static char heatsource_CalcMacCormick__doc__[] =
+static char HSmodule_CalcMacCormick__doc__[] =
 "Central difference calculations for temperature ODE. \
 \
 This method calculates the central difference solution \
@@ -725,7 +725,7 @@ central difference."
 ;
 
 static PyObject *
-heatsource_CalcMacCormick(PyObject *self, PyObject *args)
+HSmodule_CalcMacCormick(PyObject *self, PyObject *args)
 {
 	double dt, dx, U, T_sed, T_prev, Q_up;
 	double Q_hyp, Q_accr, T_accr;
@@ -745,7 +745,7 @@ heatsource_CalcMacCormick(PyObject *self, PyObject *args)
 	return Py_BuildValue("ff",Value[0], Value[1]);
 }
 
-static char heatsource_CalcHeatFluxes__doc__[] =
+static char HSmodule_CalcHeatFluxes__doc__[] =
 "CalcHeatFluxes(*args)-> tuple of 8 solar flux calculations \
 \
 Calculate the flux from incoming solar radiation for a given \
@@ -754,7 +754,7 @@ calculations for solar fluxs from incoming to stream."
 ;
 
 static PyObject *
-heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
+HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 {
 	PyObject *ShaderList, *ContData, *C_args, *Q_tribs, *T_tribs;
 	double W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, SedDepth;
@@ -832,21 +832,21 @@ heatsource_CalcHeatFluxes(PyObject *self, PyObject *args)
 
 /* List of methods defined in the module */
 
-static struct PyMethodDef heatsource_methods[] = {
-	{"CalcSolarPosition", (PyCFunction) heatsource_CalcSolarPosition, METH_VARARGS,  heatsource_CalcSolarPosition__doc__},
-	{"CalcHeatFluxes", (PyCFunction) heatsource_CalcHeatFluxes, METH_VARARGS,  heatsource_CalcHeatFluxes__doc__},
-	{"CalcFlows", (PyCFunction) heatsource_CalcFlows, METH_VARARGS, heatsource_CalcFlows__doc__},
-	{"CalcMacCormick", (PyCFunction) heatsource_CalcMacCormick, METH_VARARGS,  heatsource_CalcMacCormick__doc__},
+static struct PyMethodDef HSmodule_methods[] = {
+	{"CalcSolarPosition", (PyCFunction) HSmodule_CalcSolarPosition, METH_VARARGS,  HSmodule_CalcSolarPosition__doc__},
+	{"CalcHeatFluxes", (PyCFunction) HSmodule_CalcHeatFluxes, METH_VARARGS,  HSmodule_CalcHeatFluxes__doc__},
+	{"CalcFlows", (PyCFunction) HSmodule_CalcFlows, METH_VARARGS, HSmodule_CalcFlows__doc__},
+	{"CalcMacCormick", (PyCFunction) HSmodule_CalcMacCormick, METH_VARARGS,  HSmodule_CalcMacCormick__doc__},
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };
 
 
-/* Initialization function for the module (*must* be called initheatsource) */
+/* Initialization function for the module (*must* be called initHSmodule) */
 
-static char heatsource_module_documentation[] =
+static char HSmodule_module_documentation[] =
 "Provide optimized C functions for many heavy mathematical routines. \
 \
-The heatsource C module provides functions for calculating solar position, \
+The HSmodule C module provides functions for calculating solar position, \
 solar flux, ground fluxes, Muskingum routing, stream geometry and the \
 MacCormick central difference calculation. They are provided here because \
 the functions are hit every timestep and every spacestep, so we want to \
@@ -854,13 +854,13 @@ make them as fast as possible."
 ;
 
 PyMODINIT_FUNC
-initheatsource()
+initHSmodule()
 {
 	PyObject *m, *d;
 
 	/* Create the module and add the functions */
-	m = Py_InitModule4("heatsource", heatsource_methods,
-		heatsource_module_documentation,
+	m = Py_InitModule4("HSmodule", HSmodule_methods,
+		HSmodule_module_documentation,
 		(PyObject*)NULL,PYTHON_API_VERSION);
 
 	/* Add some symbolic constants to the module */
@@ -870,12 +870,12 @@ initheatsource()
 	PyDict_SetItemString(d, "HeatSourceError", HeatSourceError);
 
 	/* XXXX Add constants here */
-	PyDict_SetItemString(d, "__file__", PyString_FromString("heatsource.py"));
-	PyDict_SetItemString(d, "__name__", PyString_FromString("heatsource"));
+	PyDict_SetItemString(d, "__file__", PyString_FromString("HSmodule.py"));
+	PyDict_SetItemString(d, "__name__", PyString_FromString("HSmodule"));
 
 
 	/* Check for errors */
 	if (PyErr_Occurred())
-		Py_FatalError("can't initialize module heatsource");
+		Py_FatalError("can't initialize module HSmodule");
 }
 

@@ -6,14 +6,15 @@ from itertools import count
 from warnings import warn
 from time import ctime, mktime, localtime, asctime
 
-from Dieties import Chronos
-from Dieties import IniParams
-from Utils.Logger import Logger
-from Utils.easygui import indexbox, msgbox
-from Utils.Dictionaries import Interpolator
+from ..Dieties import Chronos
+from ..Dieties import IniParams
+from ..Utils.Logger import Logger
+from ..Utils.easygui import indexbox, msgbox
+from ..Utils.Dictionaries import Interpolator
+import PyHeatsource as py_HS
+import heatsource as C_HS
 
 _HS = None # Placeholder for heatsource module
-Outfile = open("E:\evans.out","w")
 
 try:
     from __debug__ import psyco_optimize
@@ -126,18 +127,17 @@ class StreamNode(object):
 
     def Initialize(self):
         """Methods necessary to set initial conditions of the node"""
-        global _HS
+        global _HS, py_HS, C_HS
         has_prev = self.prev_km is not None
         if has_prev:
             self.CalcHeat = self.CalcHeat_Opt
         else:
             self.CalcHeat = self.CalcHeat_BoundaryNode
         if IniParams["runmodule"] == "Python Source":
-            import PyHeatsource
-            _HS = PyHeatsource
+            _HS = py_HS
         else:
-            import heatsource
-            _HS = heatsource
+            print C_HS
+            _HS = C_HS
 
         self.CalcDischarge = self.CalculateDischarge
         self.C_args = (self.W_b, self.Elevation, self.TopoFactor, self.ViewToSky, self.phi, self.VDensity, self.VHeight,
@@ -247,9 +247,8 @@ c_k: %3.4f""" % stderr
         msgbox(msg)
         raise Exception(msg)
 
-    def CalcHeat_Opt(self, time, HMS,JD,JDC,offset):
+    def CalcHeat_Opt(self, time, hour, min, sec,JD,JDC,offset):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
-        hour, min, sec = HMS
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
@@ -269,8 +268,7 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-    def CalcHeat_BoundaryNode(self, time, HMS,JD,JDC,offset):
-        hour, min, sec = HMS
+    def CalcHeat_BoundaryNode(self, time, hour, min, sec,JD,JDC,offset):
         print asctime(localtime(time))
         # Reset temperatures
         self.T_prev = self.T
