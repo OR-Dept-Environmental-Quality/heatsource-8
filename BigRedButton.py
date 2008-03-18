@@ -146,27 +146,15 @@ class ModelControl(object):
 
 
 def QuitMessage():
-        mess =(("Do you really want to quit Heat Source", "Quit Heat Source",
-                ["Cancel", "Yes, quit"]),
-               ("Heatsource was developed for real men, not wimps.\nReal men don't quit.\n\nDo you seriously want to quit?", "Environmental Modeling Faux Pas",
-                ["Naw, you're right", "Seriously, quit"]),
-               ("Dude! You realize that I'm going to call you names and fuck with you for the rest of the day if you do this.\n\nI mean seriously, I won't be responsible for the names people will call you in the hallways!\n\nDo you seriously want to go through with this?", "Are you really going to be a quitter!?",
-                ["Wow, thanks! Keep going", "Man, shut up and quit already!"]),
-               ("Alright, I'm quitting.\n\nLook, man, don't come bitch to me when people snub you at cocktail parties!\n\nYou're the one who flip-flopped on this one!\n\n\n(A Harvard man wouldn't have quit.)", "Confirmed: You are a wimp.",
-                ["Wimps, press here."]))
-
-        for i in xrange(len(mess)):
-            m = mess[i]
-            b = buttonbox(m[0], m[1], m[2])
-            if b == m[2][-1]:
-                if i < 3: continue
-                else: raise Exception("Model stopped by a wimpy, flip-flopping quitter (Probably a Democrat).")
-            else: return
+        b = buttonbox("Do you really want to quit Heat Source", "Quit Heat Source", ["Cancel", "Quit"])
+        if b == "Quit":
+            raise Exception("Model stopped user.")
+        else: return
 
 
 def RunHS(sheet):
     try:
-        HSP = HSProfile(sheet)
+        HSP = ModelControl(sheet)
         HSP.run()
         del HSP
     except Exception, stderr:
@@ -176,7 +164,7 @@ def RunHS(sheet):
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunSH(sheet):
     try:
-        HSP = HSProfile(sheet, 1)
+        HSP = ModelControl(sheet, 1)
         HSP.run()
     except Exception, stderr:
         f = open("c:\\HSError.txt", "w")
@@ -185,7 +173,7 @@ def RunSH(sheet):
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunHY(sheet):
     try:
-        HSP = HSProfile(sheet, 2)
+        HSP = ModelControl(sheet, 2)
         HSP.run()
     except Exception, stderr:
         f = open("c:\\HSError.txt", "w")
