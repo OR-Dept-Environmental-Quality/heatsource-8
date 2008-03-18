@@ -1,3 +1,3 @@
-import ChronosDiety, IniParamsDiety
+import ChronosDiety
 Chronos = ChronosDiety.ChronosDiety()
-IniParams = IniParamsDiety.IniParamsDiety()
+IniParams = {}

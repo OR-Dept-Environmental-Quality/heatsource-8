@@ -12,7 +12,7 @@ from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
 from ..Utils.Dictionaries import Interpolator
 import PyHeatsource as py_HS
-import heatsource as C_HS
+import heatsource.HSmodule as C_HS
 
 _HS = None # Placeholder for heatsource module
 
@@ -136,7 +136,6 @@ class StreamNode(object):
         if IniParams["runmodule"] == "Python Source":
             _HS = py_HS
         else:
-            print C_HS
             _HS = C_HS
 
         self.CalcDischarge = self.CalculateDischarge
@@ -269,7 +268,6 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[4] += self.F_Solar[4]
 
     def CalcHeat_BoundaryNode(self, time, hour, min, sec,JD,JDC,offset):
-        print asctime(localtime(time))
         # Reset temperatures
         self.T_prev = self.T
         self.T = None

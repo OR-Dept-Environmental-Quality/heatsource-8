@@ -58,9 +58,9 @@ class Output(object):
                 self.files[key][0].write(aaa.ljust(14))
             self.files[key][0].write("\n")
 
-    def close(self): [f.close() for f in self.files.itervalues()]
+    def close(self): [f[0].close() for f in self.files.itervalues()]
 
-    def __call__(self):
+    def call(self):
         TheTime = Chronos()
         year, month, day, hour, minute, second, wk,jd,offset = Chronos.TimeTuple()
         if (TheTime < self.write_time) or (Chronos() < Chronos.start): return

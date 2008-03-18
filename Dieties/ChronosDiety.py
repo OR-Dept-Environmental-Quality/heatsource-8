@@ -1,12 +1,12 @@
 from time import strptime, mktime, asctime, localtime
 from pywintypes import Time as pyTime
 
-#try:
-#    from __debug__ import psyco_optimize
-#    if psyco_optimize:
-#        from psyco.classes import psyobj
-#        object = psyobj
-#except ImportError: pass
+try:
+    from __debug__ import psyco_optimize
+    if psyco_optimize:
+        from psyco.classes import psyobj
+        object = psyobj
+except ImportError: pass
 
 class ChronosDiety(object):
     """This class provides a clock to be used in the model timestepping.
@@ -65,31 +65,13 @@ class ChronosDiety(object):
         iterates through the sequence, cycling through time. This is a problem."""
         raise NotImplementedError("This needs some work- do we actually need it?")
         return len([i for i in self])
-    def checktime(meth):
-        """Decorator to check whether time is included and add self.__current if not"""
-        def new(*args):
-            if len(args) != 2: # args has self as first element, should be 2 length tuple
-                args += args[0].__current, # Add time to tuple
-            # Make sure the included time is a float or integer
-            elif (not isinstance(args[1], float) and not isinstance(args[1],int)):
-                raise Exception("Argument of %s must be float or int" % meth)
-            return meth(*args)
-        return new
 
-    @checktime
-    def PrettyTime(self,tm): return asctime(localtime(self.__current))
-    @checktime
-    def Year(self,tm): return localtime(tm)[0]
-    @checktime
-    def Month(self,tm): return localtime(tm)[1]
-    @checktime
-    def Day(self,tm): return localtime(tm)[2]
-    @checktime
-    def TimeTuple(self,tm): return localtime(tm)
-
-    @checktime
-    def ExcelTime(self,tm):
-        return float(pyTime(tm))
+    def PrettyTime(self): return asctime(localtime(self.__current))
+    def Year(self): return localtime(self.__current)[0]
+    def Month(self): return localtime(self.__current)[1]
+    def Day(self): return localtime(self.__current)[2]
+    def TimeTuple(self): return localtime(self.__current)
+    def ExcelTime(self): return float(pyTime(self.__current))
     
     def Start(self, start, dt=None, stop=None, spin=0, offset=0, dst=-1):
         """Initialize the clock to some default values and get ready to run.
@@ -110,12 +92,11 @@ class ChronosDiety(object):
         self.__spin_start = self.__start- (spin*86400) if spin else self.__start # Start of the spin-up period
         self.__spin_current = self.__start # Current time within the spinup period
         self.__current = self.__spin_current
-        self.__dayone = mktime((self.Year(self.__start),1,1,0,0,0,-1,-1,dst))
+        self.__dayone = mktime((localtime(self.__start)[0],1,1,0,0,0,-1,-1,dst))
         self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
         self.__jd = None # Placeholder for current julian day
         
-    @checktime
-    def GetJD(self, tm):
+    def GetJD(self):
         """FracJD([time])-> floating point julian day
 
         Takes a datetime object in UTC and returns a fractional julian date
@@ -123,7 +104,7 @@ class ChronosDiety(object):
         the resulting floating point number to 5 places to conform with the
         Naval Observatory's online system"""
         # Then break out the time into a tuple
-        y,m,d,H,M,S,day,wk,tz = localtime(tm)
+        y,m,d,H,M,S,day,wk,tz = localtime(self.__current)
         #H -= t.tzinfo.dst(t).seconds == 3600 # Correct the time for DST
         dec_day = d + (H + (M + S/60)/60)/24
 
@@ -142,7 +123,6 @@ class ChronosDiety(object):
             a = int(y/100)
             b = (2 - a + int(a/4))
             julian_day += b
-        
         jd = round(julian_day,5) #Python numerics return to about 10 places, Naval Observatory goes to 5
         jdc = round((jd-2451545.0)/36525.0,10) # Eqn. 2-5 in HS Manual
         return jd, jdc

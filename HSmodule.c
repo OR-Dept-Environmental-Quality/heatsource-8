@@ -319,7 +319,7 @@ static PyObject * HSmodule_CalcFlows(PyObject *self, PyObject *args)
 	return result;
 }
 
-void GetSolarFlux(double Value[], int hour, int JD, double Altitude,
+void GetSolarFlux(double Value[], int hour, double JD, double Altitude,
 					double Zenith, double cloud, double d_w, double W_b,
 					double Elevation, double TopoFactor, double ViewToSky,
 					double SampleDist, double phi, int emergent,
@@ -371,7 +371,7 @@ void GetSolarFlux(double Value[], int hour, int JD, double Altitude,
 	///////////////////////////////////////////////////////////////////
     // 1 - Above Topography
     double Air_Mass = (35 / sqrt(1224 * sin(radians*Altitude) + 1)) * exp(-0.0001184 * Elevation);
-    double Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10)) + 0.8;
+    double Trans_Air = 0.0685 * cos((2 * pi / 365) * (JD + 10.0)) + 0.8;
     // Calculate Diffuse Fraction
 	direct_1 = direct_0 * pow(Trans_Air,Air_Mass) * (1 - 0.65 * pow(cloud,2));
 	double Clearness_Index;
@@ -759,10 +759,10 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 	PyObject *ShaderList, *ContData, *C_args, *Q_tribs, *T_tribs;
 	double W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, SedDepth;
 	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt;
-	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w;
+	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w, JD;
 	double U, T_alluv, T_prev, T_sed, Q_hyp, cloud, humidity, T_air, wind, Disp;
-	int hour, JD, daytime, has_prev, emergent, calcevap, penman, calcalluv;
-	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdiiidddd",
+	int hour, daytime, has_prev, emergent, calcevap, penman, calcalluv;
+	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdididddd",
 								&ContData, &C_args, &d_w, &area, &P_w, &W_w, &U,
 								&Q_tribs, &T_tribs, &T_prev, &T_sed, &Q_hyp,
 								&T_dn_prev, &ShaderList, &Disp, &hour, &JD, &daytime,

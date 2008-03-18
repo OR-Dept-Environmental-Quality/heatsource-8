@@ -30,8 +30,9 @@ class Interpolator(defaultdict):
             for i in xrange(len(y0)):
                 try: val += y0[i] + ((y1[i]-y0[i])*(key-x0))/(x1-x0), # add value to the tuple
                 except TypeError: val = y0[i] + ((y1[i]-y0[i])*(key-x0))/(x1-x0),
-            return val
-        else: return y0 + ((y1-y0)*(key-x0))/(x1-x0)
+        else: val = y0 + ((y1-y0)*(key-x0))/(x1-x0)
+        self[key] = val
+        return val
 
     def View(self, minkey, maxkey, fore=None, aft=None):
         """Return dictionary subset

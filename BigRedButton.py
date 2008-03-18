@@ -16,12 +16,12 @@ from Dieties import Chronos
 from Dieties import IniParams
 from Utils.Logger import Logger
 from Utils.Output import Output as O
-from heatsource import HeatSourceError, CalcMacCormick
+from heatsource.HSmodule import HeatSourceError, CalcMacCormick
 
 from __version__ import version_info
+from __debug__ import psyco_optimize
 
 try:
-    from __debug__ import psyco_optimize
     if psyco_optimize:
         from psyco.classes import psyobj
         object = psyobj
@@ -32,7 +32,8 @@ class ModelControl(object):
         self.ErrLog = Logger
         self.worksheet = join(worksheet)
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
-
+        if not psyco_optimize: self.Initialize()
+        
     def PrintReach(self):
         with open("c:\\Reach.txt", "w") as f:
             for node in self.HS.Reach.itervalues():
@@ -73,7 +74,7 @@ class ModelControl(object):
 
     ###############################################################
     def run(self): # Argument allows profiling and testing
-        self.Initialize()
+        if psyco_optimize: self.Initialize()
         time = Chronos.TheTime
         stop = Chronos.stop
         start = Chronos.start
@@ -115,12 +116,13 @@ class ModelControl(object):
                 raise SystemExit
 
             out += self.reachlist[-1].Q
-            self.Output()
+            self.Output.call()
             time = Chronos(True)
 
-        self.Output.flush()
+        self.Output.close()
         total_time = (Time() - time1) /60
-        total_days = total_time/(IniParams["simperiod"]+IniParams["flushdays"])
+        simperiod = (IniParams["modelend"] - IniParams["modelstart"])/86400
+        total_days = total_time/(simperiod+IniParams["flushdays"])
         balances = [x.Q_mass for x in self.reachlist]
         total_inflow = sum(balances)
         mettaseconds = (total_time/timesteps/len(self.reachlist))*1e6
