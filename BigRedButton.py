@@ -34,17 +34,17 @@ class ModelControl(object):
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         if not psyco_optimize: self.Initialize()
         
-    def PrintReach(self):
-        with open("c:\\Reach.txt", "w") as f:
-            for node in self.HS.Reach.itervalues():
-                f.write("%s\n" % node)
-                for attr, val in node.GetNodeData().iteritems():
-                    if attr in ["C_args", "FLIR_Time", "FLIR_Temp", "Log"]: continue
-                    try:
-                        f.write("\t%s: %s\n" % (attr, `val`))
-                    except TypeError:
-                        f.write("\t%s\n" % (attr, [`i` for i in attr]))
-        raise Exception("DONE")
+#    def PrintReach(self):
+#        with open("c:\\Reach.txt", "w") as f:
+#            for node in self.HS.Reach.itervalues():
+#                f.write("%s\n" % node)
+#                for attr, val in node.GetNodeData().iteritems():
+#                    if attr in ["C_args", "FLIR_Time", "FLIR_Temp", "Log"]: continue
+#                    try:
+#                        f.write("\t%s: %s\n" % (attr, `val`))
+#                    except TypeError:
+#                        f.write("\t%s\n" % (attr, [`i` for i in attr]))
+#        raise Exception("DONE")
 
     def Initialize(self):
         """Set up the model.
