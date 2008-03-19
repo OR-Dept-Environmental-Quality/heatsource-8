@@ -34,18 +34,6 @@ class ModelControl(object):
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         if not psyco_optimize: self.Initialize()
         
-#    def PrintReach(self):
-#        with open("c:\\Reach.txt", "w") as f:
-#            for node in self.HS.Reach.itervalues():
-#                f.write("%s\n" % node)
-#                for attr, val in node.GetNodeData().iteritems():
-#                    if attr in ["C_args", "FLIR_Time", "FLIR_Temp", "Log"]: continue
-#                    try:
-#                        f.write("\t%s: %s\n" % (attr, `val`))
-#                    except TypeError:
-#                        f.write("\t%s\n" % (attr, [`i` for i in attr]))
-#        raise Exception("DONE")
-
     def Initialize(self):
         """Set up the model.
 
@@ -66,8 +54,7 @@ class ModelControl(object):
         stop = IniParams["modelend"]
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
-        Chronos.Start(start, dt, stop, spin, IniParams["offset"], IniParams["daylightsavings"])
-        Chronos.dst = IniParams["daylightsavings"] # adjust for daylight savings time
+        Chronos.Start(start, dt, stop, spin, IniParams["offset"])
         self.Output = O(60, self.HS.Reach, start)
         ##########################################################
         self.testfile = open("E:\\solar_new.txt", "w")
@@ -105,7 +92,7 @@ class ModelControl(object):
                     unlink("c:\\quit_heatsource")
                     QuitMessage()
             try:
-                self.run_all(time, hour, minute, second, JD, JDC, offset)
+                self.run_all(time, hour, minute, second, JD, JDC)
             except HeatSourceError, (stderr):
                 msg = "At %s and time %s\n"%(self, Chronos.PrettyTime())
                 try:
@@ -133,16 +120,16 @@ class ModelControl(object):
         print message
     #############################################################
     ## three different versions of the run() routine, depending on the run_type
-    def run_hs(self, time, H, M, S, JD, JDC, offset):
+    def run_hs(self, time, H, M, S, JD, JDC):
         [x.CalcDischarge(time) for x in self.reachlist]
-        [x.CalcHeat(time, H, M, S, JD, JDC, offset) for x in self.reachlist]
+        [x.CalcHeat(time, H, M, S, JD, JDC) for x in self.reachlist]
         [x.MacCormick2(time) for x in self.reachlist]
 
-    def run_hy(self, time, H, M, S, JD, JDC, offset):
+    def run_hy(self, time, H, M, S, JD, JDC):
         [x.CalcDischarge(time) for x in self.reachlist]
 
-    def run_sh(self, time, H, M, S, JD, JDC, offset):
-        [x.CalcHeat(time, H, M, S, JD, JDC, offset) for x in self.reachlist]
+    def run_sh(self, time, H, M, S, JD, JDC):
+        [x.CalcHeat(time, H, M, S, JD, JDC) for x in self.reachlist]
 
 
 def QuitMessage():

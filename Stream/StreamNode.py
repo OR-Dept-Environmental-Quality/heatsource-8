@@ -75,7 +75,7 @@ class StreamNode(object):
                 "F_LW_Stream", "F_LW_Atm", "F_LW_Veg", # Longwave fluxes
                 "C_args", # tuple of variables that do not change during the model
                 "CalcHeat", "CalcDischarge", # Reference to correct heat calculation method
-                "SolarPos" # Solar position variables (headwater node only)
+                "SolarPos", "UTC_offset" # Solar position variables and UTC_offset for their calculation
                 ]
         # Define members in __slots__ to ensure that later member names cannot be added accidentally
         # Set all the attributes to bare lists, or set from the constructor
@@ -97,7 +97,7 @@ class StreamNode(object):
         self.F_Total = 0.0
         self.Log = Logger
         self.ShaderList = ()
-
+        self.UTC_offset = IniParams["offset"]
     def GetNodeData(self):
         data = {}
         for attr in self.__slots:
@@ -246,7 +246,7 @@ c_k: %3.4f""" % stderr
         msgbox(msg)
         raise Exception(msg)
 
-    def CalcHeat_Opt(self, time, hour, min, sec,JD,JDC,offset):
+    def CalcHeat_Opt(self, time, hour, min, sec,JD,JDC):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
         # Reset temperatures
         self.T_prev = self.T
@@ -267,11 +267,11 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-    def CalcHeat_BoundaryNode(self, time, hour, min, sec,JD,JDC,offset):
+    def CalcHeat_BoundaryNode(self, time, hour, min, sec,JD,JDC):
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
-        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, offset, JDC)
+        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, self.UTC_offset, JDC)
         self.SolarPos = Altitude, Zenith, Daytime, dir
         try:
             self.F_Solar, \

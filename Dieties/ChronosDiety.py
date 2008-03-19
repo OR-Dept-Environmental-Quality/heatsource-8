@@ -73,7 +73,7 @@ class ChronosDiety(object):
     def TimeTuple(self): return localtime(self.__current)
     def ExcelTime(self): return float(pyTime(self.__current))
     
-    def Start(self, start, dt=None, stop=None, spin=0, offset=0, dst=-1):
+    def Start(self, start, dt=None, stop=None, spin=0, offset=0):
         """Initialize the clock to some default values and get ready to run.
         
         Initial values are starting and stopping times, timestep in seconds, number
@@ -87,12 +87,11 @@ class ChronosDiety(object):
         self.__offset = offset # The timezone offset, default to GMT
         self.__start = start
         self.__dt = dt or self.minute # There's a default dt of one minute
-        self.__dst = dst # whether we're in daylight savings time or not
         self.__stop = stop or self.__start + self.day # There's a default runtime of one day
         self.__spin_start = self.__start- (spin*86400) if spin else self.__start # Start of the spin-up period
         self.__spin_current = self.__start # Current time within the spinup period
         self.__current = self.__spin_current
-        self.__dayone = mktime((localtime(self.__start)[0],1,1,0,0,0,-1,-1,dst))
+        self.__dayone = mktime((localtime(self.__start)[0],1,1,0,0,0,-1,-1,-1))
         self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
         self.__jd = None # Placeholder for current julian day
         
@@ -105,7 +104,6 @@ class ChronosDiety(object):
         Naval Observatory's online system"""
         # Then break out the time into a tuple
         y,m,d,H,M,S,day,wk,tz = localtime(self.__current)
-        #H -= t.tzinfo.dst(t).seconds == 3600 # Correct the time for DST
         dec_day = d + (H + (M + S/60)/60)/24
 
         if m < 3:
@@ -132,7 +130,7 @@ class ChronosDiety(object):
     start = property(lambda self: self.__start)
     stop = property(lambda self: self.__stop)
     dt = property(lambda self: self.__dt)
-    offset = property(lambda self: self.__dst)
+    offset = property(lambda self: self.__offset)
     TheTime = property(lambda self: self.__current)
     JD = property(lambda self: self.GetJD())
     UTC = property(lambda self: gmtime(self.__current))
