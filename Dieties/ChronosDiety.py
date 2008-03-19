@@ -22,7 +22,6 @@ class ChronosDiety(object):
         self.hour = self.minute * 60
         self.day = self.hour * 24
         self.week = self.day * 7
-        self.__dayone = None # First day, used in julian day calculation
         self.__current = None # Current time
         self.__start = None
         self.__dt = None
@@ -91,7 +90,6 @@ class ChronosDiety(object):
         self.__spin_start = self.__start- (spin*86400) if spin else self.__start # Start of the spin-up period
         self.__spin_current = self.__start # Current time within the spinup period
         self.__current = self.__spin_current
-        self.__dayone = mktime((localtime(self.__start)[0],1,1,0,0,0,-1,-1,-1))
         self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
         self.__jd = None # Placeholder for current julian day
         
@@ -109,12 +107,8 @@ class ChronosDiety(object):
         if m < 3:
             m += 12;
             y -= 1;
-        # TODO: Figure out which of these options are correct.
-        # The first one, using dec_day, is taken from literature I found:
-        # julian_day = math.floor(365.25*(y+4716.0)) + math.floor(30.6001*(m+1)) + dec_day - 1524.5;
-        # The second is taken from the VB code
+
         julian_day = int(365.25*(y+4716.0)) + int(30.6001*(m+1)) + d - 1524.5;
-        #(I've stayed with the VB version for consistency)
 
         # This value should only be added if we fall after a certain date
         if julian_day > 2299160.0:
@@ -133,4 +127,3 @@ class ChronosDiety(object):
     offset = property(lambda self: self.__offset)
     TheTime = property(lambda self: self.__current)
     JD = property(lambda self: self.GetJD())
-    UTC = property(lambda self: gmtime(self.__current))

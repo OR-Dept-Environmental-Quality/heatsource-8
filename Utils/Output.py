@@ -62,7 +62,7 @@ class Output(object):
 
     def call(self):
         TheTime = Chronos()
-        year, month, day, hour, minute, second, wk,jd,offset = Chronos.TimeTuple()
+        year, month, day, hour, minute, second, wk,jd,dst = Chronos.TimeTuple()
         if (TheTime < self.write_time) or (Chronos() < Chronos.start): return
         for node in self.nodes:
             try:

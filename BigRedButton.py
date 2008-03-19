@@ -55,7 +55,7 @@ class ModelControl(object):
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start, dt, stop, spin, IniParams["offset"])
-        self.Output = O(60, self.HS.Reach, start)
+        self.Output = O(3660, self.HS.Reach, start)
         ##########################################################
         self.testfile = open("E:\\solar_new.txt", "w")
 
