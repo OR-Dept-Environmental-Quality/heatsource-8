@@ -1,5 +1,4 @@
 from __future__ import division
-from datetime import datetime, timedelta
 from ..Dieties import IniParams
 from ..Dieties import Chronos
 from time import localtime

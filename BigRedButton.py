@@ -10,6 +10,7 @@ from win32com.client import Dispatch
 from win32gui import PumpWaitingMessages
 from Utils.easygui import msgbox, buttonbox
 from time import time as Time
+from time import ctime
 
 from Excel.HeatSourceInterface import HeatSourceInterface
 from Dieties import Chronos

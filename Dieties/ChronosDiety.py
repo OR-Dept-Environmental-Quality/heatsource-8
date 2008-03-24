@@ -39,6 +39,9 @@ class ChronosDiety(object):
         if not tick: return self.__current
         # First we increment the current time by dt
         self.__current += self.__dt
+        if localtime(self.__current)[2] != localtime(self.__thisday)[2]: #Day numbers not equal, need to recalculate julian day
+            self.__thisday = self.__current
+            self.CalcJulian()
         # Then test whether we're still spinning up
         if self.__current < self.__start: # If we're still in the spin-up period
             if ((self.__spin_current+self.__dt)-self.__spin_start).days: #Make sure we don't advance to next day (i.e. just run the first day over and over)
@@ -91,15 +94,9 @@ class ChronosDiety(object):
         self.__spin_current = self.__start # Current time within the spinup period
         self.__current = self.__spin_current
         self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
-        self.__jd = None # Placeholder for current julian day
+        self.CalcJulian()
         
-    def GetJD(self):
-        """FracJD([time])-> floating point julian day
-
-        Takes a datetime object in UTC and returns a fractional julian date
-        according to the Naval Observatory calculations. The method rounds
-        the resulting floating point number to 5 places to conform with the
-        Naval Observatory's online system"""
+    def CalcJulian(self):
         # Then break out the time into a tuple
         y,m,d,H,M,S,day,wk,tz = localtime(self.__current)
         dec_day = d + (H + (M + S/60)/60)/24
@@ -115,10 +112,16 @@ class ChronosDiety(object):
             a = int(y/100)
             b = (2 - a + int(a/4))
             julian_day += b
-        jd = round(julian_day,5) #Python numerics return to about 10 places, Naval Observatory goes to 5
-        jdc = round((jd-2451545.0)/36525.0,10) # Eqn. 2-5 in HS Manual
-        return jd, jdc
+        #This is the julian century
+        self.__jdc = round((julian_day-2451545.0)/36525.0,10) # Eqn. 2-5 in HS Manual
+        
+        #Calculate the Julian date up until the first of the year.
+        firstjulian = ((146097*(y+4799))/400)-31738
 
+        #Calculate the Julian day since the beginning of the year from the Gregorian date.
+        a = (14-m)/12
+        self.__jd = (d-32045+(((153*(m+(12*a)-3))+2)/5)+((146097*(y+4800-a))/400))-firstjulian+1
+        
     #####################################################
     # Properties to allow reading but no changes
     start = property(lambda self: self.__start)
@@ -126,4 +129,4 @@ class ChronosDiety(object):
     dt = property(lambda self: self.__dt)
     offset = property(lambda self: self.__offset)
     TheTime = property(lambda self: self.__current)
-    JD = property(lambda self: self.GetJD())
+    JD = property(lambda self: (self.__jd, self.__jdc))

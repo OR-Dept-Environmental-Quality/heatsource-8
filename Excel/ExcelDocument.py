@@ -18,12 +18,12 @@ directionDown = -4121
 directionLeft = -4131
 directionRight = -4152
 
-try:
-    from ..__debug__ import psyco_optimize
-    if psyco_optimize:
-        from psyco.classes import psyobj
-        object = psyobj
-except InputError: pass
+#try:
+#    from ..__debug__ import psyco_optimize
+#    if psyco_optimize:
+#        from psyco.classes import psyobj
+#        object = psyobj
+#except InputError: pass
 
 class TextPB(object):
     def __init__(self):

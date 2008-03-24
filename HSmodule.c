@@ -759,10 +759,10 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 	PyObject *ShaderList, *ContData, *C_args, *Q_tribs, *T_tribs;
 	double W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, SedDepth;
 	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt;
-	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w, JD;
+	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w;
 	double U, T_alluv, T_prev, T_sed, Q_hyp, cloud, humidity, T_air, wind, Disp;
-	int hour, daytime, has_prev, emergent, calcevap, penman, calcalluv;
-	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdididddd",
+	int hour, daytime, has_prev, emergent, calcevap, penman, calcalluv, JD;
+	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdiiidddd",
 								&ContData, &C_args, &d_w, &area, &P_w, &W_w, &U,
 								&Q_tribs, &T_tribs, &T_prev, &T_sed, &Q_hyp,
 								&T_dn_prev, &ShaderList, &Disp, &hour, &JD, &daytime,
