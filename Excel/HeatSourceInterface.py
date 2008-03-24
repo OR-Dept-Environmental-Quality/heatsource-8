@@ -11,6 +11,7 @@ from win32gui import PumpWaitingMessages
 from bisect import bisect
 from time import mktime, localtime, asctime, strptime
 
+
 from ..Stream.StreamNode import StreamNode
 from ..Dieties import IniParams
 from ..Dieties import Chronos
@@ -104,8 +105,10 @@ class HeatSourceInterface(ExcelDocument):
         self.long = IniParams["longsample"]
         self.dx = IniParams["dx"]
         self.multiple = int(self.dx/self.long) #We have this many samples per distance step
-        #####################
 
+        self.flowtimelist = self.GetTimelist("Flow Data")
+        self.continuoustimelist = self.GetTimelist("Continuous Data")
+        #####################
         # Now we start through the steps of building a stream reach full of nodes
         self.GetBoundaryConditions()
         self.BuildNodes()
@@ -186,7 +189,7 @@ class HeatSourceInterface(ExcelDocument):
         self.PB("Reading boundary conditions")
         C = Chronos
         sheetname = "Continuous Data"
-        timelist = self.GetTimelist(sheetname)
+        timelist = self.continuoustimelist
         Rstart, Cstart = 5,5
         Rend = Rstart + len(timelist) - 1
         Cend = 7
@@ -248,8 +251,8 @@ class HeatSourceInterface(ExcelDocument):
         self.CheckEarlyQuit()
         self.PB("Reading inflow data")
         sheetname = "Flow Data"
+        timelist = self.flowtimelist
         # Get a list of the timestamps that we have data for, and use that to grab the data block
-        timelist = self.GetTimelist(sheetname)
         Rstart, Cstart = 4,12
         Rend = Rstart + len(timelist) - 1
         Cend = IniParams["inflowsites"]*2 + Cstart - 1
@@ -303,8 +306,8 @@ class HeatSourceInterface(ExcelDocument):
         self.CheckEarlyQuit()
         self.PB("Reading Continuous Data")
         sheetname = "Continuous Data"
-        timelist = self.GetTimelist(sheetname)
         Rstart,Cstart = 5,9
+        timelist = self.continuoustimelist
         Rend = Rstart + len(timelist) - 1
         #We need five columns because stream temp data (which we ignore in heat source)
         Cend = IniParams["contsites"]*5 + Cstart-1
@@ -623,9 +626,8 @@ class HeatSourceInterface(ExcelDocument):
 
     def InitializeNode(self, node):
         """Perform some initialization of the StreamNode, and write some values to spreadsheet"""
-        timelist = self.GetTimelist("Flow Data")
         # Initialize each nodes tribs dictionary to a tuple
-        for time in timelist:
+        for time in self.flowtimelist:
             node.Q_tribs[time] = ()
             node.T_tribs[time] = ()
         ##############################################################
