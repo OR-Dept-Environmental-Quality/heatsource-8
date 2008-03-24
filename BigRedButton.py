@@ -34,7 +34,7 @@ class ModelControl(object):
         self.worksheet = join(worksheet)
         self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
         if not psyco_optimize: self.Initialize()
-        
+
     def Initialize(self):
         """Set up the model.
 
@@ -56,7 +56,7 @@ class ModelControl(object):
         spin = IniParams["flushdays"] # Spin up period
         # Other classes hold references to the instance, but only we should Start() it.
         Chronos.Start(start, dt, stop, spin, IniParams["offset"])
-        self.Output = O(3660, self.HS.Reach, start)
+        self.Output = O(3600, self.HS.Reach, start)
         ##########################################################
         self.testfile = open("E:\\solar_new.txt", "w")
 
