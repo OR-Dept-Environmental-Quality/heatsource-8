@@ -1,6 +1,14 @@
-from __future__ import with_statement, division
-#from __future__ import with_statement # On separate line to satisfy PyDev bug
+"""BigRedButton holds the main Heat Source model controls
 
+BigRedButton holds the main Heat Source model controls.
+The ModelControl class is basically a one-off hack that
+loads and controls the model run. The other functions are
+supplied for use by the Excel interface, which imports this
+module in order to run the model from Excel.
+"""
+from __future__ import with_statement, division
+
+# Built-in modules
 from itertools import count
 from traceback import print_exc, format_tb
 from sys import exc_info
@@ -12,16 +20,18 @@ from Utils.easygui import msgbox, buttonbox
 from time import time as Time
 from time import ctime
 
-from Excel.HeatSourceInterface import HeatSourceInterface
+# Heat Source modules
+from Excel.ExcelInterface import ExcelInterface
 from Dieties import Chronos
 from Dieties import IniParams
 from Utils.Logger import Logger
 from Utils.Output import Output as O
-from heatsource.HSmodule import HeatSourceError, CalcMacCormick
-
+from HSmodule import HeatSourceError
 from __version__ import version_info
 from __debug__ import psyco_optimize
 
+# This statement allows use of psyco optimization if
+# __debug__.psyco_optimize = True
 try:
     if psyco_optimize:
         from psyco.classes import psyobj
@@ -29,62 +39,116 @@ try:
 except ImportError: pass
 
 class ModelControl(object):
-    def __init__(self, worksheet, run_type=0):
+    """Main model control class for Heat Source. 
+    
+    While it works, this class is basically a one-off hack
+    that was designed as an interim solution to model control.
+    As it is, it's a fairly dumb method which simply grabs
+    a list of StreamNodes from the ExcelInterface class,
+    and loops through them using the iterator inside 
+    ChronosDiety to advance the time. Ideally, this would be
+    a more sophisticated system that could hold and control
+    multiple stream reaches, modeling upstream reaches 
+    and using the results as tributary inputs to the down-
+    stream reaches. For that, we'd likely need a separate
+    Reach class. Since this was essentially an interim 
+    solution to the problem, don't hesitate to improve it.
+    """
+    def __init__(self, spreadsheet, run_type=0):
+        """ModelControl(spreadsheet, run_type) -> Class instance
+        
+        Spreadsheet is the path to an excel sheet containing the data.
+        run_type is one of 0,1,2 for Heat Source, Solar only, or
+        hydraulics only, respectively.
+        """
+        # TODO: Fix the logger so it actually works
         self.ErrLog = Logger
-        self.worksheet = join(worksheet)
-        self.run_type = run_type # can be "HS", "SH", or "HY" for Heatsource, Shadalator, or Hydraulics, resp.
-        if not psyco_optimize: self.Initialize()
+        self.worksheet = join(spreadsheet)
+        self.run_type = run_type
+        if not psyco_optimize: self.initialize()
 
-    def Initialize(self):
+    def initialize(self):
         """Set up the model.
 
-        This is not in __init__() because of psyco and to faciliate the
+        This is not in __init__() because psyco does not 
+        optimize calls inside __init__(). Much of the optimization
+        that we want is in the call to ExcelInterface, so we have
+        a separate initialize method and call it depending on whether
+        we are optimized (in Run() or not (in __init__()). This may
+        also allow us to faciliate the (very much later, if ever)
         ability to run concurrent models or store the ModelControl class
         for Monte Carlo runs if we want to do that later."""
-        self.HS = HeatSourceInterface(self.worksheet, self.ErrLog, self.run_type)
+        # Create an ExcelInterface instance. Here, we could just grab
+        # the Reach and PB (progress bar) attributes and then release it,
+        # but internal use has suggested that it's nice to keep ownership
+        # of the sheet throughout the model run.
+        self.HS = ExcelInterface(self.worksheet, self.ErrLog, self.run_type)
+
+        # This is the list of StreamNode instances- we sort it in reverse
+        # order because we number stream kilometer from the mouth to the 
+        # headwater, but we want to run the model from headwater to mouth.
         self.reachlist = sorted(self.HS.Reach.itervalues(), reverse=True)
-        self.cur_hour = None
+
+        # This if statement prevents us from having to test every timestep
+        # We just call self.run_all(), which is a classmethod pointing to
+        # the correct method.
         if self.run_type == 0: self.run_all = self.run_hs
         elif self.run_type == 1: self.run_all = self.run_sh
         elif self.run_type == 2: self.run_all = self.run_hy
-        else: raise Exception("Bad run_type: %i" %`self.run_type`)
-        ##########################################################
-        # Create a Chronos iterator that controls all model time
-        dt = IniParams["dt"]
-        start = IniParams["modelstart"]
-        stop = IniParams["modelend"]
-        spin = IniParams["flushdays"] # Spin up period
-        # Other classes hold references to the instance, but only we should Start() it.
-        Chronos.Start(start, dt, stop, spin, IniParams["offset"])
-        self.Output = O(3600, self.HS.Reach, start)
-        ##########################################################
-        self.testfile = open("E:\\solar_new.txt", "w")
+        else: raise Exception("Bad run_type: %i. Must be 0, 1 or 2" %`self.run_type`)
 
-    ###############################################################
-    def run(self): # Argument allows profiling and testing
-        if psyco_optimize: self.Initialize()
-        time = Chronos.TheTime
-        stop = Chronos.stop
-        start = Chronos.start
-        flush = start-(IniParams["flushdays"]*86400)
+        # Create a Chronos iterator that controls all model time.
+        Chronos.Start(start = IniParams["modelstart"],
+                      stop = IniParams["modelend"],
+                      dt = IniParams["dt"],
+                      spin = IniParams["flushdays"],
+                      offset = IniParams["offset"])
+
+        # This is the output class, which is essentially just a list
+        # of file objects and an append method which writes to them
+        # every so often.
+        self.Output = O(3600, self.HS.Reach, start)
+
+    def Run(self):
+        """Run the model one time
+        
+        Use the Chronos instance and list of StreamNodes to cycle
+        through each timestep and spacestep, calling the appropriate
+        StreamNode functions to calculate heat and hydraulics."""
+        if psyco_optimize: self.initialize()
+        time = Chronos.TheTime # Current time of the Chronos clock (i.e. this timestep)
+        stop = Chronos.stop # Stop time for Chronos
+        start = Chronos.start # Start time for Chronos, model start, not flush/spin start.
+        flush = start-(IniParams["flushdays"]*86400) # in seconds
         # Number of timesteps is based on the division of the timesteps into the hour. In other words
         # 1 day with a 1 minute dt is 1440 timesteps, while a 3 minute dt is only 480 timesteps. Thus,
         # We define the timesteps by dividing dt (now in seconds) by 3600
         timesteps = (stop-flush)/IniParams["dt"]
-        cnt = count()
-        out = 0
-        time1 = Time()
-        while time < stop:
-            JD, JDC = Chronos.JD
-            year, month, day, hour, minute, second, weekday, jday, offset = Chronos.TimeTuple()
-            if not (minute + second): # every hour
+        cnt = count() # Counter iterator for counting current timesteps passed
+        out = 0 # Volume of water flowing out of mouth (for simple mass balance)
+        time1 = Time() # Current computer time- for estimating total model runtime
+        ################################################################
+        # So, it's simple and stupid. We basically just cycle through the time
+        # until we get to the model stop time, and each cycle, we call a method
+        # that cycles through the StreamNodes, and calculates them in order.
+        # A smarter way would be to thread this so we can start calculating
+        # the second timestep (using another CPU or core) while the first one
+        # is still unfinished.
+        while time <= stop:
+            year, month, day, hour, minute, second, JD, offset, JDC = Chronos.TimeTuple()
+            # If minute and second are both zero, we are at the top of the hour. Performing
+            # The following house keeping tasks each hours saves us enormous amounts of
+            # runtime overhead over doing it every timestep.
+            if not (minute + second):
                 ts = cnt.next() # Number of actual timesteps per tick
                 hr = 60/(IniParams["dt"]/60) # Number of timesteps in one hour
+                # This writes a line to the status bar of Excel.
                 self.HS.PB("%i of %i timesteps"% (ts*hr, timesteps))
-                # Update the Excel status bar
+                # Update the Excel status bar when the queue is free
                 PumpWaitingMessages()
-                # Reset the flux daily sum for a new day
-                if not hour:
+                # zero hour+minute+second means first timestep of new day
+                # We want to zero out the daily flux sum at this point.
+                if not hour: 
                     for nd in self.reachlist: nd.F_DailySum = [0]*5
                 # Check to see if the user pressed the stop button. Pretty crappy kludge here- VB code writing an
                 # empty file- but I basically got to lazy to figure out how to interact with the underlying
@@ -92,8 +156,12 @@ class ModelControl(object):
                 if exists("c:\\quit_heatsource"):
                     unlink("c:\\quit_heatsource")
                     QuitMessage()
+            # Back to every timestep level of the loop. Here we wrap the call to
+            # run_all() in a try block to catch the exceptions thrown.
             try:
+                # Note that all of the run methods have to have the same signature
                 self.run_all(time, hour, minute, second, JD, JDC)
+            # Shit, there's a problem, throw an exception up using a graphical window.
             except HeatSourceError, (stderr):
                 msg = "At %s and time %s\n"%(self, Chronos.PrettyTime())
                 try:
@@ -101,49 +169,67 @@ class ModelControl(object):
                 except TypeError:
                     msg += `stderr`+"\nThe model run has been halted. You may ignore any further error messages."
                 msgbox(msg)
+                # Then just die
                 raise SystemExit
-
+            
+            # We've made it through the entire stream without an error, so we update our mass balance
+            # by adding the discharge of the mouth...
             out += self.reachlist[-1].Q
+            # Call the Output class to update the textfiles
             self.Output.call()
+            # and tell Chronos that we're moving time forward.
             time = Chronos(True)
 
-        self.Output.close()
+        # So, here we are at the end of a model run. First we calculate how long all of this took
         total_time = (Time() - time1) /60
-        simperiod = (IniParams["modelend"] - IniParams["modelstart"])/86400
-        total_days = total_time/(simperiod+IniParams["flushdays"])
+        # Calculate the mass balance inflow
         balances = [x.Q_mass for x in self.reachlist]
         total_inflow = sum(balances)
-        mettaseconds = (total_time/timesteps/len(self.reachlist))*1e6
+        # Calculate how long the model took to run each timestep for each spacestep.
+        # This is how long (on average) it took to calculate a single StreamNode's information
+        # one time. Ideally, for performance and impatience reasons, we want this to be somewhere
+        # around or less than 1 microsecond.
+        microseconds = (total_time/timesteps/len(self.reachlist))*1e6
         message = "Finished in %i minutes (%0.3f microseconds each cycle). Water Balance: %0.3f/%0.3f" %\
-                    (total_time, mettaseconds, total_inflow, out)
+                    (total_time, microseconds, total_inflow, out)
+        # write that final message to the Excel status bar
         self.HS.PB(message)
-        self.testfile.close()
-        print message
+        # and close out Output.
+        self.Output.close()
+        # Hopefully, Python's cyclic garbage collection takes care of the rest :)
+
     #############################################################
-    ## three different versions of the run() routine, depending on the run_type
+    # three different versions of the run() routine, depending on the run_type
+    # We use list comprehension because it's slightly faster than a for loop,
+    # and we want to eek out all the speed we can.
     def run_hs(self, time, H, M, S, JD, JDC):
+        """Call both hydraulic and solar routines for each StreamNode"""
         [x.CalcDischarge(time) for x in self.reachlist]
         [x.CalcHeat(time, H, M, S, JD, JDC) for x in self.reachlist]
         [x.MacCormick2(time) for x in self.reachlist]
 
     def run_hy(self, time, H, M, S, JD, JDC):
+        """Call hydraulic routines for each StreamNode"""
         [x.CalcDischarge(time) for x in self.reachlist]
 
     def run_sh(self, time, H, M, S, JD, JDC):
+        """Call solar routines for each StreamNode"""
         [x.CalcHeat(time, H, M, S, JD, JDC) for x in self.reachlist]
 
 
 def QuitMessage():
-        b = buttonbox("Do you really want to quit Heat Source", "Quit Heat Source", ["Cancel", "Quit"])
-        if b == "Quit":
-            raise Exception("Model stopped user.")
-        else: return
+    """Throw up a confirmation box to make sure we didn't hit the quit button accidentally"""
+    b = buttonbox("Do you really want to quit Heat Source", "Quit Heat Source", ["Cancel", "Quit"])
+    if b == "Quit":
+        raise Exception("Model stopped user.")
+    else: return
 
 
 def RunHS(sheet):
+    """Run full model"""
     try:
         HSP = ModelControl(sheet)
-        HSP.run()
+        HSP.Run()
         del HSP
     except Exception, stderr:
         f = open("c:\\HSError.txt", "w")
@@ -151,18 +237,20 @@ def RunHS(sheet):
         f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunSH(sheet):
+    """Run solar routines only"""
     try:
         HSP = ModelControl(sheet, 1)
-        HSP.run()
+        HSP.Run()
     except Exception, stderr:
         f = open("c:\\HSError.txt", "w")
         print_exc(file=f)
         f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunHY(sheet):
+    """Run hydraulics only"""
     try:
         HSP = ModelControl(sheet, 2)
-        HSP.run()
+        HSP.Run()
     except Exception, stderr:
         f = open("c:\\HSError.txt", "w")
         print_exc(file=f)

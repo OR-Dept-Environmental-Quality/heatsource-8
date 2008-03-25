@@ -23,7 +23,7 @@ from ..Utils.easygui import buttonbox
 #    1: Heat Source
 #    2: Shadelator
 
-class HeatSourceInterface(ExcelDocument):
+class ExcelInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface"""
     def __init__(self, filename=None, log=None, run_type=0):
         ExcelDocument.__init__(self, filename)

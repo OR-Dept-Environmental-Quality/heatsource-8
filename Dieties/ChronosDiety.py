@@ -41,7 +41,7 @@ class ChronosDiety(object):
         self.__current += self.__dt
         if localtime(self.__current)[2] != localtime(self.__thisday)[2]: #Day numbers not equal, need to recalculate julian day
             self.__thisday = self.__current
-            self.CalcJulian()
+            self.CalcJulianCentury()
         # Then test whether we're still spinning up
         if self.__current < self.__start: # If we're still in the spin-up period
             #Make sure we don't advance to next day (i.e. just run the first day over and over)
@@ -73,7 +73,9 @@ class ChronosDiety(object):
     def Year(self): return localtime(self.__current)[0]
     def Month(self): return localtime(self.__current)[1]
     def Day(self): return localtime(self.__current)[2]
-    def TimeTuple(self): return localtime(self.__current)
+    def TimeTuple(self):
+        year, month, day, hour, minute, second, weekday, jday, offset = localtime(self.__current)
+        return year, month, day, hour, minute, second, jday, offset, self.__jdc 
     def ExcelTime(self): return float(pyTime(self.__current))
     
     def Start(self, start, dt=None, stop=None, spin=0, offset=0):
@@ -98,9 +100,9 @@ class ChronosDiety(object):
         self.__thisday = self.__current-self.__dt 
         # Placeholder for making sure we don't leave the spin-up period until the right time
         self.__spinday = localtime(self.__spin_current)[2] 
-        self.CalcJulian()
+        self.CalcJulianCentury()
         
-    def CalcJulian(self):
+    def CalcJulianCentury(self):
         # Then break out the time into a tuple
         y,m,d,H,M,S,day,wk,tz = localtime(self.__current)
         dec_day = d + (H + (M + S/60)/60)/24
@@ -118,13 +120,6 @@ class ChronosDiety(object):
             julian_day += b
         #This is the julian century
         self.__jdc = round((julian_day-2451545.0)/36525.0,10) # Eqn. 2-5 in HS Manual
-        
-        #Calculate the Julian date up until the first of the year.
-        firstjulian = ((146097*(y+4799))/400)-31738
-
-        #Calculate the Julian day since the beginning of the year from the Gregorian date.
-        a = (14-m)/12
-        self.__jd = (d-32045+(((153*(m+(12*a)-3))+2)/5)+((146097*(y+4800-a))/400))-firstjulian+1
         
     #####################################################
     # Properties to allow reading but no changes
