@@ -1,4 +1,4 @@
-from time import strptime, mktime, asctime, localtime
+from time import strptime, mktime, asctime, localtime, ctime
 from pywintypes import Time as pyTime
 
 try:
@@ -44,7 +44,8 @@ class ChronosDiety(object):
             self.CalcJulian()
         # Then test whether we're still spinning up
         if self.__current < self.__start: # If we're still in the spin-up period
-            if ((self.__spin_current+self.__dt)-self.__spin_start).days: #Make sure we don't advance to next day (i.e. just run the first day over and over)
+            #Make sure we don't advance to next day (i.e. just run the first day over and over)
+            if localtime(self.__spin_current+self.__dt)[2] != localtime(self.__spin_start)[2]: 
                 self.__spin_current = self.__spin_start # We would have advanced, so we start again on the first day
             else:
                 self.__spin_current += self.__dt # We're spinning up and haven't advanced, so use the current spin-up time
@@ -91,9 +92,12 @@ class ChronosDiety(object):
         self.__dt = dt or self.minute # There's a default dt of one minute
         self.__stop = stop or self.__start + self.day # There's a default runtime of one day
         self.__spin_start = self.__start- (spin*86400) if spin else self.__start # Start of the spin-up period
-        self.__spin_current = self.__start # Current time within the spinup period
+        self.__spin_current = self.__spin_start # Current time within the spinup period
         self.__current = self.__spin_current
-        self.__thisday = self.__current-self.__dt # Placeholder for deciding whether we have to recalculate the julian day
+        # Placeholder for deciding whether we have to recalculate the julian day
+        self.__thisday = self.__current-self.__dt 
+        # Placeholder for making sure we don't leave the spin-up period until the right time
+        self.__spinday = localtime(self.__spin_current)[2] 
         self.CalcJulian()
         
     def CalcJulian(self):
