@@ -103,7 +103,7 @@ class StreamNode(object):
         for attr in self.__slots:
             data[attr] = getattr(self,attr)
         return data
-    
+
     def __eq__(self, other):
         cmp = other.km if isinstance(other, StreamNode) else other
         return self.km == cmp

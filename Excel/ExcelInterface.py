@@ -226,7 +226,14 @@ class ExcelInterface(ExcelDocument):
         col, row = nums[sheet]
         timelist = [i for i in ifilter(None,self.GetColumn(col,sheet)[row:])]
         # Make sure that they are only value at the top of the hour
-        return tuple([mktime(strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")) for t in timelist])
+#        return tuple([mktime(strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")) for t in timelist])
+        timelist2 = ()
+        for t in timelist:
+            tm = strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[0:8]
+            tm += 0,
+            tm = mktime(tm)
+            timelist2 += tm,
+        return timelist2
 
     def GetLocations(self,sheetname):
         """Return a list of kilometers corresponding to the inflow or continuous data sites"""
@@ -291,6 +298,7 @@ class ExcelInterface(ExcelDocument):
                 # Here, we actually set the tribs library, appending to a tuple. Q_ and T_tribs are
                 # tuples of values because we may have more than one input for a given node
                 node.Q_tribs[time] += flow, #Append to tuple
+                #print node, time, flow, node.Q_tribs[time]
                 node.T_tribs[time] += temp,
             self.PB("Reading inflow data",tm.next(), length)
 
