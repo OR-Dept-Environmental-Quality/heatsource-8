@@ -21,19 +21,18 @@ from time import time as Time
 from time import ctime
 
 # Heat Source modules
+from Dieties import IniParams
 from Excel.ExcelInterface import ExcelInterface
 from Dieties import Chronos
-from Dieties import IniParams
 from Utils.Logger import Logger
 from Utils.Output import Output as O
 from HSmodule import HeatSourceError
 from __version__ import version_info
-from __debug__ import psyco_optimize
 
 # This statement allows use of psyco optimization if
-# __debug__.psyco_optimize = True
+# IniParams["psyco_optimize"] = True
 try:
-    if psyco_optimize:
+    if IniParams["psyco_optimize"]:
         from psyco.classes import psyobj
         object = psyobj
 except ImportError: pass
@@ -65,7 +64,7 @@ class ModelControl(object):
         self.ErrLog = Logger
         self.worksheet = join(spreadsheet)
         self.run_type = run_type
-        if not psyco_optimize: self.initialize()
+        if not IniParams["psyco_optimize"]: self.initialize()
 
     def initialize(self):
         """Set up the model.
@@ -115,7 +114,7 @@ class ModelControl(object):
         Use the Chronos instance and list of StreamNodes to cycle
         through each timestep and spacestep, calling the appropriate
         StreamNode functions to calculate heat and hydraulics."""
-        if psyco_optimize: self.initialize()
+        if IniParams["psyco_optimize"]: self.initialize()
         time = Chronos.TheTime # Current time of the Chronos clock (i.e. this timestep)
         stop = Chronos.stop # Stop time for Chronos
         start = Chronos.start # Start time for Chronos, model start, not flush/spin start.

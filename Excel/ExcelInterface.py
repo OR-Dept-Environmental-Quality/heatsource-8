@@ -16,11 +16,11 @@ from os import unlink
 from sys import exit
 from win32gui import PumpWaitingMessages
 from bisect import bisect
-from time import mktime, localtime, asctime, strptime
+from time import mktime, localtime, asctime, strptime, ctime
 
 # Heat Source Methods
-from ..Stream.StreamNode import StreamNode
 from ..Dieties import IniParams
+from ..Stream.StreamNode import StreamNode
 from ..Dieties import Chronos
 from ExcelDocument import ExcelDocument
 from ..Utils.Dictionaries import Interpolator
@@ -47,7 +47,6 @@ class ExcelInterface(ExcelDocument):
                "end": "C11",
                "flushdays": "C12",
                "offset": "C13",
-               "runmodule": "C15",
                "dt": "E4",
                "dx": "E5",
                "longsample": "E6",

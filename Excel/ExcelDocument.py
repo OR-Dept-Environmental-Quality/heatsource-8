@@ -5,6 +5,8 @@ from pywintypes import com_error
 from os.path import exists
 from os import remove
 
+from ..Dieties import IniParams
+
 borderTop = 3
 borderBottom = 4
 borderLeft = 1
@@ -19,8 +21,7 @@ directionLeft = -4131
 directionRight = -4152
 
 try:
-    from ..__debug__ import psyco_optimize
-    if psyco_optimize:
+    if IniParams["psyco_optimize"]:
         from psyco.classes import psyobj
         object = psyobj
 except InputError: pass

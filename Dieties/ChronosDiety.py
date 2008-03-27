@@ -1,9 +1,9 @@
 from time import strptime, mktime, asctime, localtime, ctime
 from pywintypes import Time as pyTime
+from IniParamsDiety import IniParams
 
 try:
-    from __debug__ import psyco_optimize
-    if psyco_optimize:
+    if IniParams["psyco_optimize"]:
         from psyco.classes import psyobj
         object = psyobj
 except ImportError: pass

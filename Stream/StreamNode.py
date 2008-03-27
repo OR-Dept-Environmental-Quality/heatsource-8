@@ -17,8 +17,7 @@ import heatsource.HSmodule as C_HS
 _HS = None # Placeholder for heatsource module
 
 try:
-    from __debug__ import psyco_optimize
-    if psyco_optimize:
+    if IniParams["psyco_optimize"]:
         from psyco.classes import psyobj
         object = psyobj
 except ImportError: pass
@@ -133,7 +132,7 @@ class StreamNode(object):
             self.CalcHeat = self.CalcHeat_Opt
         else:
             self.CalcHeat = self.CalcHeat_BoundaryNode
-        if IniParams["runmodule"] == "Python Source":
+        if IniParams["run_in_python"]:
             _HS = py_HS
         else:
             _HS = C_HS
