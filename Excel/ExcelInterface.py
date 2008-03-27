@@ -1,3 +1,10 @@
+"""Main interface class for Excel->Python conversion
+
+ExcelInterface provides the single resource for converting the data
+in the Excel spreadsheet into a list of StreamNode classes for use
+by the HeatSource model.
+"""
+# Builtin methods
 from __future__ import division
 from itertools import ifilter, izip, chain, repeat
 from math import ceil, log, degrees, atan
@@ -11,20 +18,19 @@ from win32gui import PumpWaitingMessages
 from bisect import bisect
 from time import mktime, localtime, asctime, strptime
 
-
+# Heat Source Methods
 from ..Stream.StreamNode import StreamNode
 from ..Dieties import IniParams
 from ..Dieties import Chronos
 from ExcelDocument import ExcelDocument
 from ..Utils.Dictionaries import Interpolator
 from ..Utils.easygui import buttonbox
-#Flag_HS values:
-#    0: Flow Router
-#    1: Heat Source
-#    2: Shadelator
 
 class ExcelInterface(ExcelDocument):
-    """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface"""
+    """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface.
+    
+    This class provides methods which seek knowingly through a correctly formatted Excel
+    spreadsheet. It creates a list of StreamNode instances, and populates those in"""
     def __init__(self, filename=None, log=None, run_type=0):
         ExcelDocument.__init__(self, filename)
         self.run_type = run_type
@@ -108,6 +114,13 @@ class ExcelInterface(ExcelDocument):
 
         self.flowtimelist = self.GetTimelist("Flow Data")
         self.continuoustimelist = self.GetTimelist("Continuous Data")
+        from pickle import dump
+        f1 = open("C:\\flowtime.lst","w")
+        f2 = open("C:\\conttime.lst","w")
+        dump(self.flowtimelist, f1)
+        dump(self.continuoustimelist, f2)
+        f1.close()
+        f2.close()
         #####################
         # Now we start through the steps of building a stream reach full of nodes
         self.GetBoundaryConditions()
@@ -333,7 +346,8 @@ class ExcelInterface(ExcelDocument):
                 i = c.next()
                 node = self.Reach[kms[i]] # Index by kilometer
                 # Append this node to a list of all nodes which have continuous data
-                self.ContDataSites.append(node.km)
+                if node.km not in self.ContDataSites:
+                    self.ContDataSites.append(node.km)
                 # Perform some tests for data accuracy and validity
                 if cloud is None: cloud = 0.0
                 if wind is None: wind = 0.0
@@ -349,14 +363,13 @@ class ExcelInterface(ExcelDocument):
             self.PB("Reading continuous data", tm.next(), length)
         # Now we strip out the unnecessary values from the dictionaries. This is placed here
         # at the end so we can dispose of it easily if necessary
+        self.PB("Subsetting the Continuous Data")
+        tm = count()
+        length = len(self.ContDataSites)
         for km in self.ContDataSites:
             node = self.Reach[km]
-            try:
-                node.ContData = node.ContData.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
-            except AttributeError:
-                # We've already subset the dictionary from another node, no need to do it again
-                pass
-
+            node.ContData = node.ContData.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
+            self.PB("Subsetting the Continuous Data",tm.next(), length)
     def zipper(self,iterable,mul=2):
         """Zippify list by grouping <mul> consecutive elements together
 
