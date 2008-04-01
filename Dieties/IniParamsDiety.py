@@ -19,7 +19,25 @@ modules. Including the import in the Dieties.__init__.py module.
 Good thing that very important caveat is buried deeply in these
 notes where no-one will ever read it.
 """
+from collections import defaultdict
 
-IniParams = {"psyco_optimize": False,
+class Interpolator(defaultdict):
+    def __init__(self, *args, **kwargs):
+        """Linearly interpolated dictionary class
+
+        This class assumes a numeric key/value pair and will
+        allow a linear interpolation between the
+        all values, filling the dictionary with the results."""
+        defaultdict.__init__(self)
+
+IniParams = {"psyco": ('Dictionaries',
+                        'BigRedButton',
+                        'StreamNode',
+                        'PyHeatsource',
+                        'ExcelDocument',
+                        'ExcelInterface',
+                        'IniParamsDiety',
+                        'ChronosDiety',
+                        'Output'),
              "run_in_python": True,
              }

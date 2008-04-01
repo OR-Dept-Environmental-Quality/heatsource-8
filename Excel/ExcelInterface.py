@@ -6,9 +6,8 @@ by the HeatSource model.
 """
 # Builtin methods
 from __future__ import division
-from itertools import ifilter, izip, chain, repeat
+from itertools import ifilter, izip, chain, repeat, count
 from math import ceil, log, degrees, atan
-from itertools import chain, ifilterfalse, count
 from datetime import datetime, timedelta
 from win32com.client import Dispatch
 from os.path import exists, join, split, normpath
@@ -19,12 +18,19 @@ from bisect import bisect
 from time import mktime, localtime, asctime, strptime, ctime
 
 # Heat Source Methods
-from ..Dieties import IniParams
+from ..Dieties.IniParamsDiety import IniParams
 from ..Stream.StreamNode import StreamNode
-from ..Dieties import Chronos
+from ..Dieties.ChronosDiety import Chronos
 from ExcelDocument import ExcelDocument
 from ..Utils.Dictionaries import Interpolator
 from ..Utils.easygui import buttonbox
+
+from .. import opt
+try:
+    if opt(__name__):
+        import psyco.classes
+        object = psyco.classes.psyobj
+except ImportError: pass
 
 class ExcelInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface.
@@ -129,8 +135,10 @@ class ExcelInterface(ExcelDocument):
         self.GetTributaryData()
         self.GetContinuousData()
         self.SetAtmosphericData()
+        self.OrientNodes()
         self.PB("Initializing StreamNodes")
 
+    def OrientNodes(self):
         # Now we manually set each nodes next and previous kilometer values by stepping through the reach
         l = self.Reach.keys()
         l.sort(reverse=True) # Sort descending, because streams are numbered from the mouth up
@@ -237,15 +245,15 @@ class ExcelInterface(ExcelDocument):
                 'Flow Data': (11, 3)}
         col, row = nums[sheet]
         timelist = [i for i in ifilter(None,self.GetColumn(col,sheet)[row:])]
-        # Make sure that they are only value at the top of the hour
-#        return tuple([mktime(strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")) for t in timelist])
-        timelist2 = ()
+
+        timelist2 = []
         for t in timelist:
-            tm = strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[0:8]
-            tm += 0,
-            tm = mktime(tm)
-            timelist2 += tm,
-        return timelist2
+            # strptime returns a tuple, we only want the first 8 elements as a list, then we want to
+            # add a zero to the end of the list. We append this list to timelist2 and ship it off
+            # as a tuple
+            tm = [i for i in strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[0:8]] + [0]
+            timelist2.append(mktime(tm))
+        return tuple(timelist2)
 
     def GetLocations(self,sheetname):
         """Return a list of kilometers corresponding to the inflow or continuous data sites"""
@@ -387,7 +395,7 @@ class ExcelInterface(ExcelDocument):
         # Then we tack on the boundary node element
         lst.insert(0,(iterable[0],))
         # Then strip off the None values from the last (if any)
-        lst[-1] = tuple(ifilterfalse(lambda x: x is None,lst[-1]))
+        lst[-1] = tuple(ifilter(lambda x: x is not None,lst[-1]))
         return self.numify(lst)
 
     def numify(self, lst):
@@ -395,7 +403,7 @@ class ExcelInterface(ExcelDocument):
         # Remove None values at the end of each individual list
         for i in xrange(len(lst)):
             # strip out values of None from the tuple, returning a new tuple
-            lst[i] = [x for x in ifilter(lambda x: x!=None, lst[i])]
+            lst[i] = [x for x in ifilter(lambda x: x is not None, lst[i])]
         # Remove blank strings from within the list
         for l in lst:
             n = []
@@ -419,7 +427,7 @@ class ExcelInterface(ExcelDocument):
         # re-write it (well, not lazy, but I'm not paid as a programmer, and so I have
         # "better" things to do than optimize our code.)
         # First we strip off the None values.
-        stripNone = lambda y: [i for i in ifilterfalse(lambda x: x is None, y)]
+        stripNone = lambda y: [i for i in ifilter(lambda x: x is not None, y)]
         return [predicate(stripNone(x)) for x in self.zipper(iterable,self.multiple)]
 
     def zeroOutList(self, lst):
@@ -547,6 +555,7 @@ class ExcelInterface(ExcelDocument):
         # values for each node. This is culled from earlier version's VB code and discussions
         # to try to simplify it... yeah, you read that right, simplify it... you should've seen in earlier!
         for h in xrange(len(keys)):
+            self.PB("Building VegZones", h, len(keys))
             node = self.Reach[keys[h]]
             VTS_Total = 0 #View to sky value
             LC_Angle_Max = 0
@@ -622,7 +631,6 @@ class ExcelInterface(ExcelDocument):
                     rip += RE,
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
             node.ViewToSky = 1 - VTS_Total / (7 * 90)
-            self.PB("Building VegZones", h, len(keys))
 
     def BuildZonesLidar(self):
         """Build zones if we are using LiDAR data"""

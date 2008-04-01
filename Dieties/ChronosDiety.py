@@ -2,10 +2,11 @@ from time import strptime, mktime, asctime, localtime, ctime
 from pywintypes import Time as pyTime
 from IniParamsDiety import IniParams
 
+from .. import opt
 try:
-    if IniParams["psyco_optimize"]:
-        from psyco.classes import psyobj
-        object = psyobj
+    if opt(__name__):
+        import psyco.classes
+        object = psyco.classes.psyobj
 except ImportError: pass
 
 class ChronosDiety(object):
@@ -129,3 +130,5 @@ class ChronosDiety(object):
     offset = property(lambda self: self.__offset)
     TheTime = property(lambda self: self.__current)
     JD = property(lambda self: (self.__jd, self.__jdc))
+    
+Chronos = ChronosDiety()

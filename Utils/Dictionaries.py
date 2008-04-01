@@ -3,6 +3,9 @@ from time import mktime, ctime, localtime
 from collections import defaultdict
 from bisect import bisect_right, bisect_left
 
+from ..Dieties.IniParamsDiety import IniParams
+from .. import opt
+
 class Interpolator(defaultdict):
     def __init__(self, *args, **kwargs):
         """Linearly interpolated dictionary class
@@ -67,9 +70,8 @@ class Interpolator(defaultdict):
             d[k] = self[k]
         return d
 
-############################################
-## Psyco optimization
 try:
-    from psyco import bind
-    bind(Interpolator.__missing__)
+    if opt(__name__):
+        import psyco
+        psyco.bind(Interpolator.__missing__)
 except ImportError: pass

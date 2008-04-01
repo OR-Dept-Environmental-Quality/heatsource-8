@@ -21,21 +21,15 @@ from time import time as Time
 from time import ctime
 
 # Heat Source modules
-from Dieties import IniParams
+from Dieties.IniParamsDiety import IniParams
 from Excel.ExcelInterface import ExcelInterface
-from Dieties import Chronos
+from Dieties.ChronosDiety import Chronos
 from Utils.Logger import Logger
 from Utils.Output import Output as O
 from HSmodule import HeatSourceError
 from __version__ import version_info
 
-# This statement allows use of psyco optimization if
-# IniParams["psyco_optimize"] = True
-try:
-    if IniParams["psyco_optimize"]:
-        from psyco.classes import psyobj
-        object = psyobj
-except ImportError: pass
+from . import opt
 
 class ModelControl(object):
     """Main model control class for Heat Source. 
@@ -62,26 +56,12 @@ class ModelControl(object):
         """
         # TODO: Fix the logger so it actually works
         self.ErrLog = Logger
-        self.worksheet = join(spreadsheet)
-        self.run_type = run_type
-        if not IniParams["psyco_optimize"]: self.initialize()
 
-    def initialize(self):
-        """Set up the model.
-
-        This is not in __init__() because psyco does not 
-        optimize calls inside __init__(). Much of the optimization
-        that we want is in the call to ExcelInterface, so we have
-        a separate initialize method and call it depending on whether
-        we are optimized (in Run() or not (in __init__()). This may
-        also allow us to faciliate the (very much later, if ever)
-        ability to run concurrent models or store the ModelControl class
-        for Monte Carlo runs if we want to do that later."""
         # Create an ExcelInterface instance. Here, we could just grab
         # the Reach and PB (progress bar) attributes and then release it,
         # but internal use has suggested that it's nice to keep ownership
         # of the sheet throughout the model run.
-        self.HS = ExcelInterface(self.worksheet, self.ErrLog, self.run_type)
+        self.HS = ExcelInterface(spreadsheet, self.ErrLog, run_type)
 
         # This is the list of StreamNode instances- we sort it in reverse
         # order because we number stream kilometer from the mouth to the 
@@ -91,9 +71,9 @@ class ModelControl(object):
         # This if statement prevents us from having to test every timestep
         # We just call self.run_all(), which is a classmethod pointing to
         # the correct method.
-        if self.run_type == 0: self.run_all = self.run_hs
-        elif self.run_type == 1: self.run_all = self.run_sh
-        elif self.run_type == 2: self.run_all = self.run_hy
+        if run_type == 0: self.run_all = self.run_hs
+        elif run_type == 1: self.run_all = self.run_sh
+        elif run_type == 2: self.run_all = self.run_hy
         else: raise Exception("Bad run_type: %i. Must be 0, 1 or 2" %`self.run_type`)
 
         # Create a Chronos iterator that controls all model time.
@@ -114,7 +94,6 @@ class ModelControl(object):
         Use the Chronos instance and list of StreamNodes to cycle
         through each timestep and spacestep, calling the appropriate
         StreamNode functions to calculate heat and hydraulics."""
-        if IniParams["psyco_optimize"]: self.initialize()
         time = Chronos.TheTime # Current time of the Chronos clock (i.e. this timestep)
         stop = Chronos.stop # Stop time for Chronos
         start = Chronos.start # Start time for Chronos, model start, not flush/spin start.
@@ -189,7 +168,7 @@ class ModelControl(object):
         # one time. Ideally, for performance and impatience reasons, we want this to be somewhere
         # around or less than 1 microsecond.
         microseconds = (total_time/timesteps/len(self.reachlist))*1e6
-        message = "Finished in %i minutes (%0.3f microseconds each cycle). Water Balance: %0.3f/%0.3f" %\
+        message = "Finished in %i minutes (spent %0.3f microseconds in each stream node). Water Balance: %0.3f/%0.3f" %\
                     (total_time, microseconds, total_inflow, out)
         # write that final message to the Excel status bar
         self.HS.PB(message)
@@ -256,3 +235,11 @@ def RunHY(sheet):
         f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 
+try:
+    if opt(__name__):
+        import psyco
+        psyco.bind(ModelControl.Run)
+        psyco.bind(ModelControl.run_sh)
+        psyco.bind(ModelControl.run_hy)
+        psyco.bind(ModelControl.run_hs)
+except ImportError: pass

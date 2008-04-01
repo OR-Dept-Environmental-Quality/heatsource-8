@@ -1,14 +1,15 @@
 from __future__ import division
-from ..Dieties import IniParams
-from ..Dieties import Chronos
+from ..Dieties.IniParamsDiety import IniParams
+from ..Dieties.ChronosDiety import Chronos
 from time import localtime
 from os.path import join, exists
 from os import makedirs
 
+from .. import opt
 try:
-    if IniParams["psyco_optimize"]:
-        from psyco.classes import psyobj
-        object = psyobj
+    if opt(__name__):
+        import psyco.classes
+        object = psyco.classes.psyobj
 except ImportError: pass
 
 class Output(object):

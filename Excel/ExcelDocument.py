@@ -5,7 +5,7 @@ from pywintypes import com_error
 from os.path import exists
 from os import remove
 
-from ..Dieties import IniParams
+from ..Dieties.IniParamsDiety import IniParams
 
 borderTop = 3
 borderBottom = 4
@@ -20,13 +20,15 @@ directionDown = -4121
 directionLeft = -4131
 directionRight = -4152
 
+from .. import opt
 try:
-    if IniParams["psyco_optimize"]:
-        from psyco.classes import psyobj
-        object = psyobj
-except InputError: pass
+    if opt(__name__):
+        import psyco.classes
+        Tobject = psyco.classes.psyobj
+    else: Tobject = object
+except ImportError: Tobject = object
 
-class TextPB(object):
+class TextPB(Tobject):
     def __init__(self):
         self.bar = "---->"
         self.text = list(self.bar) + [" "]*60
@@ -39,6 +41,8 @@ class TextPB(object):
             msg = "%s %i%%" %(msg, num)
         return "%s  | %s" %("".join(self.text), msg)
 
+# psyco fills memory if this class is optimized, so we just use
+# the normal Python object
 class ExcelDocument(object):
     """
     Some convenience methods for Excel documents accessed

@@ -523,14 +523,16 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
 
     return solar, ground, F_Total, Delta_T, Mac
 
-#try:
-#    from psyco import bind
-#    bind(CalcSolarPosition)
-#    bind(GetStreamGeometry)
-#    bind(CalcMuskingum)
-#    bind(CalcFlows)
-#    bind(GetSolarFlux)
-#    bind(GetGroundFluxes)
-#    bind(CalcMacCormick)
-#    bind(CalcHeatFluxes)
-#except ImportError: pass
+try:
+    from .. import opt 
+    if opt(__name__):
+        from psyco import bind
+        bind(CalcSolarPosition)
+        bind(GetStreamGeometry)
+        bind(CalcMuskingum)
+        bind(CalcFlows)
+        bind(GetSolarFlux)
+        bind(GetGroundFluxes)
+        bind(CalcMacCormick)
+        bind(CalcHeatFluxes)
+except ImportError: pass

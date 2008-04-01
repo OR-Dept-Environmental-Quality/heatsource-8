@@ -6,8 +6,8 @@ from itertools import count
 from warnings import warn
 from time import ctime, mktime, localtime, asctime
 
-from ..Dieties import Chronos
-from ..Dieties import IniParams
+from ..Dieties.ChronosDiety import Chronos
+from ..Dieties.IniParamsDiety import IniParams
 from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
 from ..Utils.Dictionaries import Interpolator
@@ -16,10 +16,11 @@ import heatsource.HSmodule as C_HS
 
 _HS = None # Placeholder for heatsource module
 
+from .. import opt
 try:
-    if IniParams["psyco_optimize"]:
-        from psyco.classes import psyobj
-        object = psyobj
+    if opt(__name__):
+        import psyco.classes
+        object = psyco.classes.psyobj
 except ImportError: pass
 
 class StreamNode(object):
