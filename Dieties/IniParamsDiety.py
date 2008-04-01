@@ -30,6 +30,10 @@ class Interpolator(defaultdict):
         all values, filling the dictionary with the results."""
         defaultdict.__init__(self)
 
+            # Comment out individual models to restrict psyco
+            # from optimizing them. This is used by the function
+            # in heatsource.__init__.py that determines whether to
+            # optimize each module.
 IniParams = {"psyco": ('Dictionaries',
                         'BigRedButton',
                         'StreamNode',
@@ -39,5 +43,7 @@ IniParams = {"psyco": ('Dictionaries',
                         'IniParamsDiety',
                         'ChronosDiety',
                         'Output'),
-             "run_in_python": True,
+             # Run the routines in PyHeatsource.py instead of
+             # the C module.
+             "run_in_python": False,
              }

@@ -246,8 +246,11 @@ c_k: %3.4f""" % stderr
         msgbox(msg)
         raise Exception(msg)
 
-    def CalcHeat_Opt(self, time, hour, min, sec,JD,JDC):
+    def CalcHeat_Opt(self, time, hour, min, sec,JD,JDC,solar_only=False):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
+        # The solar_only keyword is a kludge to turn off calculation of the 
+        # ground fluxes in the case of shade-only runs.
+        
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
@@ -259,7 +262,7 @@ c_k: %3.4f""" % stderr
                 _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev)
+                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev, solar_only)
 
         except _HS.HeatSourceError, (stderr):
             self.CatchException(stderr, time)
@@ -267,7 +270,7 @@ c_k: %3.4f""" % stderr
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
 
-    def CalcHeat_BoundaryNode(self, time, hour, min, sec,JD,JDC):
+    def CalcHeat_BoundaryNode(self, time, hour, min, sec,JD,JDC, solar_only=False):
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
@@ -280,7 +283,7 @@ c_k: %3.4f""" % stderr
                 _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp, self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                            hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0)
+                            hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0, solar_only)
         except _HS.HeatSourceError, (stderr, time):
             self.CatchException(stderr)
         self.F_DailySum[1] += self.F_Solar[1]

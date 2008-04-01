@@ -18,13 +18,27 @@ class Interpolator(defaultdict):
 
     def __missing__(self,key):
         """Interpolate between dictionary values and stock dictionary with results"""
+        # First time the dictionary is in actual use, so we do some setup
         if not self.sortedkeys:
-            # ASSUMPTION: This dictionary is not changed once created.
-            self.sortedkeys = sorted(self.keys())
+            # If there are no keys, then we have an empty dictionary
+            # which will raise an exception when searching for keys.
+            # Since we are assuming no change once created, we will
+            # set a lambda function to replace this one because we're
+            # not using the method anyway.
+            if not len(self.keys()):
+                self.__missing__ = lambda x: (0.0,)
+                return (0.0,)
+            else:
+                # ASSUMPTION: This dictionary is not changed once created.
+                # TODO: We need to make this immutable by modifying __getattr__
+                self.sortedkeys = sorted(self.keys())
+                
+        # Find the previous and next available keys
         ind = bisect_right(self.sortedkeys, key)-1
         x0 = int(self.sortedkeys[ind])
         x1 = int(self.sortedkeys[ind+1])
-
+        
+        # Find the previous and next available values
         y0 = self[x0]
         y1 = self[x1]
         val = None

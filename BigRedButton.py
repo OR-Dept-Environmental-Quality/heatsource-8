@@ -133,7 +133,8 @@ class ModelControl(object):
                 # COM API without using a threading interface.
                 if exists("c:\\quit_heatsource"):
                     unlink("c:\\quit_heatsource")
-                    QuitMessage()
+                    if QuitMessage():
+                        break
             # Back to every timestep level of the loop. Here we wrap the call to
             # run_all() in a try block to catch the exceptions thrown.
             try:
@@ -192,15 +193,14 @@ class ModelControl(object):
 
     def run_sh(self, time, H, M, S, JD, JDC):
         """Call solar routines for each StreamNode"""
-        [x.CalcHeat(time, H, M, S, JD, JDC) for x in self.reachlist]
+        [x.CalcHeat(time, H, M, S, JD, JDC, True) for x in self.reachlist]
 
 
 def QuitMessage():
     """Throw up a confirmation box to make sure we didn't hit the quit button accidentally"""
     b = buttonbox("Do you really want to quit Heat Source", "Quit Heat Source", ["Cancel", "Quit"])
-    if b == "Quit":
-        raise Exception("Model stopped user.")
-    else: return
+    if b == "Quit": return True
+    else: return False
 
 
 def RunHS(sheet):

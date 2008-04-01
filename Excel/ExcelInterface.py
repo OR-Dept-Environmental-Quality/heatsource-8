@@ -74,9 +74,14 @@ class ExcelInterface(ExcelDocument):
             IniParams[key] = 0 if not IniParams[key] else IniParams[key]
         for key in ["inflowsites","flushdays","contsites"]:
             IniParams[key] = int(IniParams[key])
+        # Set up our evaporation method
         IniParams["penman"] = False
         if IniParams["calcevap"]:
             IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
+        # The offset should be negated to work around issues with internal date
+        # representation. i.e. Pacific time is -7 from UTC, but the code needs a +7 to work.
+        # TODO: This is probably a bug in ChronosDiety, not the time module. 
+        IniParams["offset"] = -1 * IniParams["offset"]
         # Make the dates into datetime instances of the start/stop dates
         IniParams["date"] = mktime(strptime(IniParams["date"].Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
         IniParams["end"] = mktime(strptime(IniParams["end"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
@@ -675,10 +680,14 @@ class ExcelInterface(ExcelDocument):
             node.T = self.T_bc[mindate]
             node.T_prev = self.T_bc[mindate]
             node.T_sed = self.T_bc[mindate]
-        if self.run_type ==1: #we're in shadealator
-            for i in ["d_w", "A", "P_w", "W_w", "U", "Disp","Q_prev","Q"]:
-                if getattr(node, i) is None:
-                    setattr(node, i, 0.01)
+        #we're in shadealator if the runtype is 1. Since much of the heat
+        # math is coupled to the shade math, we have to make sure the hydraulic
+        # values are not zero or blank because they'll raise ZeroDivisionError
+        if self.run_type ==1: 
+            for attr in ["d_w", "A", "P_w", "W_w", "U", "Disp","Q_prev","Q",
+                         "SedThermDiff","SedDepth","SedThermCond"]:
+                if (getattr(node, attr) is None) or (getattr(node, attr) == 0):
+                    setattr(node, attr, 0.01)
         node.Q_hyp = 0.0 # Assume zero hyporheic flow unless otherwise calculated
         node.E = 0 # Same for evaporation
     def QuitMessage(self):

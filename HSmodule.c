@@ -761,12 +761,12 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt;
 	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w;
 	double U, T_alluv, T_prev, T_sed, Q_hyp, cloud, humidity, T_air, wind, Disp;
-	int hour, daytime, has_prev, emergent, calcevap, penman, calcalluv, JD;
-	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdiiidddd",
+	int hour, daytime, has_prev, emergent, calcevap, penman, calcalluv, JD, solar_only;
+	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdiiiddddi",
 								&ContData, &C_args, &d_w, &area, &P_w, &W_w, &U,
 								&Q_tribs, &T_tribs, &T_prev, &T_sed, &Q_hyp,
 								&T_dn_prev, &ShaderList, &Disp, &hour, &JD, &daytime,
-								&Altitude, &Zenith, &Q_up_prev, &T_up_prev))
+								&Altitude, &Zenith, &Q_up_prev, &T_up_prev, &solar_only))
 		return NULL;
 	if (!PyArg_ParseTuple(ContData, "dddd", &cloud, &wind, &humidity, &T_air))
 		return NULL;
@@ -801,6 +801,22 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 		GetSolarFlux(solar, hour, JD, Altitude, Zenith, cloud, d_w, W_b,
 					Elevation, TopoFactor, ViewToSky, SampleDist, phi, emergent,
 					VDensity, VHeight, rip, veg, FullSunAngle, TopoShadeAngle, BankShadeAngle);
+	}
+	if (solar_only)
+	{
+		if (!has_prev)
+		{
+			return Py_BuildValue("(ffffffff)(fffffffff)ff",
+								solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
+								0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
+								0.0, 0.0);
+		} else {
+			return Py_BuildValue("(ffffffff)(fffffffff)ff(ff)",
+								solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
+								0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
+								0.0, 0.0, 0.0, 0.0);
+			
+		}
 	}
 	double ground[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 	GetGroundFluxes(ground, cloud, wind, humidity, T_air, Elevation,

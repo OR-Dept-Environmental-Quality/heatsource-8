@@ -457,18 +457,18 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
     T_in = 0
     T_up = T0
     numerator = 0
-    if len(Q_tup):
-        for i in xrange(len(Q_tup)):
-            Qitem = Q_tup[i]
-            Titem = T_tup[i]
-            # make sure there's a value for discharge. Temp can be blank if discharge is negative (withdrawl)
-            if Qitem is None or (Qitem > 0 and Titem is None):
-                raise HeatSourceError("Problem with null value in tributary discharge or temperature")
-            if Qitem > 0:
-                Q_in += Qitem
-                numerator += Qitem*Titem
-        if numerator and (Q_in > 0):
-            T_in = numerator/Q_in
+    print Q_tup
+    for i in xrange(len(Q_tup)):
+        Qitem = Q_tup[i]
+        Titem = T_tup[i]
+        # make sure there's a value for discharge. Temp can be blank if discharge is negative (withdrawl)
+        if Qitem is None or (Qitem > 0 and Titem is None):
+            raise HeatSourceError("Problem with null value in tributary discharge or temperature")
+        if Qitem > 0:
+            Q_in += Qitem
+            numerator += Qitem*Titem
+    if numerator and (Q_in > 0):
+        T_in = numerator/Q_in
     # This is basically MixItUp from the VB code
     T_mix = ((Q_in * T_in) + (T_up * Q_up)) / (Q_up + Q_in)
     #Calculate temperature change from mass transfer from hyporheic zone
@@ -493,7 +493,7 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
 
 def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T_prev,
                    T_sed, Q_hyp, T_dn_prev, ShaderList, Disp, hour, JD, daytime, Altitude, Zenith,
-                   Q_up_prev, T_up_prev):
+                   Q_up_prev, T_up_prev, solar_only):
     cloud, wind, humidity, T_air = ContData
     W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, \
         SedDepth, dx, dt, SedThermCond, SedThermDiff, Q_accr, T_accr, \
@@ -504,6 +504,13 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
         solar = GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b,
                     Elevation, TopoFactor, ViewToSky, SampleDist, phi, emergent,
                     VDensity, VHeight, ShaderList)
+
+    # We're only running shade, so return solar and some empty calories
+    if solar_only: 
+        # Boundary node
+        if not has_prev: return solar, [0]*9, 0.0, 0.0
+        # regular node
+        else: return solar, [0]*9, 0.0, 0.0, [0]*2
 
     ground = GetGroundFluxes(cloud, wind, humidity, T_air, Elevation,
                     phi, VHeight, ViewToSky, SedDepth, dx,
