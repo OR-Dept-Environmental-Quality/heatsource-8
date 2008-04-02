@@ -457,7 +457,6 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
     T_in = 0
     T_up = T0
     numerator = 0
-    print Q_tup
     for i in xrange(len(Q_tup)):
         Qitem = Q_tup[i]
         Titem = T_tup[i]

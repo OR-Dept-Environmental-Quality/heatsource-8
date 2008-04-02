@@ -1,4 +1,4 @@
-from time import strptime, mktime, asctime, localtime, ctime
+from time import strptime, mktime, localtime, ctime
 from pywintypes import Time as pyTime
 from IniParamsDiety import IniParams
 
@@ -70,7 +70,7 @@ class ChronosDiety(object):
         raise NotImplementedError("This needs some work- do we actually need it?")
         return len([i for i in self])
 
-    def PrettyTime(self): return asctime(localtime(self.__current))
+    def PrettyTime(self): return ctime(self.__current)
     def Year(self): return localtime(self.__current)[0]
     def Month(self): return localtime(self.__current)[1]
     def Day(self): return localtime(self.__current)[2]

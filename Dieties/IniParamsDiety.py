@@ -19,21 +19,7 @@ modules. Including the import in the Dieties.__init__.py module.
 Good thing that very important caveat is buried deeply in these
 notes where no-one will ever read it.
 """
-from collections import defaultdict
 
-class Interpolator(defaultdict):
-    def __init__(self, *args, **kwargs):
-        """Linearly interpolated dictionary class
-
-        This class assumes a numeric key/value pair and will
-        allow a linear interpolation between the
-        all values, filling the dictionary with the results."""
-        defaultdict.__init__(self)
-
-            # Comment out individual models to restrict psyco
-            # from optimizing them. This is used by the function
-            # in heatsource.__init__.py that determines whether to
-            # optimize each module.
 IniParams = {"psyco": ('Dictionaries',
                         'BigRedButton',
                         'StreamNode',

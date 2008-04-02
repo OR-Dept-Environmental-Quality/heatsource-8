@@ -4,7 +4,7 @@ from math import pi,exp,log10,log,sqrt,sin,cos,tan,atan,radians
 
 from itertools import count
 from warnings import warn
-from time import ctime, mktime, localtime, asctime
+from time import ctime, mktime, localtime
 
 from ..Dieties.ChronosDiety import Chronos
 from ..Dieties.IniParamsDiety import IniParams

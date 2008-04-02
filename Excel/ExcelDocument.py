@@ -1,3 +1,5 @@
+"""A class containing methods to manipulate Excel documents
+"""
 from __future__ import division
 from win32com.client import constants, Dispatch, gencache
 from pythoncom import CoInitialize, CoUninitialize
@@ -45,8 +47,10 @@ class TextPB(Tobject):
 # the normal Python object
 class ExcelDocument(object):
     """
-    Some convenience methods for Excel documents accessed
-    through COM.
+    This is a recipe class culled from ASPN (ActiveState). It implements
+    many of the necessary methods to manipulate an Excel spreadsheet using
+    the COM interface and the Python win32com library. The methods
+    excelize and deExcelize were taken from some other, now forgotten, source.
     """
     def __init__(self, filename):
         # The following code assumes that there is an active workbook (i.e. that Excel is running
@@ -54,11 +58,18 @@ class ExcelDocument(object):
         # macro which would activate the Heat Source workbook. The reason we do not call Open(excelfile)
         # is that we want to be able to catch unsaved changes, which is possible only if we catch
         # a reference to the active workbook.
-        try:
-            self.app = gencache.EnsureDispatch("Excel.Application")
-        except:
-            self.app = Dispatch("Excel.Application")
+
+        # EnsureDispatch() will start the Excel.Application, optionally doing a little makepy magic
+        # and generating some behind the scenes including some constants and classes that we use
+        # such as xlLastCell. Calling only Dispatch() will assume we have run makepy by hand, which
+        # may not be the case.
+        self.app = gencache.EnsureDispatch("Excel.Application", 0)
+        # This flag tells us whether we should quit the Excel application when this class' destructor
+        # is called. Doing so makes Excel shut down when the user may not want this to occur, so
+        # we've set it to False, but kept the flag for future changes.
         self.quit_excel = False
+        # TextPB is a progress bar like class that creates a moving arrow and a message in the status
+        # bar.
         self.PBtext = TextPB()
         # If we don't have an active workbook, open one
         if not self.app.ActiveWorkbook:
@@ -72,6 +83,7 @@ class ExcelDocument(object):
         del self.app
         del self.PBtext
     def PB(self, message, num=None, divisor=None):
+        """Send a message to the status bar, or push the arrow forward one tick"""
         try:
             self.app.StatusBar = self.PBtext(message, num, divisor)
         except com_error: # win32 throws an exception if we are playing with excel and try to update the statusbar

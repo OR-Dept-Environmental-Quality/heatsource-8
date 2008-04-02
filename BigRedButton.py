@@ -86,7 +86,7 @@ class ModelControl(object):
         # This is the output class, which is essentially just a list
         # of file objects and an append method which writes to them
         # every so often.
-        self.Output = O(3600, self.HS.Reach, IniParams["modelstart"])
+        self.Output = O(self.HS.Reach, IniParams["modelstart"])
 
     def Run(self):
         """Run the model one time
@@ -124,6 +124,10 @@ class ModelControl(object):
                 self.HS.PB("%i of %i timesteps"% (ts*hr, timesteps))
                 # Update the Excel status bar when the queue is free
                 PumpWaitingMessages()
+                # Call the Output class to update the textfiles. We call this every
+                # hour and store the data, then we write to file every day. Limiting
+                # disk access saves us considerable time.
+                self.Output(time, hour)
                 # zero hour+minute+second means first timestep of new day
                 # We want to zero out the daily flux sum at this point.
                 if not hour: 
@@ -154,13 +158,11 @@ class ModelControl(object):
             # We've made it through the entire stream without an error, so we update our mass balance
             # by adding the discharge of the mouth...
             out += self.reachlist[-1].Q
-            # Call the Output class to update the textfiles
-            self.Output.call()
             # and tell Chronos that we're moving time forward.
             time = Chronos(True)
 
         # So, here we are at the end of a model run. First we calculate how long all of this took
-        total_time = (Time() - time1) /60
+        total_time = (Time() - time1) / 60
         # Calculate the mass balance inflow
         balances = [x.Q_mass for x in self.reachlist]
         total_inflow = sum(balances)
@@ -169,12 +171,14 @@ class ModelControl(object):
         # one time. Ideally, for performance and impatience reasons, we want this to be somewhere
         # around or less than 1 microsecond.
         microseconds = (total_time/timesteps/len(self.reachlist))*1e6
-        message = "Finished in %i minutes (spent %0.3f microseconds in each stream node). Water Balance: %0.3f/%0.3f" %\
+        message = "Finished in %0.1f minutes (spent %0.3f microseconds in each stream node). Water Balance: %0.3f/%0.3f" %\
                     (total_time, microseconds, total_inflow, out)
+        # Close out Output (there's a bit of a lag when it writes the file,
+        # so we do this before the final message so people don't accidentally
+        # access the file and screw up the buffer)
+        self.Output.close()
         # write that final message to the Excel status bar
         self.HS.PB(message)
-        # and close out Output.
-        self.Output.close()
         # Hopefully, Python's cyclic garbage collection takes care of the rest :)
 
     #############################################################

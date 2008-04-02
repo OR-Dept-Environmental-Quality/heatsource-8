@@ -15,7 +15,7 @@ from os import unlink
 from sys import exit
 from win32gui import PumpWaitingMessages
 from bisect import bisect
-from time import mktime, localtime, asctime, strptime, ctime
+from time import mktime, localtime, strptime, ctime
 
 # Heat Source Methods
 from ..Dieties.IniParamsDiety import IniParams
@@ -70,8 +70,10 @@ class ExcelInterface(ExcelDocument):
                "lcdensity": "E19"}
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
-        for key in ["inflowsites","flushdays"]:
-            IniParams[key] = 0 if not IniParams[key] else IniParams[key]
+        # These might be blank, make them zeros
+        for key in ["inflowsites","flushdays","wind_a","wind_b"]:
+            IniParams[key] = 0.0 if not IniParams[key] else IniParams[key]
+        # Then make all of these integers because they're used later in for loops
         for key in ["inflowsites","flushdays","contsites"]:
             IniParams[key] = int(IniParams[key])
         # Set up our evaporation method
@@ -93,10 +95,9 @@ class ExcelInterface(ExcelDocument):
             IniParams["modelend"] = IniParams["end"]
         else:
             IniParams["modelend"] = mktime(strptime(IniParams["modelend"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
-        for attr in ["wind_a","wind_b"]:
-            if IniParams[attr] is None: IniParams[attr] = 0.0
         # make sure alluvium temp is present and a floating point number.
         IniParams["alluviumtemp"] = 0.0 if not IniParams["alluviumtemp"] else float(IniParams["alluviumtemp"])
+        # make sure that the timestep divides into 60 minutes, or we may not land squarely on each hour's starting point.
         if 60%IniParams["dt"] > 1e-7:
             raise Exception("I'm sorry, your timestep (%0.2f) must evenly divide into 60 minutes." % IniParams["dt"])
         else:
@@ -106,33 +107,29 @@ class ExcelInterface(ExcelDocument):
             raise Exception("Output directory needs to have a trailing backslash")
         # Set up the log file in the outputdir
         self.log.SetFile(normpath(join(IniParams["outputdir"],"outfile.log")))
-        # Are we running the math in C or Python?
 
         # Make empty Dictionaries for the boundary conditions
         self.Q_bc = Interpolator()
         self.T_bc = Interpolator()
-        self.ContDataSites = [] # List of kilometers with continuous data nodes assigned.
 
-        # Some convenience variables
+        # List of kilometers with continuous data nodes assigned.
+        self.ContDataSites = [] 
+
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
         if (IniParams["dx"]%IniParams["longsample"]
             or IniParams["dx"]<IniParams["longsample"]):
             raise Exception("Distance step must be a multiple of the Longitudinal transfer rate")
-        self.long = IniParams["longsample"]
+        # Some convenience variables
         self.dx = IniParams["dx"]
-        self.multiple = int(self.dx/self.long) #We have this many samples per distance step
+        self.multiple = int(self.dx/IniParams["longsample"]) #We have this many samples per distance step
 
+        # Get the list of times in the flow and continuous data sheets- we make no assumptions
+        # that they equal each other.
         self.flowtimelist = self.GetTimelist("Flow Data")
         self.continuoustimelist = self.GetTimelist("Continuous Data")
-        from pickle import dump
-        f1 = open("C:\\flowtime.lst","w")
-        f2 = open("C:\\conttime.lst","w")
-        dump(self.flowtimelist, f1)
-        dump(self.continuoustimelist, f2)
-        f1.close()
-        f2.close()
+
         #####################
-        # Now we start through the steps of building a stream reach full of nodes
+        # Now we start through the steps of building a reach full of StreamNodes
         self.GetBoundaryConditions()
         self.BuildNodes()
         if IniParams["lidar"]: self.BuildZonesLidar()
@@ -141,12 +138,11 @@ class ExcelInterface(ExcelDocument):
         self.GetContinuousData()
         self.SetAtmosphericData()
         self.OrientNodes()
-        self.PB("Initializing StreamNodes")
 
     def OrientNodes(self):
+        self.PB("Initializing StreamNodes")
         # Now we manually set each nodes next and previous kilometer values by stepping through the reach
-        l = self.Reach.keys()
-        l.sort(reverse=True) # Sort descending, because streams are numbered from the mouth up
+        l = sorted(self.Reach.keys(), reverse=True)
         head = self.Reach[max(l)] # The headwater node
         # Set the previous and next kilometer of each node.
         slope_problems = []
@@ -185,7 +181,6 @@ class ExcelInterface(ExcelDocument):
         """For each node without continuous data, use closest (up or downstream) node's data"""
         self.CheckEarlyQuit()
         self.PB("Setting Atmospheric Data")
-        from bisect import bisect
         sites = self.ContDataSites # Localize the variable for speed
         sites.sort() #Sort is necessary for the bisect module
         c = count()
@@ -212,7 +207,6 @@ class ExcelInterface(ExcelDocument):
         self.CheckEarlyQuit()
         # Get the columns, which is faster than accessing cells
         self.PB("Reading boundary conditions")
-        C = Chronos
         sheetname = "Continuous Data"
         timelist = self.continuoustimelist
         Rstart, Cstart = 5,5
@@ -233,7 +227,7 @@ class ExcelInterface(ExcelDocument):
             # Get the flow boundary condition
             if flow == 0 or not flow:
                 if self.run_type != 1:
-                    raise Exception("Missing flow boundary condition for day %i " % asctime(localtime(time)))
+                    raise Exception("Missing flow boundary condition for day %i " % ctime(time))
                 else: flow = 0
             self.Q_bc[time] = flow
             # Temperature boundary condition
@@ -500,8 +494,8 @@ class ExcelInterface(ExcelDocument):
         # if we end up with a fraction, that means that there's a node at the end that
         # is not a perfect multiple of the sample distance. We might end up ending at
         # stream kilometer 0.5, for instance, in that case
-        vars = self.LastRow("TTools Data") - 5
-
+        vars = (IniParams["length"] * 1000)/IniParams["longsample"]
+        
         num_nodes = int(ceil((vars-1)/self.multiple))
         for i in range(0, num_nodes):
             node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
@@ -528,7 +522,7 @@ class ExcelInterface(ExcelDocument):
 
         keys = self.Reach.keys()
         keys.sort(reverse=True) # Downstream sorted list of stream kilometers
-        self.PB("Building VegZones")
+        self.PB("Translating LULC Data")
         for i in xrange(7, 36): # For each column of LULC data
             col = self.GetColumn(i, "TTools Data")[5:] # LULC column
             elev = self.GetColumn(i+28,"TTools Data")[5:] # Shift by 28 to get elevation column
@@ -543,6 +537,7 @@ class ExcelInterface(ExcelDocument):
                 raise Exception("At least one land cover code from the 'TTools Data' worksheet is blank or not in 'Land Cover Codes' worksheet (Code: %s)." % stderr.message)
             if i>7:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
+            self.PB("Translating LULC Data", i, 36)
         # We have to set the emergent vegetation, so we strip those off of the iterator
         # before we record the zones.
         for i in xrange(len(keys)):
