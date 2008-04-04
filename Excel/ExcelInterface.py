@@ -227,7 +227,7 @@ class ExcelInterface(ExcelDocument):
             # Get the flow boundary condition
             if flow == 0 or not flow:
                 if self.run_type != 1:
-                    raise Exception("Missing flow boundary condition for day %i " % ctime(time))
+                    raise Exception("Missing flow boundary condition for day %s " % ctime(time))
                 else: flow = 0
             self.Q_bc[time] = flow
             # Temperature boundary condition
