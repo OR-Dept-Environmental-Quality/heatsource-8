@@ -86,7 +86,7 @@ class Output(object):
     def close(self):
         # Flush the rest of the values from the dataset by flushing the
         # daily values and by calling the write() method
-        self.write()
+        self.write(self.run_type < 2)
         # Then close all of the file objects cleanly
         [f.close() for f in self.files.itervalues()]
 
@@ -139,7 +139,7 @@ class Output(object):
         # 24xF file accesses where F=len(self.files). Each file access
         # has quite a bit of overhead, so we lump them. It's "A Good Thing."
         if not hour:
-            self.write()
+            self.write(self.run_type < 2)
 
     def daily(self, timestamp):
         """Compile and store data that is collected every hour"""
@@ -153,9 +153,9 @@ class Output(object):
         # If there's no hour, we're at the beginning of a day, so we write the values
         # to a file.
 
-    def write(self):
-        if self.run_type < 2: # don't call for hydraulics
-            self.daily(("%0.6f" % Chronos.ExcelTime()).ljust(14))
+    def write(self, daily):
+        if daily: # don't call for hydraulics
+            self.daily(("%0.6f" % float(pyTime(Chronos()))).ljust(14))
         # localize the 
         data = self.data
         # Cycle through the file objects
