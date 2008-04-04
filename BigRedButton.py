@@ -75,7 +75,6 @@ class ModelControl(object):
         elif run_type == 1: self.run_all = self.run_sh
         elif run_type == 2: self.run_all = self.run_hy
         else: raise Exception("Bad run_type: %i. Must be 0, 1 or 2" %`self.run_type`)
-
         # Create a Chronos iterator that controls all model time.
         Chronos.Start(start = IniParams["modelstart"],
                       stop = IniParams["modelend"],
@@ -86,7 +85,7 @@ class ModelControl(object):
         # This is the output class, which is essentially just a list
         # of file objects and an append method which writes to them
         # every so often.
-        self.Output = O(self.HS.Reach, IniParams["modelstart"])
+        self.Output = O(self.HS.Reach, IniParams["modelstart"], run_type)
 
     def Run(self):
         """Run the model one time
@@ -105,6 +104,7 @@ class ModelControl(object):
         cnt = count() # Counter iterator for counting current timesteps passed
         out = 0 # Volume of water flowing out of mouth (for simple mass balance)
         time1 = Time() # Current computer time- for estimating total model runtime
+        # Localize run_type for a bit more speed
         ################################################################
         # So, it's simple and stupid. We basically just cycle through the time
         # until we get to the model stop time, and each cycle, we call a method

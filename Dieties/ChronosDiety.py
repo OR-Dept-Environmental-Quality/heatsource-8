@@ -1,5 +1,4 @@
 from time import strptime, mktime, localtime, ctime
-from pywintypes import Time as pyTime
 from IniParamsDiety import IniParams
 
 from .. import opt
@@ -77,7 +76,6 @@ class ChronosDiety(object):
     def TimeTuple(self):
         year, month, day, hour, minute, second, weekday, jday, offset = localtime(self.__current)
         return year, month, day, hour, minute, second, jday, offset, self.__jdc 
-    def ExcelTime(self): return float(pyTime(self.__current))
     
     def Start(self, start, dt=None, stop=None, spin=0, offset=0):
         """Initialize the clock to some default values and get ready to run.

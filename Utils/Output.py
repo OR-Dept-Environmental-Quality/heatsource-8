@@ -3,6 +3,8 @@ from time import ctime
 from os.path import join, exists
 from os import makedirs
 from copy import deepcopy
+from pywintypes import Time as pyTime
+
 
 from ..Dieties.IniParamsDiety import IniParams
 from ..Dieties.ChronosDiety import Chronos
@@ -16,38 +18,45 @@ except ImportError: pass
 
 class Output(object):
     """Data and fileobject storage class"""
-    def __init__(self, reach, start_time):
+    def __init__(self, reach, start_time, run_type):
         # Store a sorted list of StreamNodes. This all could be a bit more abstracted.
         self.nodes = sorted(reach.itervalues(),reverse=True)
         # A reference to the model's starting time (i.e. when spin-up is over)
         self.start_time = start_time
 
+        # run_type is a bit hack-y. If we are running only hydraulics,
+        # we fail on division of solar parameters- if running only solar,
+        # we fail on hydraulics. This is an easy way to prevent that.
+        self.run_type = run_type #0=HS, 1=solar, 2=hydraulics
         # Our first time through, we ignore daily data and don't have stream
         # geometry calculated, so we have switches for those (which is a bit dumb)
         self.first_hour = True 
         self.first_day = True
 
         # Filenames and descriptions for each of the output files
-        desc = {"Heat_Cond": "Streambed Conduction Flux (w/sq m)",
-                "Heat_Conv": "Convection Flux (w/sq m)",
-                "Heat_Evap": "Evaporation Flux (w/sq m)",
-                "Heat_SR1": "Potential Solar Radiation Flux (w/sq m)",
-                "Heat_SR4": "Surface Solar Radiation Flux (w/sq m)",
-                "Heat_SR6": "Received Solar Radiation Flux (w/sq m)",
-                "Heat_TR": "Thermal Radiation Flux (w/sq m)",
-                "Hyd_DA": "Ave Depth (m)",
-                "Hyd_DM": "Max Depth (m)",
-                "Hyd_Flow": "Flow Rate (cms)",
-                "Hyd_Hyp": "Hyporheic Exchange (cms)",
-                "Hyd_Vel": "Flow Velocity (m/s)",
-                "Hyd_WT": "Top Width (m)",
-                "Rate_Evap": "Evaporation Rate (mm/hr)",
-                "Shade": "Effective Shade",
-                "Temp_H20": "Stream Temperature (*C)",
-                "Temp_Sed": "Sediment Temperature (*C)",
-                "VTS": "View to Sky",
-                "Hyd_Disp": "Hydraulic Dispersion (m2/s)"
-                }
+        desc = {}
+        if run_type < 2:
+            desc["Heat_Cond"] = "Streambed Conduction Flux (w/sq m)"
+            desc["Heat_Conv"] = "Convection Flux (w/sq m)"
+            desc["Heat_Evap"] = "Evaporation Flux (w/sq m)"
+            desc["Heat_SR1"] = "Potential Solar Radiation Flux (w/sq m)"
+            desc["Heat_SR4"] = "Surface Solar Radiation Flux (w/sq m)"
+            desc["Heat_SR6"] = "Received Solar Radiation Flux (w/sq m)"
+            desc["Heat_TR"] = "Thermal Radiation Flux (w/sq m)"
+            desc["Shade"] = "Effective Shade"
+            desc["VTS"] = "View to Sky"
+        if run_type != 1:
+            desc["Hyd_DA"] = "Ave Depth (m)"
+            desc["Hyd_DM"] = "Max Depth (m)"
+            desc["Hyd_Flow"] = "Flow Rate (cms)"
+            desc["Hyd_Hyp"] = "Hyporheic Exchange (cms)"
+            desc["Hyd_Vel"] = "Flow Velocity (m/s)"
+            desc["Hyd_WT"] = "Top Width (m)"
+        if not run_type:
+            desc["Rate_Evap"] = "Evaporation Rate (mm/hr)"
+            desc["Temp_H20"] = "Stream Temperature (*C)"
+            desc["Temp_Sed"] = "Sediment Temperature (*C)"
+            desc["Hyd_Disp"] = "Hydraulic Dispersion (m2/s)"
 
         # Storage dictionary for the data.
         self.data = {}
@@ -77,7 +86,6 @@ class Output(object):
     def close(self):
         # Flush the rest of the values from the dataset by flushing the
         # daily values and by calling the write() method
-        self.daily(("%0.6f" % Chronos.ExcelTime()).ljust(14))
         self.write()
         # Then close all of the file objects cleanly
         [f.close() for f in self.files.itervalues()]
@@ -91,7 +99,7 @@ class Output(object):
             self.first_hour = False 
             return
         # Create an Excel-friendly time string
-        timestamp = ("%0.6f" % time).ljust(14)
+        timestamp = ("%0.6f" % float(pyTime(time))).ljust(14)
         # Localize variables to save a bit of time
         nodes = self.nodes
         data = self.data
@@ -101,32 +109,36 @@ class Output(object):
         # list comprehension conforms to a column. List comprehensions
         # are generally fast (more optimized by the underlying C code)
         # than for loops.
-        data["Heat_Cond"][timestamp] = [x.F_Conduction for x in nodes]
-        data["Heat_Conv"][timestamp] = [x.F_Convection for x in nodes]
-        data["Heat_Evap"][timestamp] = [x.F_Evaporation for x in nodes]
-        data["Heat_SR1"][timestamp] = [x.F_Solar[1] for x in nodes]
-        data["Heat_SR4"][timestamp] = [x.F_Solar[4] for x in nodes]
-        data["Heat_SR6"][timestamp] = [x.F_Solar[6] for x in nodes]
-        data["Heat_TR"][timestamp] = [x.F_Longwave for x in nodes]
-
-        data["Hyd_DA"][timestamp] = [(x.A / x.W_w) for x in nodes]
-        data["Hyd_DM"][timestamp] = [x.d_w for x in nodes]
-        data["Hyd_Flow"][timestamp] = [x.Q for x in nodes]
-        data["Hyd_Hyp"][timestamp] = [x.Q_hyp for x in nodes]
-        data["Hyd_Vel"][timestamp] = [x.U for x in nodes]
-        data["Hyd_WT"][timestamp] = [x.W_w for x in nodes]
-
-        data["Rate_Evap"][timestamp] = [(x.E / x.dx / x.W_w * 3600 * 1000) for x in nodes] #TODO: Check
-        data["Temp_H20"][timestamp] = [x.T for x in nodes]
-        data["Temp_Sed"][timestamp] = [x.T_sed for x in nodes]
-        data["Hyd_Disp"][timestamp] = [x.Disp for x in nodes]
+        
+        # Run only with solar
+        if self.run_type < 2:
+            data["Heat_Cond"][timestamp] = [x.F_Conduction for x in nodes]
+            data["Heat_Conv"][timestamp] = [x.F_Convection for x in nodes]
+            data["Heat_Evap"][timestamp] = [x.F_Evaporation for x in nodes]
+            data["Heat_SR1"][timestamp] = [x.F_Solar[1] for x in nodes]
+            data["Heat_SR4"][timestamp] = [x.F_Solar[4] for x in nodes]
+            data["Heat_SR6"][timestamp] = [x.F_Solar[6] for x in nodes]
+            data["Heat_TR"][timestamp] = [x.F_Longwave for x in nodes]
+        # Run only with hydro
+        if self.run_type != 1:
+            data["Hyd_DA"][timestamp] = [(x.A / x.W_w) for x in nodes]
+            data["Hyd_DM"][timestamp] = [x.d_w for x in nodes]
+            data["Hyd_Flow"][timestamp] = [x.Q for x in nodes]
+            data["Hyd_Hyp"][timestamp] = [x.Q_hyp for x in nodes]
+            data["Hyd_Vel"][timestamp] = [x.U for x in nodes]
+            data["Hyd_WT"][timestamp] = [x.W_w for x in nodes]
+        # Run only with both solar and hydro
+        if not self.run_type:
+            data["Rate_Evap"][timestamp] = [(x.E / x.dx / x.W_w * 3600 * 1000) for x in nodes] #TODO: Check
+            data["Temp_H20"][timestamp] = [x.T for x in nodes]
+            data["Temp_Sed"][timestamp] = [x.T_sed for x in nodes]
+            data["Hyd_Disp"][timestamp] = [x.Disp for x in nodes]
         
         # Zero for an hour means a new day, so we add daily outputs
         # and write to the file. Writing only every day saves us
         # 24xF file accesses where F=len(self.files). Each file access
         # has quite a bit of overhead, so we lump them. It's "A Good Thing."
-        if not hour:  
-            self.daily(timestamp)
+        if not hour:
             self.write()
 
     def daily(self, timestamp):
@@ -142,6 +154,8 @@ class Output(object):
         # to a file.
 
     def write(self):
+        if self.run_type < 2: # don't call for hydraulics
+            self.daily(("%0.6f" % Chronos.ExcelTime()).ljust(14))
         # localize the 
         data = self.data
         # Cycle through the file objects
