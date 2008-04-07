@@ -18,7 +18,10 @@ modules. Including the import in the Dieties.__init__.py module.
 
 Good thing that very important caveat is buried deeply in these
 notes where no-one will ever read it.
+
+To turn of psyco alltogether, edit heatsource.__init__.py
 """
+
 
 IniParams = {"psyco": ('Dictionaries',
                         'BigRedButton',
