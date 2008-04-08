@@ -582,12 +582,7 @@ class ExcelInterface(ExcelDocument):
                 T_None = () # Highest angle necessary for full shade
                 rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
                 for j in xrange(4): # Iterate through each of the 4 zones
-                    # TODO: This was in a try block but with no note and no specific exception listed. Why?
-                    try:
-                        Vheight = vheight[i*4+j+1][h]
-                    except:
-                        self.log.write("Problem in BuildZonesNormal() setting Vheight")
-                        raise
+                    Vheight = vheight[i*4+j+1][h]
                     Vdens = vdensity[i*4+j+1][h]
                     Overhang = overhang[i*4+j+1][h]
                     Elev = elevation[i*4+j][h]
@@ -605,7 +600,7 @@ class ExcelInterface(ExcelDocument):
                     # Calculate the riparian extinction value
                     try:
                         RE = -log(1-Vdens)/10
-                    except:
+                    except OverflowError:
                         if Vdens == 1: RE = 1 # cannot take log of 0, RE is full if it's zero
                         else: raise
                     # Calculate the node distance
