@@ -30,7 +30,7 @@ class Output(object):
         self.run_type = run_type #0=HS, 1=solar, 2=hydraulics
         # Our first time through, we ignore daily data and don't have stream
         # geometry calculated, so we have switches for those (which is a bit dumb)
-        self.first_hour = True 
+        self.first_hour = True
         self.first_day = True
 
         # Filenames and descriptions for each of the output files
@@ -66,8 +66,8 @@ class Output(object):
         self.empty_vars = deepcopy(self.data)
         # Empty dictionary to store file objects
         self.files = {}
-        
-        # Here we build up the self.files attribute by cycling through the 
+
+        # Here we build up the self.files attribute by cycling through the
         # filenames and descriptions
         for key in desc.iterkeys():
             # String concatenation takes up a bit of time, but still a lot less
@@ -96,7 +96,7 @@ class Output(object):
         # hour run (because we don't have channel geometry calculated).
         if time < self.start_time: return
         if self.first_hour:
-            self.first_hour = False 
+            self.first_hour = False
             return
         # Create an Excel-friendly time string
         timestamp = ("%0.6f" % float(pyTime(time))).ljust(14)
@@ -109,7 +109,7 @@ class Output(object):
         # list comprehension conforms to a column. List comprehensions
         # are generally fast (more optimized by the underlying C code)
         # than for loops.
-        
+
         # Run only with solar
         if self.run_type < 2:
             data["Heat_Cond"][timestamp] = [x.F_Conduction for x in nodes]
@@ -133,7 +133,7 @@ class Output(object):
             data["Temp_H20"][timestamp] = [x.T for x in nodes]
             data["Temp_Sed"][timestamp] = [x.T_sed for x in nodes]
             data["Hyd_Disp"][timestamp] = [x.Disp for x in nodes]
-        
+
         # Zero for an hour means a new day, so we add daily outputs
         # and write to the file. Writing only every day saves us
         # 24xF file accesses where F=len(self.files). Each file access
@@ -145,7 +145,7 @@ class Output(object):
         """Compile and store data that is collected every hour"""
         # We don't want to write on the first time with zero hour, because there's no data
         if self.first_day:
-            self.first_day = False 
+            self.first_day = False
             return
         nodes = self.nodes
         self.data["Shade"][timestamp] = [((x.F_DailySum[1] - x.F_DailySum[4]) / x.F_DailySum[1]) for x in nodes]
@@ -156,7 +156,7 @@ class Output(object):
     def write(self, daily):
         if daily: # don't call for hydraulics
             self.daily(("%0.6f" % float(pyTime(Chronos()))).ljust(14))
-        # localize the 
+        # localize the
         data = self.data
         # Cycle through the file objects
         for name, fileobj in self.files.iteritems():
@@ -164,7 +164,8 @@ class Output(object):
             # stored so far. We can do this because everytime we store data, we
             # append the time string to self.times
             line = ""
-            for timestamp in data[name].iterkeys():
+            timelist = sorted(data[name].keys())
+            for timestamp in timelist:
                 line += timestamp
                 line += "".join([("%0.4f" % x).ljust(14) for x in data[name][timestamp]])
                 line += "\n"
