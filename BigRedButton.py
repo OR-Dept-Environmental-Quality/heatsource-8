@@ -32,24 +32,24 @@ from __version__ import version_info
 from . import opt
 
 class ModelControl(object):
-    """Main model control class for Heat Source. 
-    
+    """Main model control class for Heat Source.
+
     While it works, this class is basically a one-off hack
     that was designed as an interim solution to model control.
     As it is, it's a fairly dumb method which simply grabs
     a list of StreamNodes from the ExcelInterface class,
-    and loops through them using the iterator inside 
+    and loops through them using the iterator inside
     ChronosDiety to advance the time. Ideally, this would be
     a more sophisticated system that could hold and control
-    multiple stream reaches, modeling upstream reaches 
+    multiple stream reaches, modeling upstream reaches
     and using the results as tributary inputs to the down-
     stream reaches. For that, we'd likely need a separate
-    Reach class. Since this was essentially an interim 
+    Reach class. Since this was essentially an interim
     solution to the problem, don't hesitate to improve it.
     """
     def __init__(self, spreadsheet, run_type=0):
         """ModelControl(spreadsheet, run_type) -> Class instance
-        
+
         Spreadsheet is the path to an excel sheet containing the data.
         run_type is one of 0,1,2 for Heat Source, Solar only, or
         hydraulics only, respectively.
@@ -64,7 +64,7 @@ class ModelControl(object):
         self.HS = ExcelInterface(spreadsheet, self.ErrLog, run_type)
 
         # This is the list of StreamNode instances- we sort it in reverse
-        # order because we number stream kilometer from the mouth to the 
+        # order because we number stream kilometer from the mouth to the
         # headwater, but we want to run the model from headwater to mouth.
         self.reachlist = sorted(self.HS.Reach.itervalues(), reverse=True)
 
@@ -89,7 +89,7 @@ class ModelControl(object):
 
     def Run(self):
         """Run the model one time
-        
+
         Use the Chronos instance and list of StreamNodes to cycle
         through each timestep and spacestep, calling the appropriate
         StreamNode functions to calculate heat and hydraulics."""
@@ -114,31 +114,12 @@ class ModelControl(object):
         # is still unfinished.
         while time <= stop:
             year, month, day, hour, minute, second, JD, offset, JDC = Chronos.TimeTuple()
-            # If minute and second are both zero, we are at the top of the hour. Performing
-            # The following house keeping tasks each hours saves us enormous amounts of
-            # runtime overhead over doing it every timestep.
-            if not (minute + second):
-                ts = cnt.next() # Number of actual timesteps per tick
-                hr = 60/(IniParams["dt"]/60) # Number of timesteps in one hour
-                # This writes a line to the status bar of Excel.
-                self.HS.PB("%i of %i timesteps"% (ts*hr, timesteps))
-                # Update the Excel status bar when the queue is free
-                PumpWaitingMessages()
-                # Call the Output class to update the textfiles. We call this every
-                # hour and store the data, then we write to file every day. Limiting
-                # disk access saves us considerable time.
-                self.Output(time, hour)
-                # zero hour+minute+second means first timestep of new day
-                # We want to zero out the daily flux sum at this point.
-                if not hour: 
-                    for nd in self.reachlist: nd.F_DailySum = [0]*5
-                # Check to see if the user pressed the stop button. Pretty crappy kludge here- VB code writing an
-                # empty file- but I basically got to lazy to figure out how to interact with the underlying
-                # COM API without using a threading interface.
-                if exists("c:\\quit_heatsource"):
-                    unlink("c:\\quit_heatsource")
-                    if QuitMessage():
-                        break
+
+            # zero hour+minute+second means first timestep of new day
+            # We want to zero out the daily flux sum at this point.
+            if not (hour + minute + second):
+                for nd in self.reachlist: nd.F_DailySum = [0]*5
+
             # Back to every timestep level of the loop. Here we wrap the call to
             # run_all() in a try block to catch the exceptions thrown.
             try:
@@ -154,7 +135,30 @@ class ModelControl(object):
                 msgbox(msg)
                 # Then just die
                 raise SystemExit
-            
+                        # If minute and second are both zero, we are at the top of the hour. Performing
+
+            # The following house keeping tasks each hours saves us enormous amounts of
+            # runtime overhead over doing it every timestep.
+            if not (minute + second):
+                ts = cnt.next() # Number of actual timesteps per tick
+                hr = 60/(IniParams["dt"]/60) # Number of timesteps in one hour
+                # This writes a line to the status bar of Excel.
+                self.HS.PB("%i of %i timesteps"% (ts*hr, timesteps))
+                # Update the Excel status bar when the queue is free
+                PumpWaitingMessages()
+                # Call the Output class to update the textfiles. We call this every
+                # hour and store the data, then we write to file every day. Limiting
+                # disk access saves us considerable time.
+                print "output", year, month, day, hour, minute, second, JD, offset, JDC
+                self.Output(time, hour)
+                # Check to see if the user pressed the stop button. Pretty crappy kludge here- VB code writing an
+                # empty file- but I basically got to lazy to figure out how to interact with the underlying
+                # COM API without using a threading interface.
+                if exists("c:\\quit_heatsource"):
+                    unlink("c:\\quit_heatsource")
+                    if QuitMessage():
+                        break
+
             # We've made it through the entire stream without an error, so we update our mass balance
             # by adding the discharge of the mouth...
             out += self.reachlist[-1].Q
