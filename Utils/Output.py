@@ -86,7 +86,7 @@ class Output(object):
     def close(self):
         # Flush the rest of the values from the dataset by flushing the
         # daily values and by calling the write() method
-        self.write(self.run_type < 2)
+        # self.write(self.run_type < 2)  #commented out this line so shade wouldn't output last day twice - DT
         # Then close all of the file objects cleanly
         [f.close() for f in self.files.itervalues()]
 
@@ -97,7 +97,7 @@ class Output(object):
         if time < self.start_time: return
         if self.first_hour:
             self.first_hour = False
-            return
+            #return
         # Create an Excel-friendly time string
         timestamp = ("%0.6f" % float(pyTime(time))).ljust(14)
         # Localize variables to save a bit of time
@@ -138,15 +138,11 @@ class Output(object):
         # and write to the file. Writing only every day saves us
         # 24xF file accesses where F=len(self.files). Each file access
         # has quite a bit of overhead, so we lump them. It's "A Good Thing."
-        if not hour:
+        if hour == 23:
             self.write(self.run_type < 2)
 
     def daily(self, timestamp):
         """Compile and store data that is collected every hour"""
-        # We don't want to write on the first time with zero hour, because there's no data
-        if self.first_day:
-            self.first_day = False
-            return
         nodes = self.nodes
         self.data["Shade"][timestamp] = [((x.F_DailySum[1] - x.F_DailySum[4]) / x.F_DailySum[1]) for x in nodes]
         self.data["VTS"][timestamp] = [x.ViewToSky for x in nodes]
