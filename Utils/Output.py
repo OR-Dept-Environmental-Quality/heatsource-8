@@ -1,5 +1,5 @@
 from __future__ import division
-from time import ctime
+from time import ctime, strftime, gmtime
 from os.path import join, exists
 from os import makedirs
 from copy import deepcopy
@@ -99,7 +99,13 @@ class Output(object):
             self.first_hour = False
             #return
         # Create an Excel-friendly time string
-        timestamp = ("%0.6f" % float(pyTime(time))).ljust(14)
+        timestamp = strftime("%m/%d/%Y %H:%M", gmtime(time)).ljust(17)
+        timestamp = time/86400 + 25569
+        timestamp = ("%0.6f" % float(time/86400 + 25569)).ljust(14)
+        #
+        #timestamp = ("%0.6f" % float(pyTime(time))).ljust(14)
+
+
         # Localize variables to save a bit of time
         nodes = self.nodes
         data = self.data

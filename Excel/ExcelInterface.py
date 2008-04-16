@@ -15,7 +15,8 @@ from os import unlink
 from sys import exit
 from win32gui import PumpWaitingMessages
 from bisect import bisect
-from time import mktime, localtime, strptime, ctime
+from time import strptime, ctime, gmtime
+from calendar import timegm
 
 # Heat Source Methods
 from ..Dieties.IniParamsDiety import IniParams
@@ -34,7 +35,7 @@ except ImportError: pass
 
 class ExcelInterface(ExcelDocument):
     """Defines an interface specific to the Current (version 8.x) HeatSource Excel interface.
-    
+
     This class provides methods which seek knowingly through a correctly formatted Excel
     spreadsheet. It creates a list of StreamNode instances, and populates those in"""
     def __init__(self, filename=None, log=None, run_type=0):
@@ -82,19 +83,19 @@ class ExcelInterface(ExcelDocument):
             IniParams["penman"] = True if IniParams["evapmethod"] == "Penman" else False
         # The offset should be negated to work around issues with internal date
         # representation. i.e. Pacific time is -7 from UTC, but the code needs a +7 to work.
-        # TODO: This is probably a bug in ChronosDiety, not the time module. 
+        # TODO: This is probably a bug in ChronosDiety, not the time module.
         IniParams["offset"] = -1 * IniParams["offset"]
         # Make the dates into datetime instances of the start/stop dates
-        IniParams["date"] = mktime(strptime(IniParams["date"].Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
-        IniParams["end"] = mktime(strptime(IniParams["end"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
+        IniParams["date"] = timegm(strptime(IniParams["date"].Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
+        IniParams["end"] = timegm(strptime(IniParams["end"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
         if IniParams["modelstart"] is None:
             IniParams["modelstart"] = IniParams["date"]
         else:
-            IniParams["modelstart"] = mktime(strptime(IniParams["modelstart"].Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
+            IniParams["modelstart"] = timegm(strptime(IniParams["modelstart"].Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S"))
         if IniParams["modelend"] is None:
             IniParams["modelend"] = IniParams["end"]
         else:
-            IniParams["modelend"] = mktime(strptime(IniParams["modelend"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
+            IniParams["modelend"] = timegm(strptime(IniParams["modelend"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
         # make sure alluvium temp is present and a floating point number.
         IniParams["alluviumtemp"] = 0.0 if not IniParams["alluviumtemp"] else float(IniParams["alluviumtemp"])
         # make sure that the timestep divides into 60 minutes, or we may not land squarely on each hour's starting point.
@@ -113,7 +114,7 @@ class ExcelInterface(ExcelDocument):
         self.T_bc = Interpolator()
 
         # List of kilometers with continuous data nodes assigned.
-        self.ContDataSites = [] 
+        self.ContDataSites = []
 
         # the distance step must be an exact, greater or equal to one, multiple of the sample rate.
         if (IniParams["dx"]%IniParams["longsample"]
@@ -251,7 +252,7 @@ class ExcelInterface(ExcelDocument):
             # add a zero to the end of the list. We append this list to timelist2 and ship it off
             # as a tuple
             tm = [i for i in strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[0:8]] + [0]
-            timelist2.append(mktime(tm))
+            timelist2.append(timegm(tm))
         return tuple(timelist2)
 
     def GetLocations(self,sheetname):
@@ -495,7 +496,7 @@ class ExcelInterface(ExcelDocument):
         # is not a perfect multiple of the sample distance. We might end up ending at
         # stream kilometer 0.5, for instance, in that case
         vars = (IniParams["length"] * 1000)/IniParams["longsample"]
-        
+
         num_nodes = int(ceil((vars-1)/self.multiple))
         for i in range(0, num_nodes):
             node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
@@ -673,7 +674,7 @@ class ExcelInterface(ExcelDocument):
         #we're in shadealator if the runtype is 1. Since much of the heat
         # math is coupled to the shade math, we have to make sure the hydraulic
         # values are not zero or blank because they'll raise ZeroDivisionError
-        if self.run_type ==1: 
+        if self.run_type ==1:
             for attr in ["d_w", "A", "P_w", "W_w", "U", "Disp","Q_prev","Q",
                          "SedThermDiff","SedDepth","SedThermCond"]:
                 if (getattr(node, attr) is None) or (getattr(node, attr) == 0):

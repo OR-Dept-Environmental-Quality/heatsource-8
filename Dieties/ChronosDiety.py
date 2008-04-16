@@ -1,4 +1,4 @@
-from time import strptime, mktime, localtime, ctime
+from time import strptime, ctime, gmtime
 from pywintypes import Time as pyTime
 from IniParamsDiety import IniParams
 
@@ -11,7 +11,7 @@ except ImportError: pass
 
 class ChronosDiety(object):
     """This class provides a clock to be used in the model timestepping.
-    
+
     The ChronosDiety controls the current time and steps through time
     in an organized fashion based on start/stop/step functionality.
     The time is stored as seconds from the epoch. Changes to this
@@ -30,23 +30,23 @@ class ChronosDiety(object):
 
     def __call__(self,tick=False):
         """Return current time as seconds since epoch
-        
+
         Returns the current time float if called with no arguments. If tick=True,
-        advances the clock one timestep and returns new current time. If we are 
-        in a spin-up period, it tests whether the advance would move us to the 
-        next day and if so it reverts to the begining of the spin-up day, thus 
+        advances the clock one timestep and returns new current time. If we are
+        in a spin-up period, it tests whether the advance would move us to the
+        next day and if so it reverts to the begining of the spin-up day, thus
         running a single day over and over until the spin-up time is complete."""
         # Quickly return if we're not moving forward in time
         if not tick: return self.__current
         # First we increment the current time by dt
         self.__current += self.__dt
-        if localtime(self.__current)[2] != localtime(self.__thisday)[2]: #Day numbers not equal, need to recalculate julian day
+        if gmtime(self.__current)[2] != gmtime(self.__thisday)[2]: #Day numbers not equal, need to recalculate julian day
             self.__thisday = self.__current
             self.CalcJulianCentury()
         # Then test whether we're still spinning up
         if self.__current < self.__start: # If we're still in the spin-up period
             #Make sure we don't advance to next day (i.e. just run the first day over and over)
-            if localtime(self.__spin_current+self.__dt)[2] != localtime(self.__spin_start)[2]: 
+            if gmtime(self.__spin_current+self.__dt)[2] != gmtime(self.__spin_start)[2]:
                 self.__spin_current = self.__spin_start # We would have advanced, so we start again on the first day
             else:
                 self.__spin_current += self.__dt # We're spinning up and haven't advanced, so use the current spin-up time
@@ -64,24 +64,24 @@ class ChronosDiety(object):
             self(True)
     def __len__(self):
         """Length will report the number of timesteps
-        
+
         Currently, this method will screw things up because it actually
         iterates through the sequence, cycling through time. This is a problem."""
         raise NotImplementedError("This needs some work- do we actually need it?")
         return len([i for i in self])
 
     def PrettyTime(self): return ctime(self.__current)
-    def Year(self): return localtime(self.__current)[0]
-    def Month(self): return localtime(self.__current)[1]
-    def Day(self): return localtime(self.__current)[2]
+    def Year(self): return gmtime(self.__current)[0]
+    def Month(self): return gmtime(self.__current)[1]
+    def Day(self): return gmtime(self.__current)[2]
     def TimeTuple(self):
-        year, month, day, hour, minute, second, weekday, jday, offset = localtime(self.__current)
-        return year, month, day, hour, minute, second, jday, offset, self.__jdc 
+        year, month, day, hour, minute, second, weekday, jday, offset = gmtime(self.__current)
+        return year, month, day, hour, minute, second, jday, offset, self.__jdc
     def ExcelTime(self): return float(pyTime(self.__current))
-    
+
     def Start(self, start, dt=None, stop=None, spin=0, offset=0):
         """Initialize the clock to some default values and get ready to run.
-        
+
         Initial values are starting and stopping times, timestep in seconds, number
         of days to spin up and the timezone offset in hours."""
         #Make sure the start, stop and dt values are datetime instances
@@ -98,14 +98,14 @@ class ChronosDiety(object):
         self.__spin_current = self.__spin_start # Current time within the spinup period
         self.__current = self.__spin_current
         # Placeholder for deciding whether we have to recalculate the julian day
-        self.__thisday = self.__current-self.__dt 
+        self.__thisday = self.__current-self.__dt
         # Placeholder for making sure we don't leave the spin-up period until the right time
-        self.__spinday = localtime(self.__spin_current)[2] 
+        self.__spinday = gmtime(self.__spin_current)[2]
         self.CalcJulianCentury()
-        
+
     def CalcJulianCentury(self):
         # Then break out the time into a tuple
-        y,m,d,H,M,S,day,wk,tz = localtime(self.__current)
+        y,m,d,H,M,S,day,wk,tz = gmtime(self.__current)
         dec_day = d + (H + (M + S/60)/60)/24
 
         if m < 3:
@@ -121,7 +121,7 @@ class ChronosDiety(object):
             julian_day += b
         #This is the julian century
         self.__jdc = round((julian_day-2451545.0)/36525.0,10) # Eqn. 2-5 in HS Manual
-        
+
     #####################################################
     # Properties to allow reading but no changes
     start = property(lambda self: self.__start)
@@ -130,5 +130,5 @@ class ChronosDiety(object):
     offset = property(lambda self: self.__offset)
     TheTime = property(lambda self: self.__current)
     JD = property(lambda self: (self.__jd, self.__jdc))
-    
+
 Chronos = ChronosDiety()

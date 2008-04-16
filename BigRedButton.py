@@ -18,7 +18,7 @@ from win32com.client import Dispatch
 from win32gui import PumpWaitingMessages
 from Utils.easygui import msgbox, buttonbox
 from time import time as Time
-from time import ctime
+from time import ctime, gmtime
 
 # Heat Source modules
 from Dieties.IniParamsDiety import IniParams
@@ -114,7 +114,6 @@ class ModelControl(object):
         # is still unfinished.
         while time <= stop:
             year, month, day, hour, minute, second, JD, offset, JDC = Chronos.TimeTuple()
-
             # zero hour+minute+second means first timestep of new day
             # We want to zero out the daily flux sum at this point.
             if not (hour + minute + second):
@@ -149,7 +148,6 @@ class ModelControl(object):
                 # Call the Output class to update the textfiles. We call this every
                 # hour and store the data, then we write to file every day. Limiting
                 # disk access saves us considerable time.
-                print "output", year, month, day, hour, minute, second, JD, offset, JDC
                 self.Output(time, hour)
                 # Check to see if the user pressed the stop button. Pretty crappy kludge here- VB code writing an
                 # empty file- but I basically got to lazy to figure out how to interact with the underlying

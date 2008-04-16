@@ -1,5 +1,5 @@
 from __future__ import division
-from time import mktime, ctime, localtime
+from time import ctime, gmtime
 from collections import defaultdict
 from bisect import bisect_right, bisect_left
 
@@ -32,12 +32,12 @@ class Interpolator(defaultdict):
                 # ASSUMPTION: This dictionary is not changed once created.
                 # TODO: We need to make this immutable by modifying __getattr__
                 self.sortedkeys = sorted(self.keys())
-                
+
         # Find the previous and next available keys
         ind = bisect_right(self.sortedkeys, key)-1
         x0 = int(self.sortedkeys[ind])
         x1 = int(self.sortedkeys[ind+1])
-        
+
         # Find the previous and next available values
         y0 = self[x0]
         y1 = self[x1]
@@ -68,10 +68,10 @@ class Interpolator(defaultdict):
         keys = sorted(self.keys())
         # If our subset includes all values (i.e. we're not really
         # subsetting), just return ourself.
-        start_new = localtime(minkey)[0:3]
-        start_old = localtime(min(keys))[0:3]
-        stop_new = localtime(maxkey)[0:3]
-        stop_old = localtime(max(keys))[0:3]
+        start_new = gmtime(minkey)[0:3]
+        start_old = gmtime(min(keys))[0:3]
+        stop_new = gmtime(maxkey)[0:3]
+        stop_old = gmtime(max(keys))[0:3]
         if (start_new == start_old) and (stop_new == stop_old):
             return self
         # Get the minimum and maximum indices, including the one

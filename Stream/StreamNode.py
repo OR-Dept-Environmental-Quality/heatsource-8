@@ -4,7 +4,7 @@ from math import pi,exp,log10,log,sqrt,sin,cos,tan,atan,radians
 
 from itertools import count
 from warnings import warn
-from time import ctime, mktime, localtime
+from time import ctime, gmtime
 
 from ..Dieties.ChronosDiety import Chronos
 from ..Dieties.IniParamsDiety import IniParams
@@ -248,9 +248,9 @@ c_k: %3.4f""" % stderr
 
     def CalcHeat_Opt(self, time, hour, min, sec,JD,JDC,solar_only=False):
         """Inlined version of CalcHeat optimized for non-boundary nodes (removes a bunch of if/else statements)"""
-        # The solar_only keyword is a kludge to turn off calculation of the 
+        # The solar_only keyword is a kludge to turn off calculation of the
         # ground fluxes in the case of shade-only runs.
-        
+
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
