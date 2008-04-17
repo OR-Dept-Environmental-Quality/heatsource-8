@@ -94,7 +94,7 @@ class Output(object):
         """Call the storage method with a time and an hour"""
         # Ignore this if we're still spinning up of if this is the first
         # hour run (because we don't have channel geometry calculated).
-        #if time < self.start_time: return
+        if time < self.start_time: return
         if self.first_hour:
             self.first_hour = False
             #return
