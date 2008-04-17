@@ -96,6 +96,7 @@ class ExcelInterface(ExcelDocument):
             IniParams["modelend"] = IniParams["end"]
         else:
             IniParams["modelend"] = timegm(strptime(IniParams["modelend"].Format("%m/%d/%y") + " 23:59:59","%m/%d/%y %H:%M:%S"))
+        IniParams["flushtimestart"] = IniParams["modelstart"] - IniParams["flushdays"]*86400
         # make sure alluvium temp is present and a floating point number.
         IniParams["alluviumtemp"] = 0.0 if not IniParams["alluviumtemp"] else float(IniParams["alluviumtemp"])
         # make sure that the timestep divides into 60 minutes, or we may not land squarely on each hour's starting point.
@@ -128,6 +129,7 @@ class ExcelInterface(ExcelDocument):
         # that they equal each other.
         self.flowtimelist = self.GetTimelist("Flow Data")
         self.continuoustimelist = self.GetTimelist("Continuous Data")
+        self.flushtimelist = self.GetFlushTimelist()
 
         #####################
         # Now we start through the steps of building a reach full of StreamNodes
@@ -235,8 +237,25 @@ class ExcelInterface(ExcelDocument):
             t_val = temp if temp is not None else 0.0
             self.T_bc[time] = t_val
             self.PB("Reading boundary conditions",c.next(),length)
-        self.Q_bc = self.Q_bc.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
-        self.T_bc = self.T_bc.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
+
+        # Next we expand or revise the dictionary to account for the flush period
+        # Flush flow: model start value over entire flush period
+        for i in xrange(len(self.flushtimelist)):
+            time = self.flushtimelist[i]
+            self.Q_bc[time] = self.Q_bc[IniParams["modelstart"]]
+        # Flush temperature: first 24 hours repeated over flush period
+        first_day_time = IniParams["modelstart"]
+        second_day = IniParams["modelstart"] + 86400
+        for i in xrange(len(self.flushtimelist)):
+            time = self.flushtimelist[i]
+            self.T_bc[time] = self.T_bc[first_day_time]
+            first_day_time += 3600
+            if first_day_time >= second_day:
+                first_day_time = IniParams["modelstart"]
+
+
+        self.Q_bc = self.Q_bc.View(IniParams["flushtimestart"], IniParams["modelend"], aft=1)
+        self.T_bc = self.T_bc.View(IniParams["flushtimestart"], IniParams["modelend"], aft=1)
 
     def GetTimelist(self, sheet):
         """Return list of floating point time values corresponding to the data available in the sheet"""
@@ -254,6 +273,16 @@ class ExcelInterface(ExcelDocument):
             tm = [i for i in strptime(t.Format("%m/%d/%y %H:%M:%S"),"%m/%d/%y %H:%M:%S")[0:8]] + [0]
             timelist2.append(timegm(tm))
         return tuple(timelist2)
+
+    def GetFlushTimelist(self):
+        #Build a timelist that represents the flushing period
+        #This assumes that data is hourly, not tested with variable input timesteps
+        flushtimelist = []
+        flushtime = IniParams["flushtimestart"]
+        while flushtime < IniParams["modelstart"]:
+            flushtimelist += flushtime,
+            flushtime += 3600
+        return tuple(flushtimelist)
 
     def GetLocations(self,sheetname):
         """Return a list of kilometers corresponding to the inflow or continuous data sites"""
@@ -322,11 +351,28 @@ class ExcelInterface(ExcelDocument):
                 node.T_tribs[time] += temp,
             self.PB("Reading inflow data",tm.next(), length)
 
+        # Next we expand or revise the dictionary to account for the flush period
+        # Flush flow: model start value over entire flush period
+        for i in xrange(len(self.flushtimelist)):
+            time = self.flushtimelist[i]
+            for node in nodelist:
+                node.Q_tribs[time] = node.Q_tribs[IniParams["modelstart"]]
+        # Flush temperature: first 24 hours repeated over flush period
+        first_day_time = IniParams["modelstart"]
+        second_day = IniParams["modelstart"] + 86400
+        for i in xrange(len(self.flushtimelist)):
+            time = self.flushtimelist[i]
+            for node in nodelist:
+                node.T_tribs[time] = node.T_tribs[first_day_time]
+            first_day_time += 3600
+            if first_day_time >= second_day:
+                first_day_time = IniParams["modelstart"]
+
         # Now we strip out the unnecessary values from the dictionaries. This is placed here
         # at the end so we can dispose of it easily if necessary
         for node in nodelist:
-            node.Q_tribs = node.Q_tribs.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
-            node.T_tribs = node.T_tribs.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
+            node.Q_tribs = node.Q_tribs.View(IniParams["flushtimestart"], IniParams["modelend"], aft=1)
+            node.T_tribs = node.T_tribs.View(IniParams["flushtimestart"], IniParams["modelend"], aft=1)
 
     def GetContinuousData(self):
         """Get data from the "Continuous Data" page"""
@@ -368,6 +414,19 @@ class ExcelInterface(ExcelDocument):
                     else: raise Exception("Must have values for Air Temp in Continuous Data sheet")
                 node.ContData[time] = cloud, wind, humid, air
             self.PB("Reading continuous data", tm.next(), length)
+
+        # Flush meteorology: first 24 hours repeated over flush period
+        first_day_time = IniParams["modelstart"]
+        second_day = IniParams["modelstart"] + 86400
+        for i in xrange(len(self.flushtimelist)):
+            time = self.flushtimelist[i]
+            for km in self.ContDataSites:
+                node = self.Reach[km]
+                node.ContData[time] = node.ContData[first_day_time]
+            first_day_time += 3600
+            if first_day_time >= second_day:
+                first_day_time = IniParams["modelstart"]
+
         # Now we strip out the unnecessary values from the dictionaries. This is placed here
         # at the end so we can dispose of it easily if necessary
         self.PB("Subsetting the Continuous Data")
@@ -375,7 +434,7 @@ class ExcelInterface(ExcelDocument):
         length = len(self.ContDataSites)
         for km in self.ContDataSites:
             node = self.Reach[km]
-            node.ContData = node.ContData.View(IniParams["modelstart"], IniParams["modelend"], aft=1)
+            node.ContData = node.ContData.View(IniParams["flushtimestart"], IniParams["modelend"], aft=1)
             self.PB("Subsetting the Continuous Data",tm.next(), length)
     def zipper(self,iterable,mul=2):
         """Zippify list by grouping <mul> consecutive elements together

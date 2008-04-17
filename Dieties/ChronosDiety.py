@@ -44,13 +44,17 @@ class ChronosDiety(object):
             self.__thisday = self.__current
             self.CalcJulianCentury()
         # Then test whether we're still spinning up
+
         if self.__current < self.__start: # If we're still in the spin-up period
-            #Make sure we don't advance to next day (i.e. just run the first day over and over)
-            if gmtime(self.__spin_current+self.__dt)[2] != gmtime(self.__spin_start)[2]:
-                self.__spin_current = self.__spin_start # We would have advanced, so we start again on the first day
-            else:
-                self.__spin_current += self.__dt # We're spinning up and haven't advanced, so use the current spin-up time
-            # Set TheTime according to either spin_current or current and then return it
+#            print "True",
+#            #Make sure we don't advance to next day (i.e. just run the first day over and over)
+#            if gmtime(self.__spin_current+self.__dt)[2] != gmtime(self.__spin_start)[2]:
+#                self.__spin_current = self.__spin_start # We would have advanced, so we start again on the first day
+#            else:
+#                print "False"
+#                self.__spin_current += self.__dt # We're spinning up and haven't advanced, so use the current spin-up time
+#            # Set TheTime according to either spin_current or current and then return it
+            self.__spin_current += self.__dt
             return self.__spin_current
         else:
             return self.__current

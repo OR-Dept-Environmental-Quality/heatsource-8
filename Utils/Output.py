@@ -94,18 +94,12 @@ class Output(object):
         """Call the storage method with a time and an hour"""
         # Ignore this if we're still spinning up of if this is the first
         # hour run (because we don't have channel geometry calculated).
-        if time < self.start_time: return
+        #if time < self.start_time: return
         if self.first_hour:
             self.first_hour = False
             #return
         # Create an Excel-friendly time string
-        timestamp = strftime("%m/%d/%Y %H:%M", gmtime(time)).ljust(17)
-        timestamp = time/86400 + 25569
         timestamp = ("%0.6f" % float(time/86400 + 25569)).ljust(14)
-        #
-        #timestamp = ("%0.6f" % float(pyTime(time))).ljust(14)
-
-
         # Localize variables to save a bit of time
         nodes = self.nodes
         data = self.data

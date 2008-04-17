@@ -81,7 +81,6 @@ class ModelControl(object):
                       dt = IniParams["dt"],
                       spin = IniParams["flushdays"],
                       offset = IniParams["offset"])
-
         # This is the output class, which is essentially just a list
         # of file objects and an append method which writes to them
         # every so often.
