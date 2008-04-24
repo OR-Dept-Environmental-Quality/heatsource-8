@@ -556,7 +556,7 @@ class ExcelInterface(ExcelDocument):
         # stream kilometer 0.5, for instance, in that case
         vars = (IniParams["length"] * 1000)/IniParams["longsample"]
 
-        num_nodes = int(ceil((vars-1)/self.multiple))
+        num_nodes = int(ceil((vars)/self.multiple))
         for i in range(0, num_nodes):
             node = StreamNode(run_type=self.run_type,Q_mb=Q_mb)
             for k,v in data.iteritems():
@@ -566,8 +566,9 @@ class ExcelInterface(ExcelDocument):
             self.PB("Building Stream Nodes", i, vars/self.multiple)
         # Find the mouth node and calculate the actual distance
         mouth = self.Reach[min(self.Reach.keys())]
-        mouth_dx = (vars-1)%self.multiple or 1.0 # number of extra variables if we're not perfectly divisible
+        mouth_dx = (vars)%self.multiple #or 1.0 # number of extra variables if we're not perfectly divisible
         mouth.dx = IniParams["longsample"] * mouth_dx
+
 
     def BuildZonesNormal(self):
         """This method builds the sampled vegzones in the case of non-lidar datasets"""
