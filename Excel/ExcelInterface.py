@@ -566,7 +566,7 @@ class ExcelInterface(ExcelDocument):
             self.PB("Building Stream Nodes", i, vars/self.multiple)
         # Find the mouth node and calculate the actual distance
         mouth = self.Reach[min(self.Reach.keys())]
-        mouth_dx = (vars)%self.multiple #or 1.0 # number of extra variables if we're not perfectly divisible
+        mouth_dx = (vars)%self.multiple or 1.0 # number of extra variables if we're not perfectly divisible
         mouth.dx = IniParams["longsample"] * mouth_dx
 
 
