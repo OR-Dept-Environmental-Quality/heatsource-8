@@ -5,7 +5,7 @@ advanced options for the Heat Source module.
 The idea here is that there are certain options
 which we should include in the interface for daily
 use, and certain options that we should hide in a place
-where, to put it bluntly, people won't screw with them 
+where, to put it bluntly, people won't screw with them
 unless they're smart enough to know what they're doing.
 
 Of course, you can't program against stupidity, but there you are.

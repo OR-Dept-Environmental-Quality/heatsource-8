@@ -140,7 +140,7 @@ def GetStreamGeometry(Q_est, W_b, z, n, S, D_est, dx, dt):
     Dispersion = (0.011 * pow(U,2.0) * pow(Ww,2.0)) / (D_est * Shear_Velocity)
     if (Dispersion * dt / pow(dx,2.0)) > 0.5:
         Dispersion = (0.45 * pow(dx,2)) / dt
-
+    #Dispersion = 50
     return D_est, A, Pw, Rh, Ww, U, Dispersion
 
 def CalcMuskingum(Q_est, U, W_w, S, dx, dt):
@@ -452,7 +452,7 @@ def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewT
     return F_Cond, T_sed_new, F_Longwave, F_LW_Atm, F_LW_Stream, F_LW_Veg, F_Evap, F_Conv, E
 
 def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T, Disp, S1,
-                   S1_value, T0, T1, T2, Q_accr, T_accr):
+                   S1_value, T0, T1, T2, Q_accr, T_accr, MixTDelta_dn):
     Q_in = 0
     T_in = 0
     T_up = T0
@@ -478,7 +478,12 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
     # the total discharge (Q_in) somewhere else, which it is not. We should check this eventually.
     T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp)
     T_mix -= T_up
+    # We need to adjust the upstream temperature by the tributary mixing so the longitidunal slope of change in T is
+    # not over predicted.
     T0 += T_mix
+
+    #Similarly we need to adjust the downstream temperature (T2) to account for mixing in that reach.
+    T2 -= MixTDelta_dn
 
     Dummy1 = -U * (T1 - T0) / dx
     Dummy2 = Disp * (T2 - 2 * T1 + T0) / (dx**2)
@@ -488,11 +493,11 @@ def CalcMacCormick(dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup, Q_up, Delta_T,
     else:
         Temp = T1 + S * dt
 
-    return Temp, S
+    return Temp, S, T_mix
 
 def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T_prev,
                    T_sed, Q_hyp, T_dn_prev, ShaderList, Disp, hour, JD, daytime, Altitude, Zenith,
-                   Q_up_prev, T_up_prev, solar_only):
+                   Q_up_prev, T_up_prev, solar_only, MixTDelta_dn_prev):
     cloud, wind, humidity, T_air = ContData
     W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, \
         SedDepth, dx, dt, SedThermCond, SedThermDiff, Q_accr, T_accr, \
@@ -505,7 +510,7 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
                     VDensity, VHeight, ShaderList)
 
     # We're only running shade, so return solar and some empty calories
-    if solar_only: 
+    if solar_only:
         # Boundary node
         if not has_prev: return solar, [0]*9, 0.0, 0.0
         # regular node
@@ -525,12 +530,13 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
         return solar, ground, F_Total, Delta_T
 
     Mac = CalcMacCormick(dt, dx, U, ground[1], T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
-                Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr)
+                Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr, MixTDelta_dn_prev)
 
+    #Mac includes Temp, S, T_mix
     return solar, ground, F_Total, Delta_T, Mac
 
 try:
-    from .. import opt 
+    from .. import opt
     if opt(__name__):
         from psyco import bind
         bind(CalcSolarPosition)

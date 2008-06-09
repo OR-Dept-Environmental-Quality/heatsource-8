@@ -658,7 +658,7 @@ void GetGroundFluxes(double Value[], double Cloud, double Wind, double Humidity,
 
 void MacCormick(double Value[], double dt, double dx, double U, double T_sed, double T_prev, double Q_hyp,
 			   PyObject *Q_tup, PyObject *T_tup, double Q_up, double Delta_T, double Disp, int S1,
-			   double S1_value, double T0, double T1, double T2, double Q_accr, double T_accr)
+			   double S1_value, double T0, double T1, double T2, double Q_accr, double T_accr, double MixTDelta_dn)
 {
 	double T_up = T0;
 	double Temp=0;
@@ -699,7 +699,7 @@ void MacCormick(double Value[], double dt, double dx, double U, double T_sed, do
     T_mix = ((Q_accr * T_accr) + (T_mix * (Q_up + Q_in + Q_hyp))) / (Q_accr + Q_up + Q_in + Q_hyp);
 	T_mix -= T_up;
 	T0 += T_mix;
-
+	T2 -= MixTDelta_dn;
     double Dummy1 = -U * (T1 - T0) / dx;
     double Dummy2 = Disp * (T2 - 2 * T1 + T0) / pow(dx,2);
     double S = Dummy1 + Dummy2 + Delta_T / dt;
@@ -711,6 +711,7 @@ void MacCormick(double Value[], double dt, double dx, double U, double T_sed, do
 	}
 	Value[0] = Temp;
 	Value[1] = S;
+	Value[2] = T_mix;
 }
 
 static char HSmodule_CalcMacCormick__doc__[] =
@@ -728,21 +729,21 @@ static PyObject *
 HSmodule_CalcMacCormick(PyObject *self, PyObject *args)
 {
 	double dt, dx, U, T_sed, T_prev, Q_up;
-	double Q_hyp, Q_accr, T_accr;
+	double Q_hyp, Q_accr, T_accr, MixTDelta_dn_prev;
 	double Delta_T, Disp, S1_value;
 	int S1;
 	PyObject *Q_tup, *T_tup;
 	double T0, T1, T2; // Grid cells for prev, this, next
-	if (!PyArg_ParseTuple(args, "ddddddOOdddidddddd", &dt, &dx, &U, &T_sed,
+	if (!PyArg_ParseTuple(args, "ddddddOOdddiddddddd", &dt, &dx, &U, &T_sed,
 														  &T_prev, &Q_hyp, &Q_tup, &T_tup,
 												 		  &Q_up, &Delta_T, &Disp, &S1,
-												 		  &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr))
+												 		  &S1_value, &T0, &T1, &T2, &Q_accr, &T_accr, &MixTDelta_dn_prev))
 		return NULL;
-	double Value[2] = {0.0,0.0};
+	double Value[3] = {0.0,0.0, 0.0};
 	MacCormick(Value, dt, dx, U, T_sed, T_prev, Q_hyp, Q_tup, T_tup,
-				Q_up, Delta_T, Disp, S1, S1_value, T0, T1, T2, Q_accr, T_accr);
+				Q_up, Delta_T, Disp, S1, S1_value, T0, T1, T2, Q_accr, T_accr, MixTDelta_dn_prev);
 
-	return Py_BuildValue("ff",Value[0], Value[1]);
+	return Py_BuildValue("fff",Value[0], Value[1], Value[2]);
 }
 
 static char HSmodule_CalcHeatFluxes__doc__[] =
@@ -758,15 +759,15 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 {
 	PyObject *ShaderList, *ContData, *C_args, *Q_tribs, *T_tribs;
 	double W_b, Elevation, TopoFactor, ViewToSky, phi, VDensity, VHeight, SedDepth;
-	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt;
+	double Altitude, Zenith, Q_up_prev, T_up_prev, T_dn_prev, Q_accr, T_accr, dx, dt, MixTDelta_dn_prev;
 	double SedThermCond, SedThermDiff, SampleDist, wind_a, wind_b, d_w, area, P_w, W_w;
 	double U, T_alluv, T_prev, T_sed, Q_hyp, cloud, humidity, T_air, wind, Disp;
 	int hour, daytime, has_prev, emergent, calcevap, penman, calcalluv, JD, solar_only;
-	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdiiiddddi",
+	if (!PyArg_ParseTuple(args, "OOdddddOOddddOdiiiddddid",
 								&ContData, &C_args, &d_w, &area, &P_w, &W_w, &U,
 								&Q_tribs, &T_tribs, &T_prev, &T_sed, &Q_hyp,
 								&T_dn_prev, &ShaderList, &Disp, &hour, &JD, &daytime,
-								&Altitude, &Zenith, &Q_up_prev, &T_up_prev, &solar_only))
+								&Altitude, &Zenith, &Q_up_prev, &T_up_prev, &solar_only, &MixTDelta_dn_prev))
 		return NULL;
 	if (!PyArg_ParseTuple(ContData, "dddd", &cloud, &wind, &humidity, &T_air))
 		return NULL;
@@ -815,7 +816,7 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 								solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
 								0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
 								0.0, 0.0, 0.0, 0.0);
-			
+
 		}
 	}
 	double ground[9] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
@@ -835,13 +836,13 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 		return Py_BuildValue("(ffffffff)(fffffffff)ff",solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
 									  ground[0],ground[1],ground[2],ground[3],ground[4],ground[5],ground[6],ground[7],ground[8],
 									  F_Total, Delta_T);
-	double Mac[2] = {0.0,0.0};
+	double Mac[3] = {0.0,0.0,0.0};
 	MacCormick(Mac, dt, dx, U, ground[1], T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
-				Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr);
+				Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr, MixTDelta_dn_prev);
 
-	return Py_BuildValue("(ffffffff)(fffffffff)ff(ff)",solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
+	return Py_BuildValue("(ffffffff)(fffffffff)ff(fff)",solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
 									  ground[0],ground[1],ground[2],ground[3],ground[4],ground[5],ground[6],ground[7],ground[8],
-									  F_Total, Delta_T, Mac[0], Mac[1]);
+									  F_Total, Delta_T, Mac[0], Mac[1], Mac[2]);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////

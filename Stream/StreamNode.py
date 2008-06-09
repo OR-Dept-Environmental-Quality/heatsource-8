@@ -33,6 +33,7 @@ class StreamNode(object):
                 "ContData", # Continuous data
                 "Zone", "T_bc", # Initialization parameters, Zone and boundary conditions
                 "Delta_T", # Current temperature calculated from only local fluxes
+                "Mix_T_Delta", #Change in temperature due to tribs, gw, points sources, accretion
                 "T", "T_prev", # Current and previous stream temperature
                 "TopoFactor", # was Topo_W+Topo_S+Topo_E/(90*3) in original code. From Above stream surface solar flux calculations
                 "ViewToSky", # Total angle of full sun view
@@ -85,6 +86,7 @@ class StreamNode(object):
         self.__slots = __slots
         self.__slots.sort()
         self.T = 0.0
+        self.Mix_T_Delta = 0.0
         self.Q_mass = 0
         self.ContData = Interpolator(dt=IniParams["dt"])
         self.T_tribs = Interpolator(dt=IniParams["dt"])
@@ -255,14 +257,15 @@ c_k: %3.4f""" % stderr
         self.T_prev = self.T
         self.T = None
         Altitude, Zenith, Daytime, dir = self.head.SolarPos
+
         try:
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, (self.T, self.S1) = \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, (self.T, self.S1, self.Mix_T_Delta) = \
                 _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev, solar_only)
+                            hour, JD, Daytime,Altitude, Zenith, self.prev_km.Q_prev, self.prev_km.T_prev, solar_only, self.next_km.Mix_T_Delta)
 
         except _HS.HeatSourceError, (stderr):
             self.CatchException(stderr, time)
@@ -283,7 +286,7 @@ c_k: %3.4f""" % stderr
                 _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp, self.next_km.T_prev, self.ShaderList[dir], self.Disp,
-                            hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0, solar_only)
+                            hour, JD, Daytime, Altitude, Zenith, 0.0, 0.0, solar_only, self.next_km.Mix_T_Delta)
         except _HS.HeatSourceError, (stderr, time):
             self.CatchException(stderr)
         self.F_DailySum[1] += self.F_Solar[1]
@@ -300,9 +303,11 @@ c_k: %3.4f""" % stderr
         if not self.prev_km:
             return
         #===================================================
-        self.T, S = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
+        #Throw away S and mix because we won't need them.
+
+        self.T, S, mix = _HS.CalcMacCormick(self.dt, self.dx, self.U, self.T_sed, self.T_prev, self.Q_hyp,
                                     self.Q_tribs[time], self.T_tribs[time], self.prev_km.Q, self.Delta_T, self.Disp,
-                                    True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in)
+                                    True, self.S1, self.prev_km.T, self.T, self.next_km.T, self.Q_in, self.T_in, self.next_km.Mix_T_Delta)
 
     def CalcDispersion(self):
         dx = self.dx
@@ -314,6 +319,7 @@ c_k: %3.4f""" % stderr
         Disp = 0.011 * (self.U ** 2) * (self.W_w ** 2) / (self.d_w * Shear_Velocity)
         if Disp * dt / (dx ** 2) > 0.5:
             Disp = (0.45 * (dx ** 2)) / dt
+        Disp = 0.1
         return Disp
 
     def MacCormick_THW(self, time):
