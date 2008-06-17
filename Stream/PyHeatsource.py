@@ -514,7 +514,7 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
         # Boundary node
         if not has_prev: return solar, [0]*9, 0.0, 0.0
         # regular node
-        else: return solar, [0]*9, 0.0, 0.0, [0]*2
+        else: return solar, [0]*9, 0.0, 0.0, [0]*3
 
     ground = GetGroundFluxes(cloud, wind, humidity, T_air, Elevation,
                     phi, VHeight, ViewToSky, SedDepth, dx,

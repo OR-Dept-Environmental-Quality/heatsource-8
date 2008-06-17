@@ -812,10 +812,10 @@ HSmodule_CalcHeatFluxes(PyObject *self, PyObject *args)
 								0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
 								0.0, 0.0);
 		} else {
-			return Py_BuildValue("(ffffffff)(fffffffff)ff(ff)",
+			return Py_BuildValue("(ffffffff)(fffffffff)ff(fff)",
 								solar[0],solar[1],solar[2],solar[3],solar[4],solar[5],solar[6],solar[7],
 								0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,
-								0.0, 0.0, 0.0, 0.0);
+								0.0, 0.0, 0.0, 0.0, 0.0);
 
 		}
 	}
