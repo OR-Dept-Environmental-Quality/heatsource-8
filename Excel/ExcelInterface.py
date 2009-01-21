@@ -68,7 +68,8 @@ class ExcelInterface(ExcelDocument):
                "alluviumtemp": "E16",
                "emergent": "E17",
                "lidar": "E18",
-               "lcdensity": "E19"}
+               "lcdensity": "E19",
+               "lcoverhang": "E20"}
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
         # These might be blank, make them zeros
@@ -404,14 +405,18 @@ class ExcelInterface(ExcelDocument):
                 # Perform some tests for data accuracy and validity
                 if cloud is None: cloud = 0.0
                 if wind is None: wind = 0.0
-                if humid < 0 or humid is None:
+                if cloud < 0 or cloud > 1:
+                    if self.run_type == 1: # Alright in shade-a-lator
+                        cloud = 0.0
+                    else: raise Exception("Cloudiness (value of '%s' in Continuous Data) must be greater than zero and less than one." % `cloud`)
+                if humid < 0 or humid is None or humid > 1:
                     if self.run_type == 1: # Alright in shade-a-lator
                         humid = 0.0
-                    else: raise Exception("Humidity (value of %s in Continuous Data) must be greater than zero" % `hum_val`)
-                if air is None:
+                    else: raise Exception("Humidity (value of '%s' in Continuous Data) must be greater than zero and less than one." % `hum_val`)
+                if air is None or air < -90 or air > 58:
                     if self.run_type == 1: # Alright in shade-a-lator
                         air = 0.0
-                    else: raise Exception("Must have values for Air Temp in Continuous Data sheet")
+                    else: raise Exception("Air temperature input (value of '%s' in Continuous Data) outside of world records, -89 to 58 deg C." % `air`)
                 node.ContData[time] = cloud, wind, humid, air
             self.PB("Reading continuous data", tm.next(), length)
 
@@ -690,8 +695,121 @@ class ExcelInterface(ExcelDocument):
 
     def BuildZonesLidar(self):
         """Build zones if we are using LiDAR data"""
+        #self.CheckEarlyQuit()
+        #raise NotImplementedError("LiDAR not yet implemented")
+        ################### under construction - copied from BuildZonesNormal
+        #Tried to keep in the same general form as BuildZonesNormal so blame Metta
         self.CheckEarlyQuit()
-        raise NotImplementedError("LiDAR not yet implemented")
+        vheight = []
+        elevation = []
+        average = lambda x:sum(x)/len(x)
+
+        keys = self.Reach.keys()
+        keys.sort(reverse=True) # Downstream sorted list of stream kilometers
+        self.PB("Translating LULC Data")
+        for i in xrange(7, 36): # For each column of LULC data
+            col = self.GetColumn(i, "TTools Data")[5:] # LULC column
+            elev = self.GetColumn(i+28,"TTools Data")[5:] # Shift by 28 to get elevation column
+            # Make a list from the LC codes from the column, then send that to the multiplier
+            # with a lambda function that averages them appropriately. Note, we're averaging over
+            # the values (e.g. density) not the actual code, which would be meaningless.
+            try:
+                vheight.append(self.multiplier([x for x in col], average))
+            except KeyError, (stderr):
+                raise Exception("Vegetation height error" % stderr.message)
+            if i>7:  #We don't want to read in column AJ -Dan
+                elevation.append(self.multiplier(elev, average))
+            self.PB("Reading vegetation heights", i, 36)
+        # We have to set the emergent vegetation, so we strip those off of the iterator
+        # before we record the zones.
+        for i in xrange(len(keys)):
+            node = self.Reach[keys[i]]
+            node.VHeight = vheight[0][i]
+            node.VDensity = IniParams["lcdensity"]
+            node.Overhang = IniParams["lcoverhang"]
+
+        # Average over the topo values
+        topo_w = self.multiplier(self.GetColumn(4, "TTools Data")[5:], average)
+        topo_s = self.multiplier(self.GetColumn(5, "TTools Data")[5:], average)
+        topo_e = self.multiplier(self.GetColumn(6, "TTools Data")[5:], average)
+
+        # ... and you thought things were crazy earlier! Here is where we build up the
+        # values for each node. This is culled from earlier version's VB code and discussions
+        # to try to simplify it... yeah, you read that right, simplify it... you should've seen in earlier!
+        for h in xrange(len(keys)):
+            self.PB("Building VegZones", h, len(keys))
+            node = self.Reach[keys[h]]
+            VTS_Total = 0 #View to sky value
+            LC_Angle_Max = 0
+            # Now we set the topographic elevations in each direction
+            node.TopoFactor = (topo_w[h] + topo_s[h] + topo_e[h])/(90*3) # Topography factor Above Stream Surface
+            # This is basically a list of directions, each with a sort of average topography
+            ElevationList = (topo_e[h],
+                             topo_e[h],
+                             0.5*(topo_e[h]+topo_s[h]),
+                             topo_s[h],
+                             0.5*(topo_s[h]+topo_w[h]),
+                             topo_w[h],
+                             topo_w[h])
+            # Sun comes down and can be full-on, blocked by veg, or blocked by topography. Earlier implementations
+            # calculated each case on the fly. Here we chose a somewhat more elegant solution and calculate necessary
+            # angles. Basically, there is a minimum angle for which full sun is calculated (top of trees), and the
+            # maximum angle at which full shade is calculated (top of topography). Anything in between these is an
+            # angle for which sunlight is passing through trees. So, for each direction, we want to calculate these
+            # two angles so that late we can test whether we are between them, and only do the shading calculations
+            # if that is true.
+
+            for i in xrange(7): # Iterate through each direction
+                T_Full = () # lowest angle necessary for full sun
+                T_None = () # Highest angle necessary for full shade
+                rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
+                for j in xrange(4): # Iterate through each of the 4 zones
+                    Vheight = vheight[i*4+j+1][h]
+                    if Vheight < 0 or Vheight is None or Vheight > 120:
+                        raise Exception("Vegetation height (value of %s in TTools Data) must be greater than zero and less than 120 meters (when LiDAR = True)" % `Vheight`)
+                    Vdens = IniParams["lcdensity"]
+                    Overhang = IniParams["lcoverhang"]
+                    Elev = elevation[i*4+j][h]
+
+                    if not j: # We are at the stream edge, so start over
+                        LC_Angle_Max = 0 # New value for each direction
+                    else:
+                        Overhang = 0 # No overhang away from the stream
+                    ##########################################################
+                    # Calculate the relative ground elevation. This is the
+                    # vertical distance from the stream surface to the land surface
+                    SH = Elev - node.Elevation
+                    # Then calculate the relative vegetation height
+                    VH = Vheight + SH
+                    # Calculate the riparian extinction value
+                    try:
+                        RE = -log(1-Vdens)/10
+                    except OverflowError:
+                        if Vdens == 1: RE = 1 # cannot take log of 0, RE is full if it's zero
+                        else: raise
+                    # Calculate the node distance
+                    LC_Distance = IniParams["transsample"] * (j + 0.5) #This is "+ 0.5" because j starts at 0.
+                    # We shift closer to the stream by the amount of overhang
+                    # This is a rather ugly cludge.
+                    if not j: LC_Distance -= Overhang
+                    if LC_Distance <= 0:
+                        LC_Distance = 0.00001
+                    # Calculate the minimum sun angle needed for full sun
+                    T_Full += degrees(atan(VH/LC_Distance)), # It gets added to a tuple of full sun values
+                    # Now get the maximum of bank shade and topographic shade for this
+                    # direction
+                    T_None += degrees(atan(SH/LC_Distance)), # likewise, a tuple of values
+                    ##########################################################
+                    # Now we calculate the view to sky value
+                    # LC_Angle is the vertical angle from the surface to the land-cover top. It's
+                    # multiplied by the density as a kludge
+                    LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)
+                    if not j or LC_Angle_Max < LC_Angle:
+                        LC_Angle_Max = LC_Angle
+                    if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
+                    rip += RE,
+                node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
+            node.ViewToSky = 1 - VTS_Total / (7 * 90)
 
     def GetLandCoverCodes(self):
         """Return the codes from the Land Cover Codes worksheet as a dictionary of dictionaries"""
@@ -706,6 +824,9 @@ class ExcelInterface(ExcelDocument):
         for i in xrange(len(codes)):
             # Each code is a tuple in the form of (VHeight, VDensity, Overhang)
             data[codes[i]] = vals[i]
+            if vals[i][1] < 0 or vals[i][1] > 1:
+                raise Exception("Vegetation Density (value of %s in Land Cover Codes) must be greater than zero and less than one" % `hum_val`)
+
         return data
 
     def InitializeNode(self, node):
