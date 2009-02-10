@@ -522,6 +522,13 @@ class ExcelInterface(ExcelDocument):
             data[morph[i]] = self.GetColumn(2+i, "Morphology Data")[5:]
         for i in xrange(len(flow)):
             data[flow[i]] = self.GetColumn(2+i, "Flow Data")[3:]
+        #Longitude check
+        if max(data[ttools[1]]) > 180 or min(data[ttools[1]]) < -180:
+            raise Exception("Longitude must be greater than -180 and less than 180 degrees")
+        #Latitude check
+        if max(data[ttools[2]]) > 45 or min(data[ttools[2]]) < -45:
+            raise Exception("Latitude must be greater than -45 and less than 45 degrees")
+
         # Then sum and average things as appropriate. multiplier() takes a tuple
         # and applies the given lambda function to that tuple.
         for attr in sums:
@@ -821,12 +828,12 @@ class ExcelInterface(ExcelDocument):
         # make a list of lists with values: [(height[0], dens[0], over[0]), (height[1],...),...]
         vals = [tuple([j for j in i]) for i in zip(height,dens,over)]
         data = {}
+
         for i in xrange(len(codes)):
             # Each code is a tuple in the form of (VHeight, VDensity, Overhang)
             data[codes[i]] = vals[i]
-            if vals[i][1] < 0 or vals[i][1] > 1:
-                raise Exception("Vegetation Density (value of %s in Land Cover Codes) must be greater than zero and less than one" % `hum_val`)
-
+            if vals[i][0] != None and (vals[i][1] < 0 or vals[i][1] > 1):
+                raise Exception("Vegetation Density (value of %s in Land Cover Codes) must be >= 0.0 and <= 1.0" % `vals[i][1]`)
         return data
 
     def InitializeNode(self, node):
