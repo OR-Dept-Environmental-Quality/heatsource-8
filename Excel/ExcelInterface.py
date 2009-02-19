@@ -526,8 +526,8 @@ class ExcelInterface(ExcelDocument):
         if max(data[ttools[1]]) > 180 or min(data[ttools[1]]) < -180:
             raise Exception("Longitude must be greater than -180 and less than 180 degrees")
         #Latitude check
-        if max(data[ttools[2]]) > 45 or min(data[ttools[2]]) < -45:
-            raise Exception("Latitude must be greater than -45 and less than 45 degrees")
+        if max(data[ttools[2]]) > 90 or min(data[ttools[2]]) < -90:
+            raise Exception("Latitude must be greater than -90 and less than 90 degrees")
 
         # Then sum and average things as appropriate. multiplier() takes a tuple
         # and applies the given lambda function to that tuple.
