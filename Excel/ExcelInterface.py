@@ -101,7 +101,8 @@ class ExcelInterface(ExcelDocument):
         # make sure alluvium temp is present and a floating point number.
         IniParams["alluviumtemp"] = 0.0 if not IniParams["alluviumtemp"] else float(IniParams["alluviumtemp"])
         # make sure that the timestep divides into 60 minutes, or we may not land squarely on each hour's starting point.
-        if 60%IniParams["dt"] > 1e-7:
+        #if 60%IniParams["dt"] > 1e-7:
+        if float(60)/IniParams["dt"] - int(float(60)/IniParams["dt"]) > 1e-7:
             raise Exception("I'm sorry, your timestep (%0.2f) must evenly divide into 60 minutes." % IniParams["dt"])
         else:
             IniParams["dt"] = IniParams["dt"]*60 # make dt measured in seconds
@@ -631,6 +632,7 @@ class ExcelInterface(ExcelDocument):
             self.PB("Building VegZones", h, len(keys))
             node = self.Reach[keys[h]]
             VTS_Total = 0 #View to sky value
+            VTS_Total_old = 0
             LC_Angle_Max = 0
             # Now we set the topographic elevations in each direction
             node.TopoFactor = (topo_w[h] + topo_s[h] + topo_e[h])/(90*3) # Topography factor Above Stream Surface
@@ -692,13 +694,27 @@ class ExcelInterface(ExcelDocument):
                     # Now we calculate the view to sky value
                     # LC_Angle is the vertical angle from the surface to the land-cover top. It's
                     # multiplied by the density as a kludge
-                    LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)
-                    if not j or LC_Angle_Max < LC_Angle:
-                        LC_Angle_Max = LC_Angle
-                    if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
+                    ##LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)
+                    ##if not j or LC_Angle_Max < LC_Angle:
+                    ##   LC_Angle_Max = LC_Angle
+
+                    #DT: My attempt to account for the difference in density between
+                    # vegetation shade (variable dens) and bank shade (1.0)
+                    if j == 3:
+                        if max(T_Full) > 0:   #if bank and/or veg shade is occuring:
+                            #Find weighted average the density:
+                            #Vdens_mod = (Amount of Veg shade * Veg dens) + (Amount of bank shace * bank dens, i.e. 1) / (Sum of amount of shade)
+                            Vdens_mod = ((max(T_Full)-max(T_None))*float(Vdens) + max(T_None)) / max(T_Full)
+                        else:
+                            Vdens_mod = float(Vdens)
+                        VTS_Total += max(T_Full)*Vdens_mod # Add angle at end of each zone calculation
+                        ##VTS_Total_old += LC_Angle_Max
                     rip += RE,
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
             node.ViewToSky = 1 - VTS_Total / (7 * 90)
+            ##ViewToSky_old = 1 - VTS_Total_old / (7 * 90)
+            ##print node.ViewToSky, ViewToSky_old, ViewToSky_old - node.ViewToSky
+
 
     def BuildZonesLidar(self):
         """Build zones if we are using LiDAR data"""
@@ -810,10 +826,21 @@ class ExcelInterface(ExcelDocument):
                     # Now we calculate the view to sky value
                     # LC_Angle is the vertical angle from the surface to the land-cover top. It's
                     # multiplied by the density as a kludge
-                    LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)
-                    if not j or LC_Angle_Max < LC_Angle:
-                        LC_Angle_Max = LC_Angle
-                    if j == 3: VTS_Total += LC_Angle_Max # Add angle at end of each zone calculation
+                    ##LC_Angle = degrees(atan(VH / LC_Distance) * Vdens)
+                    ##if not j or LC_Angle_Max < LC_Angle:
+                    ##    LC_Angle_Max = LC_Angle
+
+                    #DT: My attempt to account for the difference in density between
+                    # vegetation shade (variable dens) and bank shade (1.0)
+                    if j == 3:
+                        if max(T_Full) > 0:   #if bank and/or veg shade is occuring:
+                            #Find weighted average the density:
+                            #Vdens_mod = (Amount of Veg shade * Veg dens) + (Amount of bank shace * bank dens, i.e. 1) / (Sum of amount of shade)
+                            Vdens_mod = ((max(T_Full)-max(T_None))*float(Vdens) + max(T_None)) / max(T_Full)
+                        else:
+                            Vdens_mod = float(Vdens)
+                        VTS_Total += max(T_Full)*Vdens_mod # Add angle at end of each zone calculation
+                        ##VTS_Total_old += LC_Angle_Max
                     rip += RE,
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
             node.ViewToSky = 1 - VTS_Total / (7 * 90)
