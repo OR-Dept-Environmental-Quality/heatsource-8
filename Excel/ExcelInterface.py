@@ -69,14 +69,17 @@ class ExcelInterface(ExcelDocument):
                "emergent": "E17",
                "lidar": "E18",
                "lcdensity": "E19",
-               "lcoverhang": "E20"}
+               "lcoverhang": "E20",
+               "transsample_count": "G7"}
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
         # These might be blank, make them zeros
         for key in ["inflowsites","flushdays","wind_a","wind_b"]:
             IniParams[key] = 0.0 if not IniParams[key] else IniParams[key]
+        # If the number of transverse sample per direction is NOT report, assume 4 (old default)
+        IniParams["transsample_count"] = 4.0 if not IniParams["transsample_count"] else IniParams["transsample_count"]
         # Then make all of these integers because they're used later in for loops
-        for key in ["inflowsites","flushdays","contsites"]:
+        for key in ["inflowsites","flushdays","contsites", "transsample_count"]:
             IniParams[key] = int(IniParams[key])
         # Set up our evaporation method
         IniParams["penman"] = False
@@ -593,13 +596,14 @@ class ExcelInterface(ExcelDocument):
         overhang = []
         elevation = []
         average = lambda x:sum(x)/len(x)
+        trans_count = IniParams["transsample_count"]
 
         keys = self.Reach.keys()
         keys.sort(reverse=True) # Downstream sorted list of stream kilometers
         self.PB("Translating LULC Data")
-        for i in xrange(7, 36): # For each column of LULC data
+        for i in xrange(7, 7*trans_count+8): # For each column of LULC data
             col = self.GetColumn(i, "TTools Data")[5:] # LULC column
-            elev = self.GetColumn(i+28,"TTools Data")[5:] # Shift by 28 to get elevation column
+            elev = self.GetColumn(i+7*trans_count,"TTools Data")[5:] # Shift by 28 to get elevation column
             # Make a list from the LC codes from the column, then send that to the multiplier
             # with a lambda function that averages them appropriately. Note, we're averaging over
             # the values (e.g. density) not the actual code, which would be meaningless.
@@ -611,7 +615,7 @@ class ExcelInterface(ExcelDocument):
                 raise Exception("At least one land cover code from the 'TTools Data' worksheet is blank or not in 'Land Cover Codes' worksheet (Code: %s)." % stderr.message)
             if i>7:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
-            self.PB("Translating LULC Data", i, 36)
+            self.PB("Translating LULC Data", i, 7*trans_count+8)
         # We have to set the emergent vegetation, so we strip those off of the iterator
         # before we record the zones.
         for i in xrange(len(keys)):
@@ -656,11 +660,11 @@ class ExcelInterface(ExcelDocument):
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
                 rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
-                for j in xrange(4): # Iterate through each of the 4 zones
-                    Vheight = vheight[i*4+j+1][h]
-                    Vdens = vdensity[i*4+j+1][h]
-                    Overhang = overhang[i*4+j+1][h]
-                    Elev = elevation[i*4+j][h]
+                for j in xrange(trans_count): # Iterate through each of the zones
+                    Vheight = vheight[i*trans_count+j+1][h]
+                    Vdens = vdensity[i*trans_count+j+1][h]
+                    Overhang = overhang[i*trans_count+j+1][h]
+                    Elev = elevation[i*trans_count+j][h]
 
                     if not j: # We are at the stream edge, so start over
                         LC_Angle_Max = 0 # New value for each direction
@@ -700,13 +704,13 @@ class ExcelInterface(ExcelDocument):
 
                     #DT: My attempt to account for the difference in density between
                     # vegetation shade (variable dens) and bank shade (1.0)
-                    if j == 3:
+                    if j == trans_count - 1:
                         if max(T_Full) > 0:   #if bank and/or veg shade is occuring:
                             #Find weighted average the density:
                             #Vdens_mod = (Amount of Veg shade * Veg dens) + (Amount of bank shace * bank dens, i.e. 1) / (Sum of amount of shade)
                             Vdens_mod = ((max(T_Full)-max(T_None))*float(Vdens) + max(T_None)) / max(T_Full)
                         else:
-                            Vdens_mod = float(Vdens)
+                            Vdens_mod = 1.0
                         VTS_Total += max(T_Full)*Vdens_mod # Add angle at end of each zone calculation
                         ##VTS_Total_old += LC_Angle_Max
                     rip += RE,
@@ -726,13 +730,14 @@ class ExcelInterface(ExcelDocument):
         vheight = []
         elevation = []
         average = lambda x:sum(x)/len(x)
+        trans_count = IniParams["transsample_count"]
 
         keys = self.Reach.keys()
         keys.sort(reverse=True) # Downstream sorted list of stream kilometers
         self.PB("Translating LULC Data")
-        for i in xrange(7, 36): # For each column of LULC data
-            col = self.GetColumn(i, "TTools Data")[5:] # LULC column
-            elev = self.GetColumn(i+28,"TTools Data")[5:] # Shift by 28 to get elevation column
+        for i in xrange(7, 7*trans_count+8): # For each column of LULC data
+            col = self.GetColumn(i, "TTools Data")[5:] # veg height column
+            elev = self.GetColumn(i+7*trans_count,"TTools Data")[5:] # Shift by 7 * "number of trans sample zones" to get elevation column
             # Make a list from the LC codes from the column, then send that to the multiplier
             # with a lambda function that averages them appropriately. Note, we're averaging over
             # the values (e.g. density) not the actual code, which would be meaningless.
@@ -742,7 +747,7 @@ class ExcelInterface(ExcelDocument):
                 raise Exception("Vegetation height error" % stderr.message)
             if i>7:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
-            self.PB("Reading vegetation heights", i, 36)
+            self.PB("Reading vegetation heights", i, 7*trans_count+8)
         # We have to set the emergent vegetation, so we strip those off of the iterator
         # before we record the zones.
         for i in xrange(len(keys)):
@@ -786,13 +791,13 @@ class ExcelInterface(ExcelDocument):
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
                 rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
-                for j in xrange(4): # Iterate through each of the 4 zones
-                    Vheight = vheight[i*4+j+1][h]
+                for j in xrange(trans_count): # Iterate through each of the zones
+                    Vheight = vheight[i*trans_count+j+1][h]
                     if Vheight < 0 or Vheight is None or Vheight > 120:
                         raise Exception("Vegetation height (value of %s in TTools Data) must be greater than zero and less than 120 meters (when LiDAR = True)" % `Vheight`)
                     Vdens = IniParams["lcdensity"]
                     Overhang = IniParams["lcoverhang"]
-                    Elev = elevation[i*4+j][h]
+                    Elev = elevation[i*trans_count+j][h]
 
                     if not j: # We are at the stream edge, so start over
                         LC_Angle_Max = 0 # New value for each direction
@@ -832,13 +837,13 @@ class ExcelInterface(ExcelDocument):
 
                     #DT: My attempt to account for the difference in density between
                     # vegetation shade (variable dens) and bank shade (1.0)
-                    if j == 3:
+                    if j == trans_count - 1:
                         if max(T_Full) > 0:   #if bank and/or veg shade is occuring:
                             #Find weighted average the density:
                             #Vdens_mod = (Amount of Veg shade * Veg dens) + (Amount of bank shace * bank dens, i.e. 1) / (Sum of amount of shade)
                             Vdens_mod = ((max(T_Full)-max(T_None))*float(Vdens) + max(T_None)) / max(T_Full)
                         else:
-                            Vdens_mod = float(Vdens)
+                            Vdens_mod = 1.0
                         VTS_Total += max(T_Full)*Vdens_mod # Add angle at end of each zone calculation
                         ##VTS_Total_old += LC_Angle_Max
                     rip += RE,
