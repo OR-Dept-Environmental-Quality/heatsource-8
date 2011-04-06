@@ -527,8 +527,20 @@ class ExcelInterface(ExcelDocument):
         for i in xrange(len(flow)):
             data[flow[i]] = self.GetColumn(2+i, "Flow Data")[3:]
         #Longitude check
-        if max(data[ttools[1]]) > 180 or min(data[ttools[1]]) < -180:
-            raise Exception("Longitude must be greater than -180 and less than 180 degrees")
+        #if max(data[ttools[1]]) > 180 or min(data[ttools[1]]) < -180:
+        print data[ttools[1]][0]
+        if max(data[ttools[1]]) > 180:
+            long_list = list(data[ttools[1]])
+            max1 = max(long_list)
+            index1 = long_list.index(max1)
+            rkm = data[ttools[0]][index1]
+            raise Exception("Longitude must be less than 180 degrees. At rKM = " + str(rkm) + ", longitude = " + str(max1))
+        if min(data[ttools[1]]) < -180:
+            long_list = list(data[ttools[1]])
+            min1 = min(long_list)
+            index1 = long_list.index(min1)
+            rkm = data[ttools[1]][index1]
+            raise Exception("Longitude must be greater than -180 degrees. At rKM = " + str(rkm) + ", longitude = " + str(min1))
         #Latitude check
         if max(data[ttools[2]]) > 90 or min(data[ttools[2]]) < -90:
             raise Exception("Latitude must be greater than -90 and less than 90 degrees")
@@ -660,6 +672,8 @@ class ExcelInterface(ExcelDocument):
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
                 rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
+                W_Vdens_num = 0.0  #Numerator for the weighted Veg density calculation
+                W_Vdens_dem = 0.0  #Denominator for the weighted Veg density calculation
                 for j in xrange(trans_count): # Iterate through each of the zones
                     Vheight = vheight[i*trans_count+j+1][h]
                     Vdens = vdensity[i*trans_count+j+1][h]
@@ -694,6 +708,9 @@ class ExcelInterface(ExcelDocument):
                     # Now get the maximum of bank shade and topographic shade for this
                     # direction
                     T_None += degrees(atan(SH/LC_Distance)), # likewise, a tuple of values
+                    veg_angle = degrees(atan(VH/LC_Distance)) - degrees(atan(SH/LC_Distance))
+                    W_Vdens_num += veg_angle*float(Vdens)
+                    W_Vdens_dem += veg_angle
                     ##########################################################
                     # Now we calculate the view to sky value
                     # LC_Angle is the vertical angle from the surface to the land-cover top. It's
@@ -708,7 +725,12 @@ class ExcelInterface(ExcelDocument):
                         if max(T_Full) > 0:   #if bank and/or veg shade is occuring:
                             #Find weighted average the density:
                             #Vdens_mod = (Amount of Veg shade * Veg dens) + (Amount of bank shace * bank dens, i.e. 1) / (Sum of amount of shade)
-                            Vdens_mod = ((max(T_Full)-max(T_None))*float(Vdens) + max(T_None)) / max(T_Full)
+                            #New way:
+                            if W_Vdens_dem > 0:
+                                Vdens_ave_veg = W_Vdens_num / W_Vdens_dem
+                            else:
+                                Vdens_ave_veg = 0
+                            Vdens_mod = ((max(T_Full)-max(T_None))* Vdens_ave_veg + max(T_None)) / max(T_Full)
                         else:
                             Vdens_mod = 1.0
                         VTS_Total += max(T_Full)*Vdens_mod # Add angle at end of each zone calculation
@@ -791,6 +813,8 @@ class ExcelInterface(ExcelDocument):
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
                 rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
+                W_Vdens_num = 0.0  #Numerator for the weighted Veg density calculation
+                W_Vdens_dem = 0.0  #Denominator for the weighted Veg density calculation
                 for j in xrange(trans_count): # Iterate through each of the zones
                     Vheight = vheight[i*trans_count+j+1][h]
                     if Vheight < 0 or Vheight is None or Vheight > 120:
@@ -827,6 +851,10 @@ class ExcelInterface(ExcelDocument):
                     # Now get the maximum of bank shade and topographic shade for this
                     # direction
                     T_None += degrees(atan(SH/LC_Distance)), # likewise, a tuple of values
+                    #Cacluation for the angle weighted veg density
+                    veg_angle = degrees(atan(VH/LC_Distance)) - degrees(atan(SH/LC_Distance))
+                    W_Vdens_num += veg_angle*float(Vdens)
+                    W_Vdens_dem += veg_angle
                     ##########################################################
                     # Now we calculate the view to sky value
                     # LC_Angle is the vertical angle from the surface to the land-cover top. It's
@@ -837,11 +865,14 @@ class ExcelInterface(ExcelDocument):
 
                     #DT: My attempt to account for the difference in density between
                     # vegetation shade (variable dens) and bank shade (1.0)
+                    # the density representing vegetation is the weighted density based on the vegetation angle.
                     if j == trans_count - 1:
                         if max(T_Full) > 0:   #if bank and/or veg shade is occuring:
                             #Find weighted average the density:
                             #Vdens_mod = (Amount of Veg shade * Veg dens) + (Amount of bank shace * bank dens, i.e. 1) / (Sum of amount of shade)
-                            Vdens_mod = ((max(T_Full)-max(T_None))*float(Vdens) + max(T_None)) / max(T_Full)
+                            #New way:
+                            Vdens_ave_veg = W_Vdens_num / W_Vdens_dem
+                            Vdens_mod = ((max(T_Full)-max(T_None))* Vdens_ave_veg + max(T_None)) / max(T_Full)
                         else:
                             Vdens_mod = 1.0
                         VTS_Total += max(T_Full)*Vdens_mod # Add angle at end of each zone calculation
