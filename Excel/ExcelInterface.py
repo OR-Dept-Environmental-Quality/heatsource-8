@@ -873,7 +873,10 @@ class ExcelInterface(ExcelDocument):
                             #Find weighted average the density:
                             #Vdens_mod = (Amount of Veg shade * Veg dens) + (Amount of bank shace * bank dens, i.e. 1) / (Sum of amount of shade)
                             #New way:
-                            Vdens_ave_veg = W_Vdens_num / W_Vdens_dem
+                            if W_Vdens_dem > 0:
+                                Vdens_ave_veg = W_Vdens_num / W_Vdens_dem
+                            else:
+                                Vdens_ave_veg = 0
                             Vdens_mod = ((max(T_Full)-max(T_None))* Vdens_ave_veg + max(T_None)) / max(T_Full)
                         else:
                             Vdens_mod = 1.0
