@@ -34,5 +34,9 @@ IniParams = {"psyco": ('Dictionaries',
                         'Output'),
              # Run the routines in PyHeatsource.py instead of
              # the C module.
-             "run_in_python": False,
+             #Run in C is not working.  Known issues:
+             #1. Number of veg zones hard coded as 4
+             #2. Output from C module does not include solar blocked and causes a crash.
+             #WARNING !!!  DO NOT RUN IN C
+             "run_in_python": True,
              }

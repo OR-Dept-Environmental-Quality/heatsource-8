@@ -38,7 +38,7 @@ class StreamNode(object):
                 "TopoFactor", # was Topo_W+Topo_S+Topo_E/(90*3) in original code. From Above stream surface solar flux calculations
                 "ViewToSky", # Total angle of full sun view
                 "ShaderList", # List of angles and attributes to determine sun shading.
-                "F_DailySum", "F_Total", # Specific sums of solar fluxes
+                "F_DailySum", "F_Total", "Solar_Blocked" # Specific sums of solar fluxes
                 "SedThermCond", "SedThermDiff", "SedDepth", # Sediment conduction values
                 "hyp_percent", # Percent hyporheic exchange
                 "F_Solar", # List of important solar fluxes
@@ -261,7 +261,7 @@ c_k: %3.4f""" % stderr
         try:
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, (self.T, self.S1, self.Mix_T_Delta) = \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, (self.T, self.S1, self.Mix_T_Delta), veg_block = \
                 _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp,self.next_km.T_prev, self.ShaderList[dir], self.Disp,
@@ -272,6 +272,9 @@ c_k: %3.4f""" % stderr
 
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
+        for i in range(len(self.Solar_Blocked[dir])):
+            self.Solar_Blocked[dir][i] += veg_block[i]
+        self.Solar_Blocked['diffuse'] += veg_block[-1]
 
     def CalcHeat_BoundaryNode(self, time, hour, min, sec,JD,JDC, solar_only=False):
         # Reset temperatures
@@ -282,7 +285,7 @@ c_k: %3.4f""" % stderr
         try:
             self.F_Solar, \
                 (self.F_Conduction, self.T_sed, self.F_Longwave, self.F_LW_Atm, self.F_LW_Stream, \
-                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T = \
+                 self.F_LW_Veg, self.F_Evaporation, self.F_Convection, self.E), self.F_Total, self.Delta_T, veg_block = \
                 _HS.CalcHeatFluxes(self.ContData[time], self.C_args, self.d_w, self.A, self.P_w, self.W_w, self.U,
                             self.Q_tribs[time], self.T_tribs[time], self.T_prev, self.T_sed,
                             self.Q_hyp, self.next_km.T_prev, self.ShaderList[dir], self.Disp,
@@ -291,6 +294,9 @@ c_k: %3.4f""" % stderr
             self.CatchException(stderr)
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
+        for i in range(len(self.Solar_Blocked[dir])):
+            self.Solar_Blocked[dir][i] += veg_block[i]
+        self.Solar_Blocked['diffuse'] += veg_block[-1]
 
         # Check if we have interpolation on, and use the appropriate time
         self.T = self.T_bc[time]

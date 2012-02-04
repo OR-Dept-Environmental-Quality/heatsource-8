@@ -176,8 +176,8 @@ def CalcFlows(U, W_w, W_b, S, dx, dt, z, n, D_est, Q, Q_up, Q_up_prev, inputs, Q
         C = CalcMuskingum(Q2, U, W_w, S, dx, dt)
         Q_new = C[0]*Q1 + C[1]*Q2 + C[2]*Q
 
-    if Q_new > 0.003:
-        Geom = GetStreamGeometry(Q_new, W_b, z, n, S, D_est, dx, dt)
+    #if Q_new > 0.000:
+    Geom = GetStreamGeometry(Q_new, W_b, z, n, S, D_est, dx, dt)
     return Q_new, Geom
 
 def GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b, Elevation, TopoFactor,
@@ -227,27 +227,31 @@ def GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b, Elevation, TopoFac
     ########################################################
     #======================================================
     #3 - Above Stream Surface (Above Bank Shade)
+    Solar_blocked_byVeg = [0]*len(VegetationAngle) #amount of solar radiation blocked by each zone, plus one for diffuse
     if Altitude <= TopoShadeAngle:    #>Topographic Shade IS Occurring<
         F_Direct[2] = 0
         F_Diffuse[2] = F_Diffuse[1] * TopoFactor
         F_Direct[3] = 0
-        F_Diffuse[3] = F_Diffuse[2] * ViewToSky
     elif Altitude < FullSunAngle:  #Partial shade from veg
         F_Direct[2] = F_Direct[1]
         F_Diffuse[2] = F_Diffuse[1] * (1 - TopoFactor)
         Dummy1 = F_Direct[2]
-        zone = 0
-        for vegangle in VegetationAngle:  #Loop to find if shading is occuring from veg. in that zone
-            if Altitude < vegangle:  #veg shading is occurring from this zone
+        zone = len(VegetationAngle) - 1
+        while zone >= 0:
+        #for vegangle in VegetationAngle:  #Loop to find if shading is occuring from veg. in that zone
+            if Altitude < VegetationAngle[zone]:  #veg shading is occurring from this zone
+                fraction_passed = (1-(1-exp(-1* RipExtinction[zone] * (SampleDist/cos(radians(Altitude))))))
+                Solar_blocked_byVeg[zone] = Dummy1 - Dummy1*fraction_passed
                 Dummy1 *= (1-(1-exp(-1* RipExtinction[zone] * (SampleDist/cos(radians(Altitude))))))
-            zone += 1
+            zone -= 1
         F_Direct[3] = Dummy1
-        F_Diffuse[3] = F_Diffuse[2] * ViewToSky
     else: # Full sun
         F_Direct[2] = F_Direct[1]
         F_Diffuse[2] = F_Diffuse[1] * (1 - TopoFactor)
         F_Direct[3] = F_Direct[2]
-        F_Diffuse[3] = F_Diffuse[2] * ViewToSky
+    F_Diffuse[3] = F_Diffuse[2] * ViewToSky
+    diffuse_blocked = F_Diffuse[2]-F_Diffuse[3]
+    Solar_blocked_byVeg.append(diffuse_blocked)
     #4 - Above Stream Surface (What a Solar Pathfinder measures)
     #Account for bank shade
     if Altitude > TopoShadeAngle and Altitude <= BankShadeAngle:  #Bank shade is occurring
@@ -343,7 +347,7 @@ def GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b, Elevation, TopoFac
     F_Solar[5] = F_Diffuse[5] + F_Direct[5]
     F_Solar[6] = F_Diffuse[6] + F_Direct[6]
     F_Solar[7] = F_Diffuse[7] + F_Direct[7]
-    return F_Solar
+    return F_Solar, Solar_blocked_byVeg
 
 def GetGroundFluxes(Cloud, Wind, Humidity, T_Air, Elevation, phi, VHeight, ViewToSky, SedDepth, dx,
                     dt, SedThermCond, SedThermDiff, calcalluv, T_alluv, P_w, W_w, emergent, penman, wind_a,
@@ -504,17 +508,18 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
         has_prev, SampleDist, emergent, wind_a, wind_b, calcevap, penman, calcalluv, T_alluv = C_args
 
     solar = [0]*8
+    veg_block = [0]*len(ShaderList[4])+[0] #plus one for diffuse blocked
     if daytime:
-        solar = GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b,
+        solar,veg_block = GetSolarFlux(hour, JD, Altitude, Zenith, cloud, d_w, W_b,
                     Elevation, TopoFactor, ViewToSky, SampleDist, phi, emergent,
                     VDensity, VHeight, ShaderList)
 
     # We're only running shade, so return solar and some empty calories
     if solar_only:
         # Boundary node
-        if not has_prev: return solar, [0]*9, 0.0, 0.0
+        if not has_prev: return solar, [0]*9, 0.0, 0.0, veg_block
         # regular node
-        else: return solar, [0]*9, 0.0, 0.0, [0]*3
+        else: return solar, [0]*9, 0.0, 0.0, [0]*3, veg_block
 
     ground = GetGroundFluxes(cloud, wind, humidity, T_air, Elevation,
                     phi, VHeight, ViewToSky, SedDepth, dx,
@@ -527,13 +532,13 @@ def CalcHeatFluxes(ContData, C_args, d_w, area, P_w, W_w, U, Q_tribs, T_tribs, T
     Delta_T = F_Total * dt / ((area / W_w) * 4182 * 998.2) # Vars are Cp (J/kg *C) and P (kgS/m3)
 
     if not has_prev:
-        return solar, ground, F_Total, Delta_T
+        return solar, ground, F_Total, Delta_T, veg_block
 
     Mac = CalcMacCormick(dt, dx, U, ground[1], T_prev, Q_hyp, Q_tribs, T_tribs, Q_up_prev,
                 Delta_T, Disp, 0, 0.0, T_up_prev, T_prev, T_dn_prev, Q_accr, T_accr, MixTDelta_dn_prev)
 
     #Mac includes Temp, S, T_mix
-    return solar, ground, F_Total, Delta_T, Mac
+    return solar, ground, F_Total, Delta_T, Mac, veg_block
 
 try:
     from .. import opt

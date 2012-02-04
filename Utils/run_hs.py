@@ -10,7 +10,7 @@ from heatsource import BigRedButton
 #BigRedButton.RunHS("T:\\Library (weekly backup)\\Models_Software\\Heat Source\\Version 8.x\\tests\\compare_to_v7\\test2\\Sim1-00_HS8_15mile.xls")
 #BigRedButton.RunHS("T:\\TMDL_WR\\Rogue\\Modeling\\HeatSource\\RogueRiver\\aaa\\HS8_Rogue_CCC3.xls")
 #BigRedButton.RunHS("T:\\TMDL_WR\\Rogue\\Modeling\\HeatSource\\ElkCreek\\redo\\HS8_Elk_Crk_new.xls")
-BigRedButton.RunSH("D:\\HStest\\dens_test\\test1\\test1.xlsm")
+BigRedButton.RunSH(r"T:\TMDL_WR\MidCoast\Models\Temperature\Heatsource\Yachats\Test\Yachats_SIM01_TEST_dt_bbb.xlsm")
 
 #BigRedButton.RunHS("D:\\HS_test_mix\\redo\\with point source\\HS8_ant_test_mix_wPS.xls")
 print "test"

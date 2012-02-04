@@ -70,6 +70,7 @@ class ExcelInterface(ExcelDocument):
                "lidar": "E18",
                "lcdensity": "E19",
                "lcoverhang": "E20",
+               "vegDistMethod": "E21",
                "transsample_count": "G7"}
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
@@ -697,7 +698,12 @@ class ExcelInterface(ExcelDocument):
                         if Vdens == 1: RE = 1 # cannot take log of 0, RE is full if it's zero
                         else: raise
                     # Calculate the node distance
-                    LC_Distance = IniParams["transsample"] * (j + 0.5) #This is "+ 0.5" because j starts at 0.
+                    #Adjustment for whether the veg sample represent a zone (see excel interface for explanation)
+                    if IniParams["vegDistMethod"] == "zone":
+                        adjust = 0.5
+                    else:
+                        adjust = 0.0
+                    LC_Distance = IniParams["transsample"] * (j + 1 - adjust) #This is "+ 1" because j starts at 0
                     # We shift closer to the stream by the amount of overhang
                     # This is a rather ugly cludge.
                     if not j: LC_Distance -= Overhang
@@ -842,7 +848,12 @@ class ExcelInterface(ExcelDocument):
                     # Calculate the node distance.
                     #Different for LiDAR because we assume you are sampling a tree at a specific location
                     #rather than a veg zone which represents the vegetation between two sample points
-                    LC_Distance = IniParams["transsample"] * (j + 1) #This is "+ 1" because j starts at 0.
+                    #Adjustment for whether the veg sample represent a zone (see excel interface for explanation)
+                    if IniParams["vegDistMethod"] == "zone":
+                        adjust = 0.5
+                    else:
+                        adjust = 0.0
+                    LC_Distance = IniParams["transsample"] * (j + 1 - adjust) #This is "+ 1" because j starts at 0
                     # We shift closer to the stream by the amount of overhang
                     # This is a rather ugly cludge.
                     if not j: LC_Distance -= Overhang

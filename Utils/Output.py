@@ -45,6 +45,7 @@ class Output(object):
             desc["Heat_TR"] = "Thermal Radiation Flux (w/sq m)"
             desc["Shade"] = "Effective Shade"
             desc["VTS"] = "View to Sky"
+            desc["SolarBlock"] = "Solar Flux blocked by vegetation (daily average w/sq m)"
         if run_type != 1:
             desc["Hyd_DA"] = "Ave Depth (m)"
             desc["Hyd_DM"] = "Max Depth (m)"
@@ -76,8 +77,16 @@ class Output(object):
             header += desc[key]
             header += "     File created on %s\n\n" % ctime()
             header += "Datetime".ljust(14)
-            # Grab a joined list of left justified strings of all the kilometers
-            header += "".join([("%0.3f" % x.km).ljust(14) for x in self.nodes])
+            if key != "SolarBlock":
+                # Grab a joined list of left justified strings of all the kilometers
+                header += "".join([("%0.3f" % x.km).ljust(14) for x in self.nodes])
+            else:
+                header += "rKM".ljust(14)
+                Labels = ["NE", "E", "SE", "S", "SW", "W", "NW"]
+                for dir in range(7):  #Seven directions
+                    for zone in range(IniParams["transsample_count"]):
+                        header += ("Veg_" + str(zone+1) + "_" + str(Labels[dir])).ljust(14)
+            header += ("diffuse_blocked").ljust(14)
             header += "\n"
             # Now create a file object in the dictionary, and write the header
             self.files[key] = open(join(IniParams["outputdir"], key + ".txt"), 'w')
@@ -139,19 +148,22 @@ class Output(object):
         # 24xF file accesses where F=len(self.files). Each file access
         # has quite a bit of overhead, so we lump them. It's "A Good Thing."
         if hour == 23:
-            self.write(self.run_type < 2)
+            print timestamp
+            self.write(self.run_type < 2, timestamp)
 
     def daily(self, timestamp):
         """Compile and store data that is collected every hour"""
         nodes = self.nodes
         self.data["Shade"][timestamp] = [((x.F_DailySum[1] - x.F_DailySum[4]) / x.F_DailySum[1]) for x in nodes]
         self.data["VTS"][timestamp] = [x.ViewToSky for x in nodes]
+        self.data["SolarBlock"][timestamp] = []
         # If there's no hour, we're at the beginning of a day, so we write the values
         # to a file.
 
-    def write(self, daily):
+    def write(self, daily, timestamp):
         if daily: # don't call for hydraulics
-            self.daily(("%0.6f" % float(pyTime(Chronos()))).ljust(14))
+            #self.daily(("%0.6f" % float(pyTime(Chronos()))).ljust(14))
+            self.daily(timestamp)
         # localize the
         data = self.data
         # Cycle through the file objects
@@ -159,12 +171,26 @@ class Output(object):
             # Each time is a single line, so we want to iterate over all the times
             # stored so far. We can do this because everytime we store data, we
             # append the time string to self.times
-            line = ""
             timelist = sorted(data[name].keys())
-            for timestamp in timelist:
-                line += timestamp
-                line += "".join([("%0.4f" % x).ljust(14) for x in data[name][timestamp]])
-                line += "\n"
+            line = ""
+            if name != "SolarBlock":
+                for timestamp in timelist:
+                    line += timestamp
+                    line += "".join([("%0.4f" % x).ljust(14) for x in data[name][timestamp]])
+                    line += "\n"
+            else:
+                timesteps = 86400.0/float(IniParams["dt"])
+                for timestamp in timelist:
+                    for x in self.nodes:
+                        line += timestamp
+                        line += ("%0.3f" % x.km).ljust(14)
+                        for dir in range(7):  #Seven directions
+                            for zone in range(IniParams["transsample_count"]):
+                                daily_ave_blocked = x.Solar_Blocked[dir][zone] / timesteps
+                                line += ("%0.4f" % daily_ave_blocked).ljust(14)
+                        daily_ave_diffuse_blocked = x.Solar_Blocked['diffuse'] / timesteps
+                        line += ("%0.4f" % daily_ave_diffuse_blocked).ljust(14)
+                        line += "\n"
             # finally, write all the lines to the file
             fileobj.write(line)
         del data
