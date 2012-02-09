@@ -86,7 +86,7 @@ class Output(object):
                 for dir in range(7):  #Seven directions
                     for zone in range(IniParams["transsample_count"]):
                         header += ("Veg_" + str(zone+1) + "_" + str(Labels[dir])).ljust(14)
-            header += ("diffuse_blocked").ljust(14)
+                header += ("diffuse_blocked").ljust(14)
             header += "\n"
             # Now create a file object in the dictionary, and write the header
             self.files[key] = open(join(IniParams["outputdir"], key + ".txt"), 'w')
