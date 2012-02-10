@@ -120,7 +120,7 @@ class ModelControl(object):
                     nd.F_DailySum = [0]*5
                     nd.Solar_Blocked = {}
                     for i in range(7):  #Seven directions
-                        nd.Solar_Blocked[i]=[0]*len(nd.ShaderList[4]) #A spot for each zone
+                        nd.Solar_Blocked[i]=[0]*IniParams["transsample_count"] #A spot for each zone
                     nd.Solar_Blocked['diffuse']=0
 
             # Back to every timestep level of the loop. Here we wrap the call to

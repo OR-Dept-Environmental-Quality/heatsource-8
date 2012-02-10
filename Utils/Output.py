@@ -185,7 +185,9 @@ class Output(object):
                         line += timestamp
                         line += ("%0.3f" % x.km).ljust(14)
                         for dir in range(7):  #Seven directions
+                            print IniParams["transsample_count"]
                             for zone in range(IniParams["transsample_count"]):
+                                print zone
                                 daily_ave_blocked = x.Solar_Blocked[dir][zone] / timesteps
                                 line += ("%0.4f" % daily_ave_blocked).ljust(14)
                         daily_ave_diffuse_blocked = x.Solar_Blocked['diffuse'] / timesteps
