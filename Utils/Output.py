@@ -55,7 +55,7 @@ class Output(object):
             desc["Hyd_WT"] = "Top Width (m)"
         if not run_type:
             desc["Rate_Evap"] = "Evaporation Rate (mm/hr)"
-            desc["Temp_H20"] = "Stream Temperature (*C)"
+            desc["Temp_H2O"] = "Stream Temperature (*C)"
             desc["Temp_Sed"] = "Sediment Temperature (*C)"
             desc["Hyd_Disp"] = "Hydraulic Dispersion (m2/s)"
 
@@ -139,7 +139,7 @@ class Output(object):
         # Run only with both solar and hydro
         if not self.run_type:
             data["Rate_Evap"][timestamp] = [(x.E / x.dx / x.W_w * 3600 * 1000) for x in nodes] #TODO: Check
-            data["Temp_H20"][timestamp] = [x.T for x in nodes]
+            data["Temp_H2O"][timestamp] = [x.T for x in nodes]
             data["Temp_Sed"][timestamp] = [x.T_sed for x in nodes]
             data["Hyd_Disp"][timestamp] = [x.Disp for x in nodes]
 

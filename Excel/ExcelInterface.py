@@ -756,6 +756,7 @@ class ExcelInterface(ExcelDocument):
         #Tried to keep in the same general form as BuildZonesNormal so blame Metta
         self.CheckEarlyQuit()
         vheight = []
+        vdens = []
         elevation = []
         average = lambda x:sum(x)/len(x)
         trans_count = IniParams["transsample_count"]
@@ -766,13 +767,18 @@ class ExcelInterface(ExcelDocument):
         for i in xrange(7, 7*trans_count+8): # For each column of LULC data
             col = self.GetColumn(i, "TTools Data")[5:] # veg height column
             elev = self.GetColumn(i+7*trans_count,"TTools Data")[5:] # Shift by 7 * "number of trans sample zones" to get elevation column
+            if IniParams["lcdensity"] == 999:
+                dens = self.GetColumn(i+7*trans_count*2,"TTools Data")[5:]
+            else:
+                dens = [IniParams["lcdensity"]]*len(col)
             # Make a list from the LC codes from the column, then send that to the multiplier
             # with a lambda function that averages them appropriately. Note, we're averaging over
             # the values (e.g. density) not the actual code, which would be meaningless.
             try:
                 vheight.append(self.multiplier([x for x in col], average))
+                vdens.append(self.multiplier([x for x in dens], average))
             except KeyError, (stderr):
-                raise Exception("Vegetation height error" % stderr.message)
+                raise Exception("Vegetation height/density error" % stderr.message)
             if i>7:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
             self.PB("Reading vegetation heights", i, 7*trans_count+8)
@@ -781,7 +787,7 @@ class ExcelInterface(ExcelDocument):
         for i in xrange(len(keys)):
             node = self.Reach[keys[i]]
             node.VHeight = vheight[0][i]
-            node.VDensity = IniParams["lcdensity"]
+            node.VDensity = vdens[0][i]
             node.Overhang = IniParams["lcoverhang"]
 
         # Average over the topo values
@@ -825,7 +831,7 @@ class ExcelInterface(ExcelDocument):
                     Vheight = vheight[i*trans_count+j+1][h]
                     if Vheight < 0 or Vheight is None or Vheight > 120:
                         raise Exception("Vegetation height (value of %s in TTools Data) must be greater than zero and less than 120 meters (when LiDAR = True)" % `Vheight`)
-                    Vdens = IniParams["lcdensity"]
+                    Vdens = vdens[i*trans_count+j+1][h]
                     Overhang = IniParams["lcoverhang"]
                     Elev = elevation[i*trans_count+j][h]
 
