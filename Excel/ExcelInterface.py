@@ -768,7 +768,7 @@ class ExcelInterface(ExcelDocument):
             col = self.GetColumn(i, "TTools Data")[5:] # veg height column
             elev = self.GetColumn(i+7*trans_count,"TTools Data")[5:] # Shift by 7 * "number of trans sample zones" to get elevation column
             if IniParams["lcdensity"] == 999:
-                dens = self.GetColumn(i+7*trans_count*2,"TTools Data")[5:]
+                dens = self.GetColumn(i+1+7*trans_count*2,"TTools Data")[5:]
             else:
                 dens = [IniParams["lcdensity"]]*len(col)
             # Make a list from the LC codes from the column, then send that to the multiplier
