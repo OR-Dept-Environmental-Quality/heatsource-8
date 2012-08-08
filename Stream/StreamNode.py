@@ -12,7 +12,9 @@ from ..Utils.Logger import Logger
 from ..Utils.easygui import indexbox, msgbox
 from ..Utils.Dictionaries import Interpolator
 import PyHeatsource as py_HS
-import heatsource.HSmodule as C_HS
+#Commented out below as a kludge needed to have multiple versions available to run on one machine.
+#C routines are out of date anyway and should not be run
+#import heatsource.HSmodule as C_HS
 
 _HS = None # Placeholder for heatsource module
 
