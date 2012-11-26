@@ -282,7 +282,7 @@ c_k: %3.4f""" % stderr
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
-        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, self.UTC_offset, JDC)
+        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, self.UTC_offset, JDC, IniParams["radialsample_count"])
         self.SolarPos = Altitude, Zenith, Daytime, dir
         try:
             self.F_Solar, \

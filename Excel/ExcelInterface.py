@@ -71,7 +71,8 @@ class ExcelInterface(ExcelDocument):
                "lcdensity": "E19",
                "lcoverhang": "E20",
                "vegDistMethod": "E21",
-               "transsample_count": "G7"}
+               "transsample_count": "G7",
+               "radialsample_count": "G6"}
         for k,v in lst.iteritems():
             IniParams[k] = self.GetValue(v, "Heat Source Inputs")
         # These might be blank, make them zeros
@@ -79,8 +80,10 @@ class ExcelInterface(ExcelDocument):
             IniParams[key] = 0.0 if not IniParams[key] else IniParams[key]
         # If the number of transverse sample per direction is NOT report, assume 4 (old default)
         IniParams["transsample_count"] = 4.0 if not IniParams["transsample_count"] else IniParams["transsample_count"]
+        # If the number of radial sample  directions is NOT report, assume 7 (old default, no north) but report as -999
+        IniParams["radialsample_count"] = -999 if not IniParams["radialsample_count"] else IniParams["radialsample_count"]
         # Then make all of these integers because they're used later in for loops
-        for key in ["inflowsites","flushdays","contsites", "transsample_count"]:
+        for key in ["inflowsites","flushdays","contsites", "transsample_count", "radialsample_count"]:
             IniParams[key] = int(IniParams[key])
         # Set up our evaporation method
         IniParams["penman"] = False
@@ -610,13 +613,15 @@ class ExcelInterface(ExcelDocument):
         elevation = []
         average = lambda x:sum(x)/len(x)
         trans_count = IniParams["transsample_count"]
-
+        radial_count = IniParams["radialsample_count"]
+        if radial_count == -999:
+            radial_count = 7
         keys = self.Reach.keys()
         keys.sort(reverse=True) # Downstream sorted list of stream kilometers
         self.PB("Translating LULC Data")
-        for i in xrange(7, 7*trans_count+8): # For each column of LULC data
+        for i in xrange(radial_count, radial_count*trans_count+8): # For each column of LULC data
             col = self.GetColumn(i, "TTools Data")[5:] # LULC column
-            elev = self.GetColumn(i+7*trans_count,"TTools Data")[5:] # Shift by 28 to get elevation column
+            elev = self.GetColumn(i+radial_count*trans_count,"TTools Data")[5:] # Shift by 28 to get elevation column
             # Make a list from the LC codes from the column, then send that to the multiplier
             # with a lambda function that averages them appropriately. Note, we're averaging over
             # the values (e.g. density) not the actual code, which would be meaningless.
@@ -626,9 +631,9 @@ class ExcelInterface(ExcelDocument):
                 overhang.append(self.multiplier([LC[x][2] for x in col], average))
             except KeyError, (stderr):
                 raise Exception("At least one land cover code from the 'TTools Data' worksheet is blank or not in 'Land Cover Codes' worksheet (Code: %s)." % stderr.message)
-            if i>7:  #We don't want to read in column AJ -Dan
+            if i>radial_count:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
-            self.PB("Translating LULC Data", i, 7*trans_count+8)
+            self.PB("Translating LULC Data", i, radial_count*trans_count+8)
         # We have to set the emergent vegetation, so we strip those off of the iterator
         # before we record the zones.
         for i in xrange(len(keys)):
@@ -669,7 +674,7 @@ class ExcelInterface(ExcelDocument):
             # two angles so that late we can test whether we are between them, and only do the shading calculations
             # if that is true.
 
-            for i in xrange(7): # Iterate through each direction
+            for i in xrange(radial_count): # Iterate through each direction
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
                 rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
@@ -743,7 +748,7 @@ class ExcelInterface(ExcelDocument):
                         ##VTS_Total_old += LC_Angle_Max
                     rip += RE,
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
-            node.ViewToSky = 1 - VTS_Total / (7 * 90)
+            node.ViewToSky = 1 - VTS_Total / (radial_count * 90)
             ##ViewToSky_old = 1 - VTS_Total_old / (7 * 90)
             ##print node.ViewToSky, ViewToSky_old, ViewToSky_old - node.ViewToSky
 
@@ -760,15 +765,17 @@ class ExcelInterface(ExcelDocument):
         elevation = []
         average = lambda x:sum(x)/len(x)
         trans_count = IniParams["transsample_count"]
-
+        radial_count = IniParams["radialsample_count"]
+        if radial_count == -999:
+            radial_count = 7
         keys = self.Reach.keys()
         keys.sort(reverse=True) # Downstream sorted list of stream kilometers
         self.PB("Translating LULC Data")
-        for i in xrange(7, 7*trans_count+8): # For each column of LULC data
+        for i in xrange(radial_count, radial_count*trans_count+8): # For each column of LULC data
             col = self.GetColumn(i, "TTools Data")[5:] # veg height column
-            elev = self.GetColumn(i+7*trans_count,"TTools Data")[5:] # Shift by 7 * "number of trans sample zones" to get elevation column
+            elev = self.GetColumn(i+radial_count*trans_count,"TTools Data")[5:] # Shift by 7 * "number of trans sample zones" to get elevation column
             if IniParams["lcdensity"] == 999:
-                dens = self.GetColumn(i+1+7*trans_count*2,"TTools Data")[5:]
+                dens = self.GetColumn(i+1+radial_count*trans_count*2,"TTools Data")[5:]
             else:
                 dens = [IniParams["lcdensity"]]*len(col)
             # Make a list from the LC codes from the column, then send that to the multiplier
@@ -779,9 +786,9 @@ class ExcelInterface(ExcelDocument):
                 vdens.append(self.multiplier([x for x in dens], average))
             except KeyError, (stderr):
                 raise Exception("Vegetation height/density error" % stderr.message)
-            if i>7:  #We don't want to read in column AJ -Dan
+            if i>radial_count:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
-            self.PB("Reading vegetation heights", i, 7*trans_count+8)
+            self.PB("Reading vegetation heights", i, radial_count*trans_count+8)
         # We have to set the emergent vegetation, so we strip those off of the iterator
         # before we record the zones.
         for i in xrange(len(keys)):
@@ -821,7 +828,7 @@ class ExcelInterface(ExcelDocument):
             # two angles so that late we can test whether we are between them, and only do the shading calculations
             # if that is true.
 
-            for i in xrange(7): # Iterate through each direction
+            for i in xrange(radial_count): # Iterate through each direction
                 T_Full = () # lowest angle necessary for full sun
                 T_None = () # Highest angle necessary for full shade
                 rip = () # Riparian extinction, basically the amount of loss due to vegetation shading
@@ -901,7 +908,7 @@ class ExcelInterface(ExcelDocument):
                         ##VTS_Total_old += LC_Angle_Max
                     rip += RE,
                 node.ShaderList += (max(T_Full), ElevationList[i], max(T_None), rip, T_Full),
-            node.ViewToSky = 1 - VTS_Total / (7 * 90)
+            node.ViewToSky = 1 - VTS_Total / (radial_count * 90)
 
     def GetLandCoverCodes(self):
         """Return the codes from the Land Cover Codes worksheet as a dictionary of dictionaries"""
