@@ -119,7 +119,7 @@ class ModelControl(object):
                 for nd in self.reachlist:
                     nd.F_DailySum = [0]*5
                     nd.Solar_Blocked = {}
-                    for i in range(7):  #Seven directions
+                    for i in range(IniParams["radialsample_count"]):  #Seven directions
                         nd.Solar_Blocked[i]=[0]*IniParams["transsample_count"] #A spot for each zone
                     nd.Solar_Blocked['diffuse']=0
 

@@ -420,7 +420,7 @@ class ExcelInterface(ExcelDocument):
                 if humid < 0 or humid is None or humid > 1:
                     if self.run_type == 1: # Alright in shade-a-lator
                         humid = 0.0
-                    else: raise Exception("Humidity (value of '%s' in Continuous Data) must be greater than zero and less than one." % `hum_val`)
+                    else: raise Exception("Humidity (value of '%s' in Continuous Data) must be greater than zero and less than one." % `humid`)
                 if air is None or air < -90 or air > 58:
                     if self.run_type == 1: # Alright in shade-a-lator
                         air = 0.0
@@ -616,10 +616,11 @@ class ExcelInterface(ExcelDocument):
         radial_count = IniParams["radialsample_count"]
         if radial_count == -999:
             radial_count = 7
+            IniParams["radialsample_count"] = 7
         keys = self.Reach.keys()
         keys.sort(reverse=True) # Downstream sorted list of stream kilometers
         self.PB("Translating LULC Data")
-        for i in xrange(radial_count, radial_count*trans_count+8): # For each column of LULC data
+        for i in xrange(7, radial_count*trans_count+8): # For each column of LULC data
             col = self.GetColumn(i, "TTools Data")[5:] # LULC column
             elev = self.GetColumn(i+radial_count*trans_count,"TTools Data")[5:] # Shift by 28 to get elevation column
             # Make a list from the LC codes from the column, then send that to the multiplier
@@ -631,7 +632,7 @@ class ExcelInterface(ExcelDocument):
                 overhang.append(self.multiplier([LC[x][2] for x in col], average))
             except KeyError, (stderr):
                 raise Exception("At least one land cover code from the 'TTools Data' worksheet is blank or not in 'Land Cover Codes' worksheet (Code: %s)." % stderr.message)
-            if i>radial_count:  #We don't want to read in column AJ -Dan
+            if i>7:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
             self.PB("Translating LULC Data", i, radial_count*trans_count+8)
         # We have to set the emergent vegetation, so we strip those off of the iterator
@@ -658,14 +659,20 @@ class ExcelInterface(ExcelDocument):
             LC_Angle_Max = 0
             # Now we set the topographic elevations in each direction
             node.TopoFactor = (topo_w[h] + topo_s[h] + topo_e[h])/(90*3) # Topography factor Above Stream Surface
-            # This is basically a list of directions, each with a sort of average topography
-            ElevationList = (topo_e[h],
-                             topo_e[h],
-                             0.5*(topo_e[h]+topo_s[h]),
-                             topo_s[h],
-                             0.5*(topo_s[h]+topo_w[h]),
-                             topo_w[h],
-                             topo_w[h])
+            # This is basically a list of directions, each with one of three topographies
+            ElevationList = []
+            WedgeZones = radial_count
+            Angle_Incr = 360.0 / WedgeZones
+            WedgeNumbers = range(1,WedgeZones+1)
+            WedgeAngleMid = [x*Angle_Incr for x in WedgeNumbers]
+            for i in xrange(radial_count): # Iterate through each direction
+                WedgeAngle = WedgeAngleMid[i]
+                if WedgeAngle < 135:
+                    ElevationList.append(topo_e[h])
+                elif WedgeAngle < 225:
+                    ElevationList.append(topo_s[h])
+                else:
+                    ElevationList.append(topo_w[h])
             # Sun comes down and can be full-on, blocked by veg, or blocked by topography. Earlier implementations
             # calculated each case on the fly. Here we chose a somewhat more elegant solution and calculate necessary
             # angles. Basically, there is a minimum angle for which full sun is calculated (top of trees), and the
@@ -771,7 +778,7 @@ class ExcelInterface(ExcelDocument):
         keys = self.Reach.keys()
         keys.sort(reverse=True) # Downstream sorted list of stream kilometers
         self.PB("Translating LULC Data")
-        for i in xrange(radial_count, radial_count*trans_count+8): # For each column of LULC data
+        for i in xrange(7, radial_count*trans_count+8): # For each column of LULC data
             col = self.GetColumn(i, "TTools Data")[5:] # veg height column
             elev = self.GetColumn(i+radial_count*trans_count,"TTools Data")[5:] # Shift by 7 * "number of trans sample zones" to get elevation column
             if IniParams["lcdensity"] == 999:
@@ -786,7 +793,7 @@ class ExcelInterface(ExcelDocument):
                 vdens.append(self.multiplier([x for x in dens], average))
             except KeyError, (stderr):
                 raise Exception("Vegetation height/density error" % stderr.message)
-            if i>radial_count:  #We don't want to read in column AJ -Dan
+            if i>7:  #We don't want to read in column AJ -Dan
                 elevation.append(self.multiplier(elev, average))
             self.PB("Reading vegetation heights", i, radial_count*trans_count+8)
         # We have to set the emergent vegetation, so we strip those off of the iterator
@@ -812,14 +819,20 @@ class ExcelInterface(ExcelDocument):
             LC_Angle_Max = 0
             # Now we set the topographic elevations in each direction
             node.TopoFactor = (topo_w[h] + topo_s[h] + topo_e[h])/(90*3) # Topography factor Above Stream Surface
-            # This is basically a list of directions, each with a sort of average topography
-            ElevationList = (topo_e[h],
-                             topo_e[h],
-                             0.5*(topo_e[h]+topo_s[h]),
-                             topo_s[h],
-                             0.5*(topo_s[h]+topo_w[h]),
-                             topo_w[h],
-                             topo_w[h])
+            # This is basically a list of directions, each with one of three topographies
+            ElevationList = []
+            WedgeZones = radial_count
+            Angle_Incr = 360.0 / WedgeZones
+            WedgeNumbers = range(1,WedgeZones+1)
+            WedgeAngleMid = [x*Angle_Incr for x in WedgeNumbers]
+            for i in xrange(radial_count): # Iterate through each direction
+                WedgeAngle = WedgeAngleMid[i]
+                if WedgeAngle < 135:
+                    ElevationList.append(topo_e[h])
+                elif WedgeAngle < 225:
+                    ElevationList.append(topo_s[h])
+                else:
+                    ElevationList.append(topo_w[h])
             # Sun comes down and can be full-on, blocked by veg, or blocked by topography. Earlier implementations
             # calculated each case on the fly. Here we chose a somewhat more elegant solution and calculate necessary
             # angles. Basically, there is a minimum angle for which full sun is calculated (top of trees), and the

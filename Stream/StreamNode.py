@@ -296,6 +296,7 @@ c_k: %3.4f""" % stderr
             self.CatchException(stderr)
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
+        #test = len(self.Solar_Blocked[dir])
         for i in range(len(self.Solar_Blocked[dir])):
             self.Solar_Blocked[dir][i] += veg_block[i]
         self.Solar_Blocked['diffuse'] += veg_block[-1]
