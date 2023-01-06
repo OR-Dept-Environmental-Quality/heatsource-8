@@ -119,7 +119,7 @@ class ModelControl(object):
                 for nd in self.reachlist:
                     nd.F_DailySum = [0]*5
                     nd.Solar_Blocked = {}
-                    for i in range(IniParams["radialsample_count"]):  #Seven directions
+                    for i in range(7):  #Seven directions
                         nd.Solar_Blocked[i]=[0]*IniParams["transsample_count"] #A spot for each zone
                     nd.Solar_Blocked['diffuse']=0
 
@@ -220,9 +220,6 @@ def RunHS(sheet):
         HSP.Run()
         del HSP
     except Exception, stderr:
-        f = open("c:\\HSError.txt", "w")
-        print_exc(file=f)
-        f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunSH(sheet):
     """Run solar routines only"""
@@ -230,9 +227,6 @@ def RunSH(sheet):
         HSP = ModelControl(sheet, 1)
         HSP.Run()
     except Exception, stderr:
-        f = open("c:\\HSError.txt", "w")
-        print_exc(file=f)
-        f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 def RunHY(sheet):
     """Run hydraulics only"""
@@ -240,9 +234,6 @@ def RunHY(sheet):
         HSP = ModelControl(sheet, 2)
         HSP.Run()
     except Exception, stderr:
-        f = open("c:\\HSError.txt", "w")
-        print_exc(file=f)
-        f.close()
         msgbox("".join(format_tb(exc_info()[2]))+"\nSynopsis: %s"%stderr, "HeatSource Error", err=True)
 
 try:

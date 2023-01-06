@@ -5,7 +5,7 @@ from bisect import bisect
 
 class HeatSourceError(Exception): pass
 
-def CalcSolarPosition(lat, lon, hour, min, sec, offset, JDC, radial_samples):
+def CalcSolarPosition(lat, lon, hour, min, sec, offset, JDC):
     toRadians = pi/180.0
     toDegrees = 180.0/pi
     MeanObliquity = 23.0 + (26.0 + ((21.448 - JDC * (46.815 + JDC * (0.00059 - JDC * 0.001813))) / 60.0)) / 60.0
@@ -94,18 +94,9 @@ def CalcSolarPosition(lat, lon, hour, min, sec, offset, JDC, radial_samples):
     Daytime = 0
     if Altitude > 0.0:
             Daytime = 1
-    if radial_samples == -999:  #-999 is a code indicating that the numver of radial samples was blank, so we assumed old methods.
-        dir = bisect((0.0,67.5,112.5,157.5,202.5,247.5,292.5),Azimuth)-1
-    else: #using terms from GIS sampling routine
-        WedgeZones = radial_samples
-        Angle_Incr = 360.0 / WedgeZones
-        WedgeNumbers = range(1,WedgeZones)
-        WedgeAngleStart = [x*Angle_Incr-Angle_Incr/2 for x in WedgeNumbers]
-        if Azimuth < WedgeAngleStart[0]:
-            Azimuth_mod = Azimuth + 360
-        else:
-            Azimuth_mod = Azimuth
-        dir = bisect(WedgeAngleStart,Azimuth_mod)-1
+
+    dir = bisect((0.0,67.5,112.5,157.5,202.5,247.5,292.5),Azimuth)-1
+
     return Altitude, Zenith, Daytime, dir
 
 
@@ -162,11 +153,11 @@ def CalcMuskingum(Q_est, U, W_w, S, dx, dt):
     if X > 0.5: X = 0.5
     elif X < 0.0: X = 0.0
     K = dx / c_k
-    dt = dt
+    dt_stable = (2 * K * (1 - X)) / 60
 
     # Check the celerity to ensure stability. These tests are from the VB code.
     if dt >= (2 * K * (1 - X)):  #Unstable - Decrease dt or increase dx
-        raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
+        raise Exception("Unstable timestep. Decrease dt or increase dx. dT must be < %0.3f. K=%0.3f, X=%0.3f" % (dt_stable, K, X))
 
     # These calculations are from Chow's "Applied Hydrology"
     D = K * (1 - X) + 0.5 * dt

@@ -75,7 +75,8 @@ class Output(object):
             # than writing to a file each time.
             header = "Heat Source Hourly Output File:  "
             header += desc[key]
-            header += "     File created on %s\n\n" % ctime()
+            header += "     File created on %s" % ctime()
+            header += "     Heat Source v.8.0.8\n\n"
             header += "Datetime".ljust(14)
             if key != "SolarBlock":
                 # Grab a joined list of left justified strings of all the kilometers
@@ -148,7 +149,7 @@ class Output(object):
         # 24xF file accesses where F=len(self.files). Each file access
         # has quite a bit of overhead, so we lump them. It's "A Good Thing."
         if hour == 23:
-            print timestamp
+
             self.write(self.run_type < 2, timestamp)
 
     def daily(self, timestamp):
@@ -185,9 +186,9 @@ class Output(object):
                         line += timestamp
                         line += ("%0.3f" % x.km).ljust(14)
                         for dir in range(7):  #Seven directions
-                            print IniParams["transsample_count"]
+
                             for zone in range(IniParams["transsample_count"]):
-                                print zone
+
                                 daily_ave_blocked = x.Solar_Blocked[dir][zone] / timesteps
                                 line += ("%0.4f" % daily_ave_blocked).ljust(14)
                         daily_ave_diffuse_blocked = x.Solar_Blocked['diffuse'] / timesteps

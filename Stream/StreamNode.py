@@ -282,7 +282,7 @@ c_k: %3.4f""" % stderr
         # Reset temperatures
         self.T_prev = self.T
         self.T = None
-        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, self.UTC_offset, JDC, IniParams["radialsample_count"])
+        Altitude, Zenith, Daytime, dir = _HS.CalcSolarPosition(self.Latitude, self.Longitude, hour, min, sec, self.UTC_offset, JDC)
         self.SolarPos = Altitude, Zenith, Daytime, dir
         try:
             self.F_Solar, \
@@ -296,7 +296,6 @@ c_k: %3.4f""" % stderr
             self.CatchException(stderr)
         self.F_DailySum[1] += self.F_Solar[1]
         self.F_DailySum[4] += self.F_Solar[4]
-        #test = len(self.Solar_Blocked[dir])
         for i in range(len(self.Solar_Blocked[dir])):
             self.Solar_Blocked[dir][i] += veg_block[i]
         self.Solar_Blocked['diffuse'] += veg_block[-1]
