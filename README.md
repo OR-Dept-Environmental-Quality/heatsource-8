@@ -1,6 +1,6 @@
 Heat Source 8
 -------------
-Archive Version: Heat Source 8.0.8
+Archive Version: Heat Source 8.0.9
 
 Also see [Heat Source version 9][1].
 
