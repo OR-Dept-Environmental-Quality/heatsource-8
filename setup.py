@@ -1,4 +1,20 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
+
+# For this setup file to be executed correctly the package files need to be moved into a src folder like this:
+
+# |-heatsource-8
+#   |-setup.py
+#   |-src
+#       |-heatsource808
+#           |-Dieties
+#           |-Excel
+#           |-Stream
+#           |-Utils
+#           |-__init__.py
+#           |-__version__.py
+#           |-BigRedButton.py
+#           |-HSmodule.c
+#           |-HSmodule.pyd
 
 from distutils.core import setup, Extension
 from sys import version_info as VI
