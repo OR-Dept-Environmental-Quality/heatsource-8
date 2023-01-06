@@ -76,7 +76,7 @@ class Output(object):
             header = "Heat Source Hourly Output File:  "
             header += desc[key]
             header += "     File created on %s" % ctime()
-            header += "     Heat Source v.8.0.9\n\n"
+            header += "     Heat Source v.8.0.8\n\n"
             header += "Datetime".ljust(14)
             if key != "SolarBlock":
                 # Grab a joined list of left justified strings of all the kilometers
