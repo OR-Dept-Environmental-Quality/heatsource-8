@@ -153,11 +153,11 @@ def CalcMuskingum(Q_est, U, W_w, S, dx, dt):
     if X > 0.5: X = 0.5
     elif X < 0.0: X = 0.0
     K = dx / c_k
-    dt = dt
+    dt_stable = (2 * K * (1 - X)) / 60
 
     # Check the celerity to ensure stability. These tests are from the VB code.
     if dt >= (2 * K * (1 - X)):  #Unstable - Decrease dt or increase dx
-        raise Exception("Unstable timestep. K=%0.3f, X=%0.3f, tests=(%0.3f, %0.3f)" % (K,X,test0,test1))
+        raise Exception("Unstable timestep. Decrease dt or increase dx. dT must be < %0.3f. K=%0.3f, X=%0.3f" % (dt_stable, K, X))
 
     # These calculations are from Chow's "Applied Hydrology"
     D = K * (1 - X) + 0.5 * dt
